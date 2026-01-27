@@ -1,0 +1,370 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Luna v2</title>
+    <style>
+        :root {
+            --bg-dark: #0f172a;
+            --bg-card: rgba(255, 255, 255, 0.08);
+            --primary: #818cf8;
+            --love: #ec4899;
+            --text: #f8fafc;
+            --text-dim: rgba(248, 250, 252, 0.5);
+            --lamb-white: #fff7f0;
+            --lamb-shadow: #e2dcd5;
+        }
+
+        * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+        
+        body {
+            margin: 0; padding: 0;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            background: #000;
+            color: var(--text);
+            height: 100vh;
+            overflow: hidden;
+            user-select: none;
+            display: flex;
+            flex-direction: column;
+        }
+
+        /* --- Header --- */
+        .header {
+            padding: 20px;
+            padding-bottom: 0;
+            z-index: 50;
+        }
+        .header-top {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+        }
+        .title-group { text-align: center; }
+        .title { font-size: 18px; font-weight: 700; }
+        .subtitle { font-size: 11px; color: var(--text-dim); text-transform: uppercase; letter-spacing: 1px; }
+
+        .tabs {
+            display: flex;
+            background: rgba(255,255,255,0.1);
+            padding: 4px;
+            border-radius: 12px;
+            position: relative;
+        }
+        .tab-btn {
+            flex: 1;
+            padding: 8px 0;
+            text-align: center;
+            font-size: 13px;
+            font-weight: 600;
+            color: var(--text-dim);
+            cursor: pointer;
+            z-index: 2;
+            transition: color 0.2s;
+        }
+        .tab-btn.active { color: #fff; }
+        .tab-indicator {
+            position: absolute;
+            top: 4px; bottom: 4px;
+            width: 33.33%;
+            background: rgba(255,255,255,0.15);
+            border-radius: 8px;
+            transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            z-index: 1;
+        }
+
+        /* --- Content Views --- */
+        .content {
+            flex: 1;
+            position: relative;
+            overflow: hidden;
+        }
+        .view {
+            position: absolute;
+            inset: 0;
+            overflow-y: auto;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+            transition: opacity 0.3s, transform 0.3s;
+            opacity: 0;
+            pointer-events: none;
+            transform: translateX(20px);
+        }
+        .view.active {
+            opacity: 1;
+            pointer-events: auto;
+            transform: translateX(0);
+        }
+
+        /* --- Status View --- */
+        .scene-container {
+            width: 100%;
+            height: 320px;
+            background: linear-gradient(to bottom, #1e1b4b 0%, #312e81 60%, #064e3b 60%, #065f46 100%); /* Midnight Meadow */
+            border-radius: 24px;
+            position: relative;
+            overflow: hidden;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.3);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+        
+        /* Atmospheric elements */
+        .stars { position: absolute; inset: 0; background-image: radial-gradient(white 1px, transparent 1px); background-size: 50px 50px; opacity: 0.2; }
+        .glow-overlay { position: absolute; inset: 0; background: radial-gradient(circle at center, transparent 30%, rgba(0,0,0,0.5) 100%); }
+
+        /* --- Pet Visuals (Luna v2) --- */
+        .lamb-wrapper {
+            position: relative;
+            width: 160px;
+            height: 160px;
+            filter: drop-shadow(0 10px 20px rgba(0,0,0,0.5));
+            animation: breathe 4s ease-in-out infinite;
+        }
+        .head {
+            position: absolute; top: 10px; left: 50%; transform: translateX(-50%);
+            width: 90px; height: 80px; background: var(--lamb-white); border-radius: 45px; z-index: 10;
+        }
+        .body {
+            position: absolute; top: 60px; left: 50%; transform: translateX(-50%);
+            width: 100px; height: 80px; background: var(--lamb-white); border-radius: 50px; z-index: 5;
+        }
+        .wool-puff { position: absolute; background: var(--lamb-white); border-radius: 50%; }
+        /* Wool on head */
+        .head .wool-puff:nth-child(1) { width: 40px; height: 40px; top: -10px; left: 25px; }
+        .head .wool-puff:nth-child(2) { width: 30px; height: 30px; top: 5px; left: 0px; }
+        .head .wool-puff:nth-child(3) { width: 30px; height: 30px; top: 5px; right: 0px; }
+        /* Paws */
+        .paw {
+            position: absolute; bottom: -5px; width: 20px; height: 25px; background: var(--lamb-white); border-radius: 10px; z-index: 6;
+        }
+        .paw.left { left: 35px; } .paw.right { right: 35px; }
+        
+        .scarf {
+            position: absolute; top: 80px; left: 50%; transform: translateX(-50%);
+            width: 90px; height: 25px; background: #fb7185; border-radius: 12px; z-index: 11;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+        }
+        .face { position: absolute; top: 35px; width: 100%; height: 100%; z-index: 12; }
+        .eye { position: absolute; top: 0; width: 8px; height: 8px; background: #1a1a1a; border-radius: 50%; }
+        .eye.left { left: 25px; } .eye.right { right: 25px; }
+        .blush { position: absolute; top: 12px; width: 10px; height: 6px; background: #ffb7c5; border-radius: 50%; opacity: 0.6; }
+        .blush.left { left: 18px; } .blush.right { right: 18px; }
+        .mouth {
+            position: absolute; top: 18px; left: 50%; transform: translateX(-50%);
+            width: 8px; height: 4px; border-bottom: 2px solid #1a1a1a; border-radius: 0 0 10px 10px;
+        }
+
+        /* Mood modifiers */
+        .lamb-wrapper.mood-hungry .eye { height: 10px; width: 10px; top: -2px; }
+        .lamb-wrapper.mood-hungry .mouth { width: 6px; height: 6px; border: 2px solid #1a1a1a; border-radius: 50%; border-top: 0; }
+        .lamb-wrapper.mood-tired .eye { height: 2px; top: 4px; }
+        .lamb-wrapper.mood-loved .blush { opacity: 1; transform: scale(1.2); }
+        .lamb-wrapper.mood-sad .head { filter: grayscale(0.5); }
+        
+        @keyframes breathe { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.02); } }
+
+        /* Info Card */
+        .info-card {
+            background: var(--bg-card); border-radius: 20px; padding: 16px; border: 1px solid rgba(255,255,255,0.05);
+            display: flex; flex-direction: column; gap: 8px;
+        }
+        .mood-row { display: flex; justify-content: space-between; align-items: center; }
+        .mood-label { font-size: 15px; font-weight: 600; color: #fff; }
+        .streak-badge { font-size: 11px; background: rgba(255,255,255,0.1); padding: 4px 8px; border-radius: 12px; }
+        .check-row { font-size: 13px; color: var(--text-dim); display: flex; gap: 10px; }
+        
+        /* Stats Rings Grid */
+        .stats-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 8px; }
+        .stat-item { display: flex; flex-direction: column; align-items: center; gap: 6px; }
+        .ring-container { width: 48px; height: 48px; position: relative; }
+        .ring-svg { transform: rotate(-90deg); width: 100%; height: 100%; }
+        .ring-bg { fill: none; stroke: rgba(255,255,255,0.1); stroke-width: 4; }
+        .ring-progress { fill: none; stroke-width: 4; stroke-linecap: round; stroke-dasharray: 100; stroke-dashoffset: 0; transition: stroke-dashoffset 0.5s ease; }
+        .ring-icon { position: absolute; inset: 0; display: flex; justify-content: center; align-items: center; font-size: 16px; }
+        .stat-label { font-size: 10px; color: var(--text-dim); }
+
+        /* --- Care View --- */
+        .care-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+        .care-card {
+            background: var(--bg-card); border: 1px solid rgba(255,255,255,0.05);
+            border-radius: 20px; padding: 20px;
+            display: flex; flex-direction: column; align-items: center; text-align: center; gap: 10px;
+            transition: transform 0.1s, background 0.2s;
+        }
+        .care-card:active { transform: scale(0.96); background: rgba(255,255,255,0.12); }
+        .care-icon { font-size: 32px; margin-bottom: 4px; }
+        .care-title { font-size: 15px; font-weight: 600; }
+        .care-desc { font-size: 11px; color: var(--text-dim); line-height: 1.4; }
+        .care-cooldown { font-size: 10px; color: var(--love); font-weight: 600; opacity: 0; transition: opacity 0.2s; }
+        .care-card.on-cooldown { opacity: 0.5; pointer-events: none; }
+        .care-card.on-cooldown .care-cooldown { opacity: 1; }
+
+        /* --- Timeline View --- */
+        .timeline-list { display: flex; flex-direction: column; gap: 16px; padding-bottom: 40px; }
+        .event { display: flex; gap: 12px; align-items: flex-end; }
+        .event.me { flex-direction: row-reverse; }
+        .avatar { width: 32px; height: 32px; border-radius: 50%; background: #333; display: flex; justify-content: center; align-items: center; font-size: 14px; flex-shrink: 0; }
+        .bubble {
+            background: #27272a; padding: 10px 14px; border-radius: 18px; border-bottom-left-radius: 4px;
+            font-size: 13px; color: #fff; max-width: 80%; line-height: 1.4;
+        }
+        .event.me .bubble { background: #4f46e5; border-radius: 18px; border-bottom-right-radius: 4px; }
+        .ts { display: block; font-size: 10px; color: rgba(255,255,255,0.4); margin-top: 4px; }
+
+        /* --- Action Overlay Scene --- */
+        .overlay-scene {
+            position: fixed; inset: 0; background: rgba(0,0,0,0.8); backdrop-filter: blur(10px);
+            z-index: 100; display: flex; justify-content: center; align-items: center;
+            opacity: 0; pointer-events: none; transition: opacity 0.3s;
+        }
+        .overlay-scene.active { opacity: 1; pointer-events: auto; }
+        .scene-content { text-align: center; transform: scale(0.8); transition: transform 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275); }
+        .overlay-scene.active .scene-content { transform: scale(1); }
+        .scene-emoji { font-size: 80px; margin-bottom: 20px; display: block; animation: bounce 1s infinite; }
+        .scene-text { font-size: 24px; font-weight: 700; color: #fff; }
+
+        @keyframes bounce { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-20px); } }
+
+        /* --- Toast --- */
+        .toast {
+            position: fixed; bottom: 30px; left: 50%; transform: translateX(-50%) translateY(20px);
+            background: #333; padding: 10px 20px; border-radius: 30px; font-size: 13px;
+            opacity: 0; transition: all 0.3s; pointer-events: none; z-index: 200; box-shadow: 0 10px 20px rgba(0,0,0,0.3);
+        }
+        .toast.visible { opacity: 1; transform: translateX(-50%) translateY(0); }
+    </style>
+</head>
+<body>
+
+    <div class="header">
+        <div class="header-top">
+            <!-- Back handled by parent frame usually, but visually represented -->
+            <div></div> 
+            <div class="title-group">
+                <div class="title">Luna 🐑</div>
+                <div class="subtitle">Couple Pet</div>
+            </div>
+            <div style="width: 24px;"></div>
+        </div>
+        <div class="tabs">
+            <div class="tab-indicator" id="tabIndicator"></div>
+            <div class="tab-btn active" onclick="switchTab(0)">Status</div>
+            <div class="tab-btn" onclick="switchTab(1)">Pflege</div>
+            <div class="tab-btn" onclick="switchTab(2)">Timeline</div>
+        </div>
+    </div>
+
+    <div class="content">
+        <!-- STATUS TAB -->
+        <div class="view active" id="view-status">
+            <div class="scene-container">
+                <div class="glow-overlay"></div>
+                <div class="stars"></div>
+                
+                <div class="lamb-wrapper" id="petVisual">
+                    <div class="wool-puff" style="top: -20px; left: 40px; width: 50px; height: 50px;"></div>
+                    <div class="head">
+                        <div class="wool-puff"></div>
+                        <div class="wool-puff"></div>
+                        <div class="wool-puff"></div>
+                        <div class="face">
+                            <div class="eye left"></div>
+                            <div class="eye right"></div>
+                            <div class="blush left"></div>
+                            <div class="blush right"></div>
+                            <div class="mouth"></div>
+                        </div>
+                    </div>
+                    <div class="body"></div>
+                    <div class="paw left"></div>
+                    <div class="paw right"></div>
+                    <div class="scarf"></div>
+                </div>
+            </div>
+
+            <div class="info-card">
+                <div class="mood-row">
+                    <span class="mood-label" id="moodLabel">Luna ist glücklich 💗</span>
+                    <span class="streak-badge" id="streakLabel">🔥 0 Tage</span>
+                </div>
+                <div class="check-row">
+                    <span>Gefüttert: <span id="fedCheck">❌</span></span>
+                    <span>•</span>
+                    <span id="lastActionText">Keine Aktion heute</span>
+                </div>
+            </div>
+
+            <div class="stats-grid">
+                <!-- Rings generated by JS -->
+                <div class="stat-item" id="ring-hunger"></div>
+                <div class="stat-item" id="ring-energy"></div>
+                <div class="stat-item" id="ring-hygiene"></div>
+                <div class="stat-item" id="ring-fun"></div>
+                <div class="stat-item" id="ring-love"></div>
+            </div>
+        </div>
+
+        <!-- CARE TAB -->
+        <div class="view" id="view-care">
+            <div class="care-grid">
+                <div class="care-card" onclick="performAction('feed')" id="card-feed">
+                    <div class="care-icon">🍎</div>
+                    <div class="care-title">Füttern</div>
+                    <div class="care-desc">Hunger stillen & Liebe zeigen</div>
+                    <div class="care-cooldown">Warten...</div>
+                </div>
+                <div class="care-card" onclick="performAction('play')" id="card-play">
+                    <div class="care-icon">🧶</div>
+                    <div class="care-title">Spielen</div>
+                    <div class="care-desc">Energie verbrauchen, Spaß haben</div>
+                    <div class="care-cooldown">Warten...</div>
+                </div>
+                <div class="care-card" onclick="performAction('care')" id="card-care">
+                    <div class="care-icon">🧼</div>
+                    <div class="care-title">Pflege</div>
+                    <div class="care-desc">Baden & Sauber machen</div>
+                    <div class="care-cooldown">Warten...</div>
+                </div>
+                <div class="care-card" onclick="performAction('sleep')" id="card-sleep">
+                    <div class="care-icon">🌙</div>
+                    <div class="care-title">Schlafen</div>
+                    <div class="care-desc">Energie tanken, Ruhe gönnen</div>
+                    <div class="care-cooldown">Warten...</div>
+                </div>
+                <div class="care-card" style="grid-column: span 2; background: rgba(236, 72, 153, 0.1); border-color: rgba(236, 72, 153, 0.3);" onclick="performAction('love')" id="card-love">
+                    <div class="care-icon">💗</div>
+                    <div class="care-title" style="color: #f472b6;">Liebe geben</div>
+                    <div class="care-desc">Extra Zuneigung für Luna</div>
+                    <div class="care-cooldown">Warten...</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- TIMELINE TAB -->
+        <div class="view" id="view-timeline">
+            <div class="timeline-list" id="timelineList">
+                <!-- Items populated by JS -->
+                <div class="event" style="justify-content: center; opacity: 0.5; font-size: 12px;">Noch keine Einträge</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Overlay Scene -->
+    <div class="overlay-scene" id="actionOverlay">
+        <div class="scene-content">
+            <span class="scene-emoji" id="sceneEmoji">🍎</span>
+            <div class="scene-text" id="sceneText">Lecker!</div>
+        </div>
+    </div>
+
+    <div class="toast" id="toast">Nachricht</div>
+
+    <script src="luna.js"></script>
+</body>
+</html>

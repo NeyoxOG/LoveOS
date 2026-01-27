@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Hearts Stack</title>
+    <style>
+        body { margin:0; padding:0; background:#000; color:#fff; font-family:-apple-system, sans-serif; overflow:hidden; user-select:none; touch-action:none; display:flex; flex-direction:column; height:100vh; }
+        .top-ui { position:absolute; top:0; left:0; right:0; padding:16px; display:flex; justify-content:space-between; z-index:10; pointer-events:none; }
+        .score-box { font-size:24px; font-weight:700; text-shadow:0 2px 4px rgba(0,0,0,0.5); }
+        .game-area { flex:1; position:relative; overflow:hidden; background:linear-gradient(to bottom, #1e1b4b, #4c0519); }
+        
+        #gameCanvas { width:100%; height:100%; display:block; }
+
+        .btn-action {
+            position:absolute; bottom:30px; left:50%; transform:translateX(-50%);
+            width:120px; height:120px; border-radius:50%; background:rgba(255,255,255,0.1);
+            border:2px solid rgba(255,255,255,0.3); backdrop-filter:blur(5px);
+            display:flex; justify-content:center; align-items:center;
+            font-size:16px; font-weight:700; letter-spacing:1px;
+            box-shadow:0 10px 30px rgba(0,0,0,0.5); cursor:pointer;
+            z-index:20; touch-action:manipulation;
+        }
+        .btn-action:active { background:rgba(255,255,255,0.2); transform:translateX(-50%) scale(0.95); }
+
+        .overlay {
+            position:absolute; inset:0; background:rgba(0,0,0,0.8); backdrop-filter:blur(10px);
+            display:none; flex-direction:column; justify-content:center; align-items:center; z-index:100; text-align:center;
+        }
+        .overlay.active { display:flex; }
+        .overlay h1 { font-size:40px; margin:0 0 10px 0; }
+        .overlay p { color:#aaa; margin-bottom:30px; }
+        .btn-restart { background:#ec4899; color:white; border:none; padding:12px 30px; border-radius:24px; font-size:16px; font-weight:700; }
+        .btn-close { position:absolute; top:16px; left:16px; background:rgba(255,255,255,0.1); width:40px; height:40px; border-radius:50%; border:none; color:white; font-size:20px; cursor:pointer; z-index:30; pointer-events:auto; }
+
+    </style>
+</head>
+<body>
+    <button class="btn-close" onclick="window.history.back()">✕</button>
+    <div class="top-ui">
+        <div class="score-box" id="scoreEl">0</div>
+        <div class="score-box" style="font-size:14px; opacity:0.6" id="bestEl">Best: 0</div>
+    </div>
+
+    <div class="game-area">
+        <canvas id="gameCanvas"></canvas>
+    </div>
+
+    <div class="btn-action" id="dropBtn">DROP</div>
+
+    <div class="overlay" id="endScreen">
+        <h1>Game Over</h1>
+        <p>Score: <span id="finalScore">0</span></p>
+        <button class="btn-restart" onclick="restartGame()">Try Again</button>
+        <button class="btn-restart" style="background:transparent; border:1px solid #555; margin-top:10px;" onclick="window.history.back()">Exit</button>
+    </div>
+
+    <script src="game_stack.js"></script>
+</body>
+</html>

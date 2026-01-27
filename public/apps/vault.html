@@ -1,0 +1,309 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Message Vault</title>
+    <style>
+        :root {
+            --bg-dark: #000;
+            --bg-card: #1c1c1e;
+            --primary: #ec4899; /* Pink-ish */
+            --text: #ffffff;
+            --text-dim: rgba(255, 255, 255, 0.5);
+            --border: rgba(255, 255, 255, 0.1);
+        }
+
+        * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+
+        body {
+            margin: 0; padding: 0;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            background: var(--bg-dark);
+            color: var(--text);
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+            user-select: none;
+        }
+
+        /* Top Bar */
+        .topbar {
+            padding: 16px 20px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            background: rgba(28, 28, 30, 0.5);
+            backdrop-filter: blur(20px);
+            border-bottom: 1px solid var(--border);
+            z-index: 50;
+        }
+        .title { font-size: 17px; font-weight: 600; text-align: center; flex: 1; }
+        .action-btn { 
+            color: var(--primary); font-size: 24px; font-weight: 400; cursor: pointer; border: none; background: none; padding: 0;
+            transition: opacity 0.2s;
+        }
+        .action-btn:active { opacity: 0.6; }
+        .back-placeholder { width: 24px; } /* Spacer */
+
+        /* Tabs */
+        .tabs-container {
+            padding: 12px 16px;
+            background: rgba(28, 28, 30, 0.3);
+        }
+        .segmented-control {
+            background: rgba(118, 118, 128, 0.24);
+            border-radius: 9px;
+            padding: 2px;
+            display: flex;
+            position: relative;
+        }
+        .segment-btn {
+            flex: 1;
+            padding: 6px 0;
+            text-align: center;
+            font-size: 13px;
+            font-weight: 500;
+            color: #fff;
+            z-index: 2;
+            cursor: pointer;
+        }
+        .segment-indicator {
+            position: absolute;
+            top: 2px; bottom: 2px;
+            width: 25%;
+            background: #636366;
+            border-radius: 7px;
+            box-shadow: 0 3px 8px rgba(0,0,0,0.12);
+            transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            z-index: 1;
+        }
+
+        /* Main Content */
+        .main-scroll {
+            flex: 1;
+            overflow-y: auto;
+            padding: 20px;
+            padding-bottom: 100px;
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+        }
+
+        /* Message Card (Envelope) */
+        .msg-card {
+            background: var(--bg-card);
+            border-radius: 18px;
+            padding: 0;
+            position: relative;
+            overflow: hidden;
+            transition: transform 0.2s;
+            border: 1px solid var(--border);
+            height: 140px;
+            cursor: pointer;
+        }
+        .msg-card:active { transform: scale(0.98); }
+        
+        .envelope-bg {
+            position: absolute; inset: 0;
+            background: linear-gradient(135deg, #2c2c2e 0%, #1c1c1e 100%);
+            display: flex; flex-direction: column; justify-content: center; align-items: center;
+        }
+        .envelope-flap {
+            position: absolute; top: 0; left: 0; right: 0; height: 60px;
+            background: linear-gradient(to bottom, rgba(255,255,255,0.05), transparent);
+            clip-path: polygon(0 0, 50% 100%, 100% 0);
+        }
+
+        .seal {
+            width: 40px; height: 40px;
+            border-radius: 50%;
+            background: var(--primary);
+            box-shadow: 0 4px 10px rgba(0,0,0,0.3), inset 0 2px 5px rgba(255,255,255,0.3);
+            display: flex; justify-content: center; align-items: center;
+            font-size: 18px;
+            position: relative;
+            z-index: 10;
+        }
+        .seal::after {
+            content: ''; position: absolute; inset: 4px; border: 1px dashed rgba(255,255,255,0.3); border-radius: 50%;
+        }
+
+        .msg-content {
+            position: relative; z-index: 20;
+            padding: 16px;
+            width: 100%; height: 100%;
+            display: flex; flex-direction: column; justify-content: space-between;
+        }
+        .msg-header { display: flex; justify-content: space-between; align-items: flex-start; }
+        .msg-title { font-size: 16px; font-weight: 600; color: #fff; margin-bottom: 4px; text-shadow: 0 1px 2px rgba(0,0,0,0.5); }
+        .msg-preview { font-size: 13px; color: var(--text-dim); }
+        
+        .msg-meta { display: flex; justify-content: space-between; align-items: center; font-size: 11px; color: var(--text-dim); }
+        .author-badge { display: flex; align-items: center; gap: 6px; background: rgba(0,0,0,0.3); padding: 4px 8px; border-radius: 12px; }
+        .author-avatar { width: 16px; height: 16px; background: #555; border-radius: 50%; font-size: 10px; display: flex; justify-content: center; align-items: center; color: #fff; }
+        
+        .lock-badge {
+            display: flex; align-items: center; gap: 4px;
+            background: rgba(0,0,0,0.4); padding: 4px 8px; border-radius: 8px;
+            border: 1px solid rgba(255,255,255,0.1);
+        }
+        
+        /* Opened State (Flat Card) */
+        .msg-card.opened {
+            background: linear-gradient(to bottom, #fff7f0, #ffe4e6); /* Paper */
+            color: #1c1c1e;
+        }
+        .msg-card.opened .msg-title { color: #1c1c1e; text-shadow: none; }
+        .msg-card.opened .msg-preview { color: #666; }
+        .msg-card.opened .seal { display: none; }
+        .msg-card.opened .envelope-flap { display: none; }
+        .msg-card.opened .msg-meta { color: #888; }
+        .msg-card.opened .author-badge { background: rgba(0,0,0,0.05); }
+
+        /* Fullscreen Reader (Hidden initially) */
+        .reader-overlay {
+            position: fixed; inset: 0; background: rgba(0,0,0,0.6); backdrop-filter: blur(20px);
+            z-index: 100; opacity: 0; pointer-events: none; transition: opacity 0.4s;
+            display: flex; justify-content: center; align-items: center;
+        }
+        .reader-overlay.active { opacity: 1; pointer-events: auto; }
+        
+        .paper-sheet {
+            width: 90%; max-width: 400px; height: 70vh;
+            background: #fff7f0;
+            box-shadow: 0 20px 50px rgba(0,0,0,0.5);
+            transform: translateY(100vh) rotate(-5deg);
+            transition: transform 0.6s cubic-bezier(0.19, 1, 0.22, 1);
+            padding: 40px;
+            position: relative;
+            display: flex; flex-direction: column;
+            color: #333;
+            font-family: Georgia, serif;
+            border-radius: 2px;
+        }
+        .reader-overlay.active .paper-sheet { transform: translateY(0) rotate(0); }
+        
+        .paper-close {
+            position: absolute; top: 10px; right: 10px;
+            width: 30px; height: 30px; background: rgba(0,0,0,0.05); border-radius: 50%;
+            display: flex; justify-content: center; align-items: center; cursor: pointer; color: #333;
+        }
+        .paper-content { overflow-y: auto; flex: 1; line-height: 1.6; font-size: 16px; margin-top: 20px; white-space: pre-wrap; }
+        .paper-date { margin-top: 20px; font-size: 12px; color: #888; text-align: right; font-style: italic; }
+
+        /* Composer Sheet */
+        .composer-sheet {
+            position: fixed; bottom: 0; left: 0; right: 0;
+            background: #1c1c1e;
+            border-top-left-radius: 24px; border-top-right-radius: 24px;
+            box-shadow: 0 -10px 40px rgba(0,0,0,0.5);
+            z-index: 200;
+            transform: translateY(100%);
+            transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            padding: 20px; padding-bottom: 40px;
+            border-top: 1px solid var(--border);
+            max-height: 90vh; overflow-y: auto;
+        }
+        .composer-sheet.active { transform: translateY(0); }
+        
+        .composer-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
+        .composer-title { font-size: 18px; font-weight: 600; }
+        
+        .form-group { margin-bottom: 16px; }
+        .label { font-size: 12px; color: var(--text-dim); margin-bottom: 6px; display: block; text-transform: uppercase; letter-spacing: 0.5px; }
+        .input-text, .input-area, .input-select {
+            width: 100%; background: #2c2c2e; border: none; border-radius: 12px;
+            padding: 12px; color: #fff; font-size: 16px; font-family: inherit;
+        }
+        .input-area { min-height: 120px; resize: none; }
+        
+        .btn-primary {
+            width: 100%; background: var(--primary); color: #fff; border: none; padding: 14px;
+            border-radius: 14px; font-size: 16px; font-weight: 600; margin-top: 10px; cursor: pointer;
+        }
+
+        /* Empty State */
+        .empty-state { text-align: center; color: var(--text-dim); margin-top: 60px; font-size: 14px; }
+
+    </style>
+</head>
+<body>
+
+    <div class="topbar">
+        <div class="back-placeholder"></div>
+        <div class="title">Message Vault</div>
+        <button class="action-btn" id="btnAdd">+</button>
+    </div>
+
+    <div class="tabs-container">
+        <div class="segmented-control">
+            <div class="segment-indicator" id="segIndicator"></div>
+            <div class="segment-btn" onclick="filterList('all', 0)">Alle</div>
+            <div class="segment-btn" onclick="filterList('locked', 1)">Locked</div>
+            <div class="segment-btn" onclick="filterList('opened', 2)">Offen</div>
+            <div class="segment-btn" onclick="filterList('pinned', 3)">Pinned</div>
+        </div>
+    </div>
+
+    <div class="main-scroll" id="msgList">
+        <!-- JS renders items here -->
+        <div class="empty-state">Lade Tresor... 🔐</div>
+    </div>
+
+    <!-- Reader -->
+    <div class="reader-overlay" id="reader">
+        <div class="paper-sheet" id="paperSheet">
+            <div class="paper-close" id="readerClose">✕</div>
+            <h2 style="margin: 0; font-size: 22px;" id="readerTitle">Titel</h2>
+            <div class="paper-content" id="readerBody">...</div>
+            <div class="paper-date" id="readerDate">--</div>
+        </div>
+    </div>
+
+    <!-- Composer -->
+    <div class="composer-sheet" id="composer">
+        <div class="composer-header">
+            <button style="background:none; border:none; color:#f87171; font-size:16px;" id="composerCancel">Abbrechen</button>
+            <span class="composer-title">Neue Nachricht</span>
+            <div style="width: 60px;"></div>
+        </div>
+
+        <div class="form-group">
+            <label class="label">Titel</label>
+            <input type="text" class="input-text" id="inpTitle" placeholder="z.B. Für schlechte Tage...">
+        </div>
+
+        <div class="form-group">
+            <label class="label">Nachricht</label>
+            <textarea class="input-area" id="inpBody" placeholder="Schreibe deine Nachricht..."></textarea>
+        </div>
+
+        <div class="form-group">
+            <label class="label">Schloss (Optional)</label>
+            <select class="input-select" id="inpLockType">
+                <option value="none">Kein Schloss</option>
+                <option value="time">Zeit-Schloss ⏳</option>
+                <option value="reward">Reward-Lock 🏆</option>
+            </select>
+        </div>
+
+        <div class="form-group hidden" id="groupTime">
+            <label class="label">Öffnen am</label>
+            <input type="datetime-local" class="input-text" id="inpTime">
+        </div>
+
+        <div class="form-group hidden" id="groupReward">
+            <label class="label">Benötigter Reward</label>
+            <select class="input-select" id="inpRewardId">
+                <!-- Populated by JS -->
+            </select>
+        </div>
+
+        <button class="btn-primary" id="composerSave">In den Tresor legen 🔐</button>
+    </div>
+
+    <script src="vault.js"></script>
+</body>
+</html>

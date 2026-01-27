@@ -1,0 +1,5 @@
+{
+  "name": "FiaOS",
+  "description": "An iOS-inspired Love-OS with a secure login system, glassmorphism UI, and profile management.",
+  "requestFramePermissions": []
+}

@@ -1,0 +1,276 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Admin Center</title>
+    <style>
+        :root {
+            --bg-dark: #000;
+            --bg-card: #1c1c1e;
+            --primary: #818cf8;
+            --danger: #ef4444;
+            --text: #ffffff;
+            --text-dim: rgba(255, 255, 255, 0.5);
+            --border: rgba(255, 255, 255, 0.1);
+        }
+
+        * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+
+        body {
+            margin: 0; padding: 0;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            background: var(--bg-dark);
+            color: var(--text);
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+            user-select: none;
+        }
+
+        /* Top Bar */
+        .topbar {
+            padding: 16px 20px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: rgba(28, 28, 30, 0.8);
+            backdrop-filter: blur(20px);
+            border-bottom: 1px solid var(--border);
+            z-index: 50;
+            position: relative;
+        }
+        .title { font-size: 17px; font-weight: 600; text-align: center; }
+        .badge { background: #4f46e5; color: #fff; font-size: 10px; padding: 2px 6px; border-radius: 4px; margin-left: 6px; font-weight: 700; text-transform: uppercase; }
+
+        /* Tabs */
+        .tabs-container {
+            padding: 12px 16px;
+            background: rgba(28, 28, 30, 0.5);
+        }
+        .segmented-control {
+            background: rgba(118, 118, 128, 0.24);
+            border-radius: 9px;
+            padding: 2px;
+            display: flex;
+            position: relative;
+        }
+        .segment-btn {
+            flex: 1;
+            padding: 6px 0;
+            text-align: center;
+            font-size: 13px;
+            font-weight: 500;
+            color: #fff;
+            z-index: 2;
+            cursor: pointer;
+        }
+        .segment-indicator {
+            position: absolute;
+            top: 2px; bottom: 2px;
+            width: 20%;
+            background: #636366;
+            border-radius: 7px;
+            box-shadow: 0 3px 8px rgba(0,0,0,0.12);
+            transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            z-index: 1;
+        }
+
+        /* Content */
+        .content {
+            flex: 1;
+            overflow-y: auto;
+            padding: 20px;
+            padding-bottom: 80px;
+        }
+        .hidden { display: none; }
+
+        /* Card Styles */
+        .card-group {
+            background: var(--bg-card);
+            border-radius: 12px;
+            overflow: hidden;
+            margin-bottom: 24px;
+        }
+        .group-title { font-size: 13px; text-transform: uppercase; color: var(--text-dim); margin: 0 0 8px 12px; letter-spacing: 0.5px; }
+
+        .list-item {
+            display: flex; align-items: center; justify-content: space-between;
+            padding: 16px;
+            background: var(--bg-card);
+            border-bottom: 1px solid var(--border);
+            font-size: 15px;
+        }
+        .list-item:last-child { border-bottom: none; }
+        .list-item-content { display: flex; align-items: center; gap: 12px; }
+        .list-avatar { width: 36px; height: 36px; border-radius: 50%; background: #333; display: flex; justify-content: center; align-items: center; font-size: 18px; }
+        .list-info { display: flex; flex-direction: column; }
+        .list-sub { font-size: 12px; color: var(--text-dim); }
+
+        /* Controls */
+        .toggle {
+            width: 50px; height: 30px; background: #333; border-radius: 15px; position: relative; transition: 0.3s; cursor: pointer;
+        }
+        .toggle::after {
+            content: ''; position: absolute; top: 2px; left: 2px; width: 26px; height: 26px;
+            background: #fff; border-radius: 50%; transition: 0.3s;
+        }
+        .toggle.active { background: #34c759; }
+        .toggle.active::after { transform: translateX(20px); }
+
+        button.btn {
+            background: #007aff; color: white; border: none; padding: 6px 12px; border-radius: 8px; font-size: 13px; font-weight: 500; cursor: pointer;
+        }
+        button.btn.danger { background: var(--danger); }
+        button.btn.secondary { background: rgba(255,255,255,0.1); }
+        
+        .action-row {
+            padding: 16px; display: flex; gap: 10px;
+        }
+        .action-row button { flex: 1; padding: 12px; }
+
+        /* Modal Overlay for User Edit */
+        .modal {
+            position: fixed; inset: 0; background: rgba(0,0,0,0.5); backdrop-filter: blur(5px);
+            z-index: 100; display: none; align-items: flex-end;
+        }
+        .modal.active { display: flex; }
+        .modal-sheet {
+            background: #1c1c1e; width: 100%; border-top-left-radius: 20px; border-top-right-radius: 20px;
+            padding: 20px; box-shadow: 0 -10px 40px rgba(0,0,0,0.5); border-top: 1px solid var(--border);
+            animation: slideUp 0.3s ease-out;
+        }
+        @keyframes slideUp { from { transform: translateY(100%); } to { transform: translateY(0); } }
+
+        select {
+            background: #333; color: white; border: none; padding: 8px; border-radius: 8px; width: 100%; font-size: 16px; margin-top: 4px;
+        }
+
+    </style>
+</head>
+<body>
+
+    <div class="topbar">
+        <div class="title">Admin Center <span class="badge">PRO</span></div>
+    </div>
+
+    <div class="tabs-container">
+        <div class="segmented-control">
+            <div class="segment-indicator" id="segIndicator"></div>
+            <div class="segment-btn" onclick="switchTab('users', 0)">Users</div>
+            <div class="segment-btn" onclick="switchTab('apps', 1)">Apps</div>
+            <div class="segment-btn" onclick="switchTab('rewards', 2)">Rewards</div>
+            <div class="segment-btn" onclick="switchTab('luna', 3)">Luna</div>
+            <div class="segment-btn" onclick="switchTab('system', 4)">System</div>
+        </div>
+    </div>
+
+    <div class="content">
+        
+        <!-- USERS TAB -->
+        <div id="tab-users">
+            <div class="group-title">Registered Users</div>
+            <div class="card-group" id="usersList">
+                <!-- Populated by JS -->
+            </div>
+        </div>
+
+        <!-- APPS TAB -->
+        <div id="tab-apps" class="hidden">
+            <div class="group-title">App Visibility</div>
+            <div class="card-group" id="appsList">
+                <!-- Populated by JS -->
+            </div>
+            <p style="font-size:12px; color:#666; padding:0 16px;">Deaktivierte Apps sind für alle Nutzer (außer Admin) unsichtbar.</p>
+        </div>
+
+        <!-- REWARDS TAB -->
+        <div id="tab-rewards" class="hidden">
+            <div class="action-row">
+                 <button class="btn secondary" onclick="resetRewardsAll()">Reset ALL Rewards</button>
+            </div>
+            <div class="group-title">Unlock Tool</div>
+            <div class="card-group" style="padding:16px;">
+                <label style="font-size:12px; color:#888;">Target User</label>
+                <select id="rewardUserSelect"></select>
+                <br><br>
+                <label style="font-size:12px; color:#888;">Reward ID</label>
+                <select id="rewardIdSelect"></select>
+                <br><br>
+                <button class="btn" style="width:100%" onclick="adminUnlockReward()">Unlock Selected</button>
+            </div>
+        </div>
+
+        <!-- LUNA TAB -->
+        <div id="tab-luna" class="hidden">
+            <div class="group-title">Shared State</div>
+            <div class="card-group">
+                <div class="list-item">
+                    <span>Reset Shared State</span>
+                    <button class="btn danger" onclick="resetLunaState()">Reset</button>
+                </div>
+                <div class="list-item">
+                     <span>Set Mood</span>
+                     <select style="width:100px;" onchange="setLunaMood(this.value)">
+                         <option value="">-</option>
+                         <option value="happy">Happy</option>
+                         <option value="sad">Sad</option>
+                         <option value="hungry">Hungry</option>
+                         <option value="loved">Loved</option>
+                     </select>
+                </div>
+            </div>
+        </div>
+
+        <!-- SYSTEM TAB -->
+        <div id="tab-system" class="hidden">
+            <div class="group-title">System Control</div>
+            <div class="card-group">
+                <div class="list-item">
+                    <span>Maintenance Mode</span>
+                    <div class="toggle" id="toggleMaint" onclick="toggleMaintenance()"></div>
+                </div>
+            </div>
+
+            <div class="group-title">Data Management</div>
+            <div class="card-group">
+                <div class="list-item" onclick="exportConfig()">
+                    <span>Export Global Config</span>
+                    <span>JSON ›</span>
+                </div>
+                <div class="list-item" onclick="factoryReset()">
+                    <span style="color:var(--danger)">Factory Reset</span>
+                    <span>⚠️</span>
+                </div>
+            </div>
+        </div>
+
+    </div>
+
+    <!-- User Edit Modal -->
+    <div class="modal" id="userModal">
+        <div class="modal-sheet">
+            <h3 style="margin-top:0">Edit User</h3>
+            <p id="editUserName" style="color:#888; margin-bottom:20px;"></p>
+            
+            <label style="font-size:12px; color:#888;">Role</label>
+            <select id="editUserRole">
+                <option value="user">User</option>
+                <option value="admin">Admin</option>
+                <option value="guest">Guest</option>
+                <option value="developer">Developer</option>
+                <option value="banned">Banned</option>
+            </select>
+
+            <div style="margin-top:20px; display:flex; gap:10px;">
+                <button class="btn" style="flex:1" onclick="saveUserEdit()">Save</button>
+                <button class="btn danger" style="flex:1" onclick="kickUser()">Kick (Logout)</button>
+            </div>
+            <button class="btn secondary" style="width:100%; margin-top:10px;" onclick="closeModal()">Cancel</button>
+        </div>
+    </div>
+
+    <script src="admin.js"></script>
+</body>
+</html>
