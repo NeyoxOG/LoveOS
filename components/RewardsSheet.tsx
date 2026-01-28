@@ -71,7 +71,6 @@ const RewardsSheet: React.FC<RewardsSheetProps> = ({ isOpen, onClose, rewardsDat
     } else if (activeTab === 'love') {
         list = REWARD_CATALOG.filter(r => r.category === 'love');
     } else {
-        // General: Exclude Love/Valentine specific if desired, or show all non-special
         list = REWARD_CATALOG.filter(r => r.category !== 'love' && r.category !== 'valentine');
     }
 
@@ -231,9 +230,6 @@ const RewardsSheet: React.FC<RewardsSheetProps> = ({ isOpen, onClose, rewardsDat
                   const isTheme = reward.type === 'theme_unlock';
                   const themeDef = isTheme && reward.payload?.themeId ? THEMES[reward.payload.themeId] : null;
                   
-                  // Valentine redeemed style override: If unlocked, treat as redeemed/completed visual
-                  const isRedeemedStyle = activeTab === 'valentine' && isUnlocked;
-
                   return (
                     <motion.div
                       layout
@@ -244,10 +240,10 @@ const RewardsSheet: React.FC<RewardsSheetProps> = ({ isOpen, onClose, rewardsDat
                         relative flex items-center gap-4 p-4 rounded-2xl border transition-all duration-300 overflow-hidden
                         ${isUnlocked 
                           ? activeTab === 'valentine'
-                            ? 'bg-gradient-to-br from-pink-950/50 to-purple-950/50 border-pink-500/30'
+                            ? 'bg-gradient-to-br from-pink-950/80 to-purple-950/80 border-pink-500/40' // Enhanced visibility for Valentine unlocked
                             : activeTab === 'love'
-                                ? 'bg-gradient-to-br from-rose-950/50 to-pink-950/50 border-rose-500/30'
-                                : 'bg-gradient-to-br from-indigo-950/50 to-purple-950/50 border-indigo-500/30' 
+                                ? 'bg-gradient-to-br from-rose-950/80 to-pink-950/80 border-rose-500/40'
+                                : 'bg-gradient-to-br from-indigo-950/80 to-purple-950/80 border-indigo-500/40' 
                           : 'bg-white/5 border-white/5 grayscale opacity-60'}
                       `}
                     >
@@ -280,7 +276,7 @@ const RewardsSheet: React.FC<RewardsSheetProps> = ({ isOpen, onClose, rewardsDat
                           {isTheme && isUnlocked && <Palette className="w-3 h-3 text-white/50" />}
                         </h3>
                         <p className="text-xs text-white/40 leading-relaxed truncate">
-                          {isRedeemedStyle ? "Eingelöst ✔" : reward.description}
+                          {activeTab === 'valentine' && isUnlocked ? "Eingelöst ✔" : reward.description}
                         </p>
                       </div>
 
