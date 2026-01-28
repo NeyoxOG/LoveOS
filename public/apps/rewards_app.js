@@ -88,6 +88,9 @@ function render() {
         }
     }
 
+    // Ensure redeemed object exists
+    if (!rewardsData.redeemed) rewardsData.redeemed = {};
+
     // Filter logic update
     const filtered = items.filter(item => {
         const isRedeemed = rewardsData.redeemed && rewardsData.redeemed[item.id];
@@ -123,7 +126,7 @@ function render() {
             
             if (isRedeemed) {
                 const ts = rewardsData.redeemed[item.id];
-                const dateStr = new Date(ts).toLocaleDateString();
+                const dateStr = ts ? new Date(ts).toLocaleDateString() : 'Eingelöst';
                 actionHtml = `<div class="redeemed-badge"><span>✔</span> ${dateStr}</div>`;
             } else {
                 actionHtml = `<button class="redeem-btn" onclick="redeem('${item.id}')">Einlösen</button>`;

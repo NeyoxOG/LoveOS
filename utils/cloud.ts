@@ -70,7 +70,6 @@ export const cloud = {
 
         try {
             await auth.signInWithEmailAndPassword(email, password);
-            console.log(`[Cloud] Connected as ${userId}`);
             return true;
         } catch (e: any) {
             if (e.code === 'auth/invalid-credential' || e.code === 'auth/user-not-found') {
@@ -106,7 +105,6 @@ export const cloud = {
         try {
             let path = '';
             if (type === 'daily_state') path = `users/${targetUid}/data/daily_state`;
-            // Add other types as needed
             if (!path) return null;
 
             const snap = await db.doc(path).get();
@@ -132,14 +130,17 @@ export const cloud = {
     async adminResetUser(targetUid: string) {
         try {
             // Delete subcollections manually or just main docs ref
-            // Note: Firestore requires deleting docs individually for subcollections, 
-            // but here we just reset main config docs.
-            
             await db.doc(`users/${targetUid}/data/rewards`).delete();
             await db.doc(`users/${targetUid}/data/prefs`).delete();
             await db.doc(`users/${targetUid}/data/daily_state`).delete();
             
-            // Reset Profile (don't delete, just reset fields)
+            // Delete Diary Entries (Need to fetch and delete individually in Firestore)
+            const diarySnap = await db.collection('users').doc(targetUid).collection('diary').get();
+            const batch = db.batch();
+            diarySnap.docs.forEach(doc => batch.delete(doc.ref));
+            await batch.commit();
+
+            // Reset Profile
             await db.collection('users').doc(targetUid).update({ 
                 onboardingCompleted: false,
                 avatar: { type: 'emoji', value: targetUid.charAt(0).toUpperCase() } 
@@ -361,7 +362,7 @@ export const cloud = {
             return;
         }
         try {
-            // IMPORTANT: Completely overwrite or carefully merge messages array
+            // Vault saves the whole array, so set() is fine for updating
             await db.collection('couples').doc(COUPLE_ID).collection('apps').doc('vault').set(sanitize(state));
         } catch {}
     },
@@ -384,7 +385,7 @@ export const cloud = {
             return;
         }
         try {
-            // Merge true updates fields, doesn't delete existing
+            // Upsert based on ID
             await db.collection('users').doc(getUid()).collection('diary').doc(entry.id).set(sanitize(entry), { merge: true });
         } catch {}
     },
