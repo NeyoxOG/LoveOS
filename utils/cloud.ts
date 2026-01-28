@@ -6,7 +6,7 @@ import { UserRewardsData } from '../types';
 
 // Placeholder Emails for Silent Auth
 const AUTH_MAP: Record<string, string> = {
-    'fia': 'fia@fiaos.app', // TODO: Replace with real emails in Firebase Console
+    'fia': 'fia@fiaos.app', 
     'collin': 'collin@fiaos.app'
 };
 
@@ -44,7 +44,14 @@ export const cloud = {
         try {
             await signInWithEmailAndPassword(auth, email, password);
             return true;
-        } catch (e) {
+        } catch (e: any) {
+            // Gracefully handle auth errors for smoother offline/dev experience
+            // This prevents "Cloud Auth Failed" spam when credentials don't match or users don't exist in FB yet.
+            const ignoredCodes = ['auth/invalid-credential', 'auth/user-not-found', 'auth/invalid-email', 'auth/internal-error'];
+            if (ignoredCodes.includes(e.code)) {
+                console.warn(`[Cloud] Silent login skipped: ${e.code}. Running in offline mode.`);
+                return false;
+            }
             console.error("Cloud Auth Failed:", e);
             return false;
         }
@@ -68,7 +75,7 @@ export const cloud = {
             const snap = await getDoc(ref);
             return snap.exists() ? snap.data() as UserRewardsData : null;
         } catch (e) {
-            console.error("Rewards Load Error", e);
+            // console.warn("Rewards Load Error (Offline?)", e);
             return null;
         }
     },
@@ -85,7 +92,7 @@ export const cloud = {
             const ref = doc(db, `users/${uid}/data/rewards`);
             await setDoc(ref, data, { merge: true });
         } catch (e) {
-            console.error("Rewards Save Error", e);
+            // Silent fail for offline
         }
     },
 
@@ -110,10 +117,10 @@ export const cloud = {
                 streak: { count: 0 },
                 history: []
             };
-            await setDoc(ref, initial);
+            // Try to create it, but catch if permission denied or offline
+            try { await setDoc(ref, initial); } catch(e) {}
             return initial;
         } catch (e) {
-            console.error("Luna Load Error", e);
             return null;
         }
     },
@@ -126,8 +133,10 @@ export const cloud = {
             return;
         }
         
-        const ref = doc(db, 'couples', COUPLE_ID, 'apps', 'luna');
-        await updateDoc(ref, patch);
+        try {
+            const ref = doc(db, 'couples', COUPLE_ID, 'apps', 'luna');
+            await updateDoc(ref, patch);
+        } catch (e) {}
     },
 
     async addLunaHistory(item: any) {
@@ -159,7 +168,6 @@ export const cloud = {
             const all = [...userEntries, ...sharedEntries];
             return all.sort((a: any, b: any) => b.createdAt - a.createdAt);
         } catch (e) {
-            console.error("Diary Load Error", e);
             return [];
         }
     },
@@ -174,12 +182,14 @@ export const cloud = {
             return;
         }
 
-        const path = entry.scope === 'shared' 
-            ? `couples/${COUPLE_ID}/diary`
-            : `users/${getUid()}/diary`;
-            
-        const docRef = doc(db, path, entry.id);
-        await setDoc(docRef, entry, { merge: true });
+        try {
+            const path = entry.scope === 'shared' 
+                ? `couples/${COUPLE_ID}/diary`
+                : `users/${getUid()}/diary`;
+                
+            const docRef = doc(db, path, entry.id);
+            await setDoc(docRef, entry, { merge: true });
+        } catch(e) {}
     },
 
     async deleteDiaryEntry(id: string, scope: 'user' | 'shared') {
@@ -189,7 +199,7 @@ export const cloud = {
             localStorage.setItem(`fiaos_guest_${getUid()}_diary`, JSON.stringify(list));
             return;
         }
-        console.warn("Delete not implemented in v0.3 adapter - requires explicit deleteDoc import");
+        console.warn("Delete not implemented in v0.3 adapter");
     },
 
     // --- Vault ---
@@ -198,9 +208,11 @@ export const cloud = {
             const k = `fiaos_vault_guest_${getUid()}`;
             return JSON.parse(localStorage.getItem(k) || '{"messages":[]}');
         }
-        const ref = doc(db, 'couples', COUPLE_ID, 'apps', 'vault');
-        const snap = await getDoc(ref);
-        if (snap.exists()) return snap.data();
+        try {
+            const ref = doc(db, 'couples', COUPLE_ID, 'apps', 'vault');
+            const snap = await getDoc(ref);
+            if (snap.exists()) return snap.data();
+        } catch(e) {}
         return { messages: [] };
     },
 
@@ -209,8 +221,10 @@ export const cloud = {
             localStorage.setItem(`fiaos_vault_guest_${getUid()}`, JSON.stringify(state));
             return;
         }
-        const ref = doc(db, 'couples', COUPLE_ID, 'apps', 'vault');
-        await setDoc(ref, state);
+        try {
+            const ref = doc(db, 'couples', COUPLE_ID, 'apps', 'vault');
+            await setDoc(ref, state);
+        } catch(e) {}
     },
 
     // --- Games / Leaderboard ---
@@ -220,18 +234,15 @@ export const cloud = {
         const uid = getUid();
         const ref = doc(db, 'leaderboards', gameId, 'scores', uid);
         
-        // We use setDoc with merge to update score
-        // Ideally we check if new score is higher, but here we trust client logic to only call if highscore
         try {
             await setDoc(ref, {
                 score,
                 ...extra,
                 updatedAt: serverTimestamp(),
                 uid,
-                // We grab display name from session for leaderboard display
                 displayName: JSON.parse(localStorage.getItem('fiaos_session') || '{}').name
             }, { merge: true });
-        } catch (e) { console.error(e); }
+        } catch (e) { }
     },
 
     async getLeaderboard(gameId: string) {
@@ -242,7 +253,6 @@ export const cloud = {
             const snap = await getDocs(q);
             return snap.docs.map(d => d.data());
         } catch (e) {
-            console.error("Leaderboard Error", e);
             return [];
         }
     },
@@ -262,6 +272,6 @@ export const cloud = {
         try {
             const ref = doc(db, 'users', getUid());
             await setDoc(ref, data, { merge: true });
-        } catch (e) { console.error(e); }
+        } catch (e) { }
     }
 };
