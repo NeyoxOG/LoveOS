@@ -42,12 +42,12 @@ export interface OverlayState {
 // --- Rewards System Types ---
 
 export type RewardType = 'reward' | 'theme_unlock' | 'cosmetic_unlock';
-export type RewardCategory = 'general' | 'love' | 'games' | 'diary' | 'valentine';
+export type RewardCategory = 'general' | 'love' | 'games' | 'diary' | 'valentine' | 'daily';
 
 export interface Reward {
   id: string;
   title: string;
-  description: string;
+  description?: string;
   icon: string;
   type?: RewardType;
   category?: RewardCategory;
@@ -69,7 +69,7 @@ export interface UserRewardsData {
   version: number;
   rewards: Record<string, RewardProgress>;
   valentine: ValentineProgress;
-  redeemed?: Record<string, number>; // New: Track redemption timestamps by Reward ID
+  redeemed?: Record<string, number>; 
   meta: {
     lastSeenAt: number;
     points: number;
@@ -85,7 +85,8 @@ export interface UserProfile {
   avatar: { type: 'emoji' | 'image', value: string };
   createdAt: number;
   updatedAt: number;
-  onboardingCompleted?: boolean; // New Flag
+  onboardingCompleted?: boolean;
+  forceLogoutAt?: number;
 }
 
 export interface UserPrefs {
@@ -101,7 +102,7 @@ export interface UserPrefs {
 export interface ThemeDef {
   id: string;
   name: string;
-  unlockRewardId?: string; // If set, requires this reward
+  unlockRewardId?: string; 
   colors: {
     bgGradient: string;
     cardBg: string;
@@ -118,12 +119,11 @@ export interface UserStatusConfig {
 }
 
 export interface AdminConfig {
-  appVisibility: Record<string, boolean>; // true = visible, false = hidden
-  userStatus: Record<string, UserStatusConfig>; // userId -> { role, banned }
+  appVisibility: Record<string, boolean>;
+  userStatus: Record<string, UserStatusConfig>;
   maintenanceMode: boolean;
   lastEditedBy: string;
   updatedAt: number;
-  // Deprecated but kept for type safety during migration if needed
   roleOverrides?: Record<string, UserRole>; 
   userBadges?: Record<string, UserBadge[]>;
 }
@@ -145,7 +145,7 @@ export interface UserIndex {
 export interface GameStats {
   stack: { best: number, last: number, plays: number };
   reaction: { best: number, last: number, plays: number, bestCombo: number };
-  blockblast: { best: number, last: number, plays: number }; // Replaced fillbox
+  blockblast: { best: number, last: number, plays: number };
   puzzle: { bestTimeMs: number | null, lastTimeMs: number | null, plays: number, bestMoves: number | null };
   snake: { best: number, last: number, plays: number };
   flappy: { best: number, last: number, plays: number };
@@ -154,15 +154,15 @@ export interface GameStats {
 export interface LeaderboardEntry {
   userId: string;
   name: string;
-  score: number; // or timeMs for puzzle
-  extra?: number; // e.g. moves for puzzle
+  score: number; 
+  extra?: number; 
   date: number;
 }
 
 export interface GlobalArcadeData {
   stack: LeaderboardEntry[];
   reaction: LeaderboardEntry[];
-  blockblast: LeaderboardEntry[]; // Replaced fillbox
+  blockblast: LeaderboardEntry[];
   puzzle: LeaderboardEntry[];
   snake: LeaderboardEntry[];
   flappy: LeaderboardEntry[];
@@ -211,6 +211,7 @@ export interface DailyState {
   lastClaimDateISO: string | null;
   streak: number;
   totalClaims: number;
+  points: number;
   todaySeed: string;
   openedToday: boolean;
   lastOpenAt: number;

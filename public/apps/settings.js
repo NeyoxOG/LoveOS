@@ -16,9 +16,15 @@ let cloud = null;
 // Emojis for Avatar Picker
 const AVATAR_EMOJIS = ["👽", "🦊", "🐱", "🐶", "🦁", "🐯", "🐨", "🐼", "🐻", "🐰", "🐹", "🐭", "🦄", "🦋", "🍄", "🌺", "🌸", "🌼", "⚡", "🔥", "💧", "❄️", "🌟", "🌙", "🌍", "🪐", "🍕", "🍔", "🍟", "🍩"];
 
-// Themes Defs (Visual) - Added unlock conditions
+// Themes Defs (Visual) - Updated with new options
 const THEMES_UI = [
-    { id: 'roseGlass', name: 'Default', color: '#2e1065', unlockRewardId: null },
+    { id: 'roseGlass', name: 'FiaOS Rose', color: '#4a0423', unlockRewardId: null },
+    { id: 'lavender', name: 'Lavender', color: '#4c1d95', unlockRewardId: null },
+    { id: 'mint', name: 'Mint', color: '#064e3b', unlockRewardId: null },
+    { id: 'ocean', name: 'Ocean', color: '#0c4a6e', unlockRewardId: null },
+    { id: 'sunset', name: 'Sunset', color: '#7c2d12', unlockRewardId: null },
+    
+    // Unlockables
     { id: 'aurora', name: 'Aurora', color: '#2b5876', unlockRewardId: 'reward.welcomeTheme' },
     { id: 'softRose', name: 'Soft Rose', color: '#be185d', unlockRewardId: 'love_1_month' },
     { id: 'midnightLove', name: 'Midnight', color: '#1e1b4b', unlockRewardId: 'love_3_month' },
@@ -104,7 +110,7 @@ function renderUI() {
     // Themes
     const tList = document.getElementById('themeList');
     tList.innerHTML = THEMES_UI.map(t => {
-        // Unlock check: generic rewards OR valentine rewards
+        // Unlock check: generic rewards OR valentine rewards OR no requirement
         const isUnlocked = !t.unlockRewardId || 
                            (rewards?.rewards?.[t.unlockRewardId]?.unlocked) || 
                            (rewards?.valentine?.unlocked?.[t.unlockRewardId]);

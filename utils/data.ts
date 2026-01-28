@@ -278,6 +278,7 @@ export const loadDailyState = (userId: string): DailyState => {
          lastClaimDateISO: null,
          streak: 0,
          totalClaims: 0,
+         points: 0,
          todaySeed: `${userId}_${todayISO}`,
          openedToday: false,
          lastOpenAt: 0
