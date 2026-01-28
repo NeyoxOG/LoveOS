@@ -5,20 +5,19 @@
 
 const KEYS = {
     SESSION: 'fiaos_session',
-    USER_GAMES: 'fiaos_user_', 
-    GLOBAL_ARCADE: 'fiaos_global_arcade'
+    USER_GAMES: 'fiaos_user_'
 };
 
 const canvas = document.getElementById('gameCanvas');
 const ctx = canvas.getContext('2d');
 let user = null;
 let gameRunning = false;
-let loopId = null;
+let cloud = null;
 
 // Game Config
 const GRID_SIZE = 20;
-const TILE_COUNT = 20; // 20x20 Grid
-let TILE_SIZE = 0; // Calculated on resize
+const TILE_COUNT = 20; 
+let TILE_SIZE = 0;
 
 // State
 let snake = [];
@@ -28,7 +27,7 @@ let dy = 0;
 let nextDx = 0;
 let nextDy = 0;
 let score = 0;
-let speed = 7; // FPS-ish control via timeout
+let speed = 7;
 let lastFrameTime = 0;
 let frameInterval = 1000 / 7;
 
@@ -36,13 +35,15 @@ function init() {
     const sessionStr = localStorage.getItem(KEYS.SESSION);
     if (sessionStr) user = JSON.parse(sessionStr);
 
+    if (window.parent.FIAOS && window.parent.FIAOS.cloud) {
+        cloud = window.parent.FIAOS.cloud;
+    }
+
     resize();
     window.addEventListener('resize', resize);
     
-    // Controls
     window.addEventListener('keydown', handleKey);
     
-    // Touch / Swipe
     const area = document.getElementById('gameArea');
     let touchStartX = 0;
     let touchStartY = 0;
@@ -62,16 +63,12 @@ function init() {
 }
 
 function resize() {
-    // Determine max square size that fits
     const area = document.getElementById('gameArea');
-    const maxSize = Math.min(area.clientWidth, area.clientHeight) - 40; // padding
-    
-    // Snap to grid
+    const maxSize = Math.min(area.clientWidth, area.clientHeight) - 40;
     TILE_SIZE = Math.floor(maxSize / TILE_COUNT);
     canvas.width = TILE_SIZE * TILE_COUNT;
     canvas.height = TILE_SIZE * TILE_COUNT;
-    
-    draw(); // Static redraw
+    draw(); 
 }
 
 function loadStats() {
@@ -89,7 +86,6 @@ function startGame() {
     speed = 7;
     frameInterval = 1000 / speed;
     
-    // Init Snake (Center)
     const cx = 10;
     const cy = 10;
     snake = [
@@ -98,7 +94,6 @@ function startGame() {
         { x: cx, y: cy + 2 }
     ];
     
-    // Moving Up initially
     dx = 0; dy = -1;
     nextDx = 0; nextDy = -1;
     
@@ -112,9 +107,7 @@ function startGame() {
 
 function gameLoop(timestamp) {
     if (!gameRunning) return;
-    
     requestAnimationFrame(gameLoop);
-    
     const elapsed = timestamp - lastFrameTime;
     if (elapsed > frameInterval) {
         lastFrameTime = timestamp - (elapsed % frameInterval);
@@ -125,32 +118,22 @@ function gameLoop(timestamp) {
 
 function handleKey(e) {
     if (!gameRunning) return;
-    
-    // Prevent 180 turns
-    // Up
     if ((e.key === 'ArrowUp' || e.key === 'w') && dy === 0) { nextDx = 0; nextDy = -1; }
-    // Down
     if ((e.key === 'ArrowDown' || e.key === 's') && dy === 0) { nextDx = 0; nextDy = 1; }
-    // Left
     if ((e.key === 'ArrowLeft' || e.key === 'a') && dx === 0) { nextDx = -1; nextDy = 0; }
-    // Right
     if ((e.key === 'ArrowRight' || e.key === 'd') && dx === 0) { nextDx = 1; nextDy = 0; }
 }
 
 function handleSwipe(sx, sy, ex, ey) {
     if (!gameRunning) return;
-    
     const dxSwipe = ex - sx;
     const dySwipe = ey - sy;
-    
     if (Math.abs(dxSwipe) > Math.abs(dySwipe)) {
-        // Horizontal
         if (Math.abs(dxSwipe) > 30) {
             if (dxSwipe > 0 && dx === 0) { nextDx = 1; nextDy = 0; }
             if (dxSwipe < 0 && dx === 0) { nextDx = -1; nextDy = 0; }
         }
     } else {
-        // Vertical
         if (Math.abs(dySwipe) > 30) {
             if (dySwipe > 0 && dy === 0) { nextDx = 0; nextDy = 1; }
             if (dySwipe < 0 && dy === 0) { nextDx = 0; nextDy = -1; }
@@ -163,44 +146,32 @@ function placeFood() {
     while (!valid) {
         food.x = Math.floor(Math.random() * TILE_COUNT);
         food.y = Math.floor(Math.random() * TILE_COUNT);
-        
         valid = !snake.some(s => s.x === food.x && s.y === food.y);
     }
 }
 
 function update() {
-    // Apply buffered direction
     dx = nextDx;
     dy = nextDy;
-    
     const head = { x: snake[0].x + dx, y: snake[0].y + dy };
     
-    // Wall Collision
     if (head.x < 0 || head.x >= TILE_COUNT || head.y < 0 || head.y >= TILE_COUNT) {
-        gameOver();
-        return;
+        gameOver(); return;
     }
-    
-    // Self Collision
     if (snake.some(s => s.x === head.x && s.y === head.y)) {
-        gameOver();
-        return;
+        gameOver(); return;
     }
     
     snake.unshift(head);
     
-    // Eat Food
     if (head.x === food.x && head.y === food.y) {
         score++;
         updateScore();
         placeFood();
-        
-        // Speed up every 5 points
         if (score % 5 === 0) {
             speed += 0.5;
             frameInterval = 1000 / speed;
         }
-        
         checkMilestones(score);
     } else {
         snake.pop();
@@ -208,39 +179,29 @@ function update() {
 }
 
 function draw() {
-    // Clear
     ctx.fillStyle = 'rgba(0,0,0,0.4)';
     ctx.clearRect(0, 0, canvas.width, canvas.height);
     
-    // Draw Snake
     snake.forEach((seg, i) => {
-        // Head
         if (i === 0) {
             ctx.fillStyle = '#4ade80';
             ctx.shadowBlur = 15;
             ctx.shadowColor = '#4ade80';
         } else {
-            // Body Gradient
-            // Fade green to teal
             const alpha = 1 - (i / (snake.length + 5));
             ctx.fillStyle = `rgba(34, 197, 94, ${Math.max(0.3, alpha)})`;
             ctx.shadowBlur = 0;
         }
-        
         const x = seg.x * TILE_SIZE;
         const y = seg.y * TILE_SIZE;
-        const s = TILE_SIZE - 2; // Gap
-        
-        // Round Rect
+        const s = TILE_SIZE - 2;
         ctx.beginPath();
         ctx.roundRect(x + 1, y + 1, s, s, i===0 ? 6 : 4);
         ctx.fill();
         
-        // Eyes for Head
         if (i === 0) {
             ctx.fillStyle = '#000';
             const eyeSize = s / 5;
-            // Simple eyes logic
             ctx.beginPath();
             ctx.arc(x + s/3, y + s/3, eyeSize, 0, Math.PI*2);
             ctx.arc(x + s*2/3, y + s/3, eyeSize, 0, Math.PI*2);
@@ -248,21 +209,15 @@ function draw() {
         }
     });
     
-    // Draw Food
     const fx = food.x * TILE_SIZE + TILE_SIZE/2;
     const fy = food.y * TILE_SIZE + TILE_SIZE/2 + (Math.sin(Date.now()/200)*2);
     const fs = TILE_SIZE / 2;
-    
     ctx.shadowBlur = 10;
     ctx.shadowColor = '#ef4444';
     ctx.fillStyle = '#ef4444';
-    
-    // Heart Shape (Simple) or Circle
     ctx.beginPath();
     ctx.arc(fx, fy, fs, 0, Math.PI*2);
     ctx.fill();
-    
-    // Inner light
     ctx.shadowBlur = 0;
     ctx.fillStyle = 'rgba(255,255,255,0.8)';
     ctx.beginPath();
@@ -281,25 +236,18 @@ function gameOver() {
     saveData(score);
 }
 
-// --- Data & Rewards ---
-
 function checkMilestones(s) {
     const unlocks = [];
     if (s === 10) unlocks.push('snake_score_10');
     if (s === 25) unlocks.push('snake_score_25');
     if (s === 50) unlocks.push('snake_score_50');
-
     unlocks.forEach(id => {
-        if (window.parent.FIAOS_EVENTS) {
-            window.parent.FIAOS_EVENTS.emit('games.unlock', { id });
-        }
+        if (window.parent.FIAOS_EVENTS) window.parent.FIAOS_EVENTS.emit('games.unlock', { id });
     });
 }
 
 function saveData(s) {
     if (!user) return;
-    
-    // 1. User Local
     const uKey = `${KEYS.USER_GAMES}${user.id}_games`;
     let uData = JSON.parse(localStorage.getItem(uKey) || '{}');
     if (!uData.snake) uData.snake = { best: 0, plays: 0 };
@@ -307,28 +255,11 @@ function saveData(s) {
     uData.snake.last = s;
     uData.snake.plays++;
     if (s > uData.snake.best) uData.snake.best = s;
-    
     localStorage.setItem(uKey, JSON.stringify(uData));
 
-    // 2. Global Leaderboard
-    const gKey = KEYS.GLOBAL_ARCADE;
-    let gData = JSON.parse(localStorage.getItem(gKey) || '{"snake":[]}');
-    
-    // Ensure snake array exists (migration)
-    if (!gData.snake) gData.snake = [];
-
-    gData.snake.push({
-        userId: user.id,
-        name: user.name,
-        score: s,
-        date: Date.now()
-    });
-    
-    // Sort Desc
-    gData.snake.sort((a,b) => b.score - a.score);
-    gData.snake = gData.snake.slice(0, 10);
-    
-    localStorage.setItem(gKey, JSON.stringify(gData));
+    if (cloud) {
+        cloud.saveHighscore('snake', s);
+    }
 }
 
 init();

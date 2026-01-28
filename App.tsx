@@ -3,11 +3,10 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { User, Session, AppItem, ToastState, OverlayState, UserRewardsData, UserProfile, UserPrefs, AdminConfig } from './types';
 import { NOISE_BG, REWARD_CATALOG } from './constants';
 import { loadSession, saveSession, clearSession } from './utils/session';
-import { cloud } from './utils/cloud'; // Import Cloud Adapter
+import { cloud } from './utils/cloud'; 
 import { 
   INITIAL_REWARDS_DATA,
   saveUserRewards, unlockRewardLogic, setRewardsLastSeen, 
-  debugUnlockValentine, debugResetValentine,
   loadUserProfile, loadUserPrefs, applyTheme, saveLastApp,
   loadAdminConfig, updateUserIndex
 } from './utils/data';
@@ -26,8 +25,6 @@ declare global {
     FIAOS_DEBUG?: {
       unlock: (rewardId: string) => void;
       unlockAll: () => void;
-      unlockValentine: () => void;
-      resetValentine: () => void;
     };
     FIAOS_EVENTS?: {
       emit: (event: string, data?: any) => void;
@@ -37,7 +34,7 @@ declare global {
         bridgeUnlockTheme: (data: { themeId: string }) => void;
         bridgeUnlockApp: (data: { appId: string }) => void;
         bridgeLunaBoost: (data: any) => void;
-        cloud: typeof cloud; // Expose Cloud API
+        cloud: typeof cloud; 
     };
     FIAOS_APPLY_PREFS?: (prefs: UserPrefs) => void;
     FIAOS_PROFILE_UPDATED?: (profile: UserProfile) => void;
@@ -51,19 +48,15 @@ const App: React.FC = () => {
   const [isAuthSheetOpen, setIsAuthSheetOpen] = useState(false);
   const [isAccountSheetOpen, setIsAccountSheetOpen] = useState(false);
   
-  // Navigation & Feedback State
   const [toast, setToast] = useState<ToastState>({ id: 0, message: '' });
   const [overlay, setOverlay] = useState<OverlayState>({ isOpen: false, title: '', content: '' });
   
-  // Rewards State
   const [isRewardsOpen, setIsRewardsOpen] = useState(false);
   const [rewardsTab, setRewardsTab] = useState('general');
   const [rewardsData, setRewardsData] = useState<UserRewardsData | null>(null);
 
-  // App Window State
   const [openedApp, setOpenedApp] = useState<{id: string, name: string} | null>(null);
 
-  // Profile & Prefs & Admin
   const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
   const [userPrefs, setUserPrefs] = useState<UserPrefs | null>(null);
   const [adminConfig, setAdminConfig] = useState<AdminConfig | null>(null);
@@ -72,9 +65,9 @@ const App: React.FC = () => {
     setToast({ id: Date.now(), message });
   }, []);
 
-  // Initialize App (load session)
+  // Initialize App
   useEffect(() => {
-    // Expose Cloud API for iframes
+    // Expose Cloud API
     window.FIAOS = {
         ...(window.FIAOS || {}),
         cloud: cloud,
@@ -84,76 +77,59 @@ const App: React.FC = () => {
         bridgeLunaBoost: (data) => showToast("Luna fühlt sich besser! 🐑💖")
     } as any;
 
-    // Load Local Admin Config (Fast fallback)
     let config = loadAdminConfig();
     setAdminConfig(config);
 
     const storedSession = loadSession();
     if (storedSession) {
-      
-      // 1. Check for forced logout via localStorage flag
-      const freshCheck = localStorage.getItem(`fiaos_user_${storedSession.userId}_session_flag`);
-      if (freshCheck === 'forceLogout') {
-          handleLogout();
-          localStorage.removeItem(`fiaos_user_${storedSession.userId}_session_flag`); // Clear flag
-          return;
-      }
-      
-      // 2. Load Cloud Config (Async update)
-      if (storedSession.role !== 'guest') {
-          cloud.loadAdminConfig().then(remoteConfig => {
-              if (remoteConfig) {
-                  setAdminConfig(remoteConfig);
-                  // Check Ban immediately after cloud load
-                  const status = remoteConfig.userStatus[storedSession.userId];
-                  if (status && status.banned) {
-                      handleLogout();
-                      showToast("Account via Cloud gesperrt. ⛔");
+      // Restore Cloud Connection
+      cloud.restoreConnection().then(() => {
+          // After auth restore, load cloud data
+          if (storedSession.role !== 'guest') {
+              cloud.loadAdminConfig().then(remoteConfig => {
+                  if (remoteConfig) {
+                      setAdminConfig(remoteConfig);
+                      if (remoteConfig.userStatus[storedSession.userId]?.banned) {
+                          handleLogout();
+                          showToast("Account via Cloud gesperrt. ⛔");
+                      }
                   }
-              }
-          });
-      }
+              });
+              
+              cloud.loadRewards().then(data => {
+                  if (data) setRewardsData(data);
+                  else {
+                      const initial = JSON.parse(JSON.stringify(INITIAL_REWARDS_DATA));
+                      setRewardsData(initial);
+                      cloud.saveRewards(initial);
+                  }
+              });
+
+              cloud.loadProfile().then(p => {
+                  if (p) setUserProfile(p as UserProfile);
+                  else {
+                      const local = loadUserProfile(storedSession);
+                      setUserProfile(local);
+                      cloud.saveProfile(local); 
+                  }
+              });
+          }
+      });
 
       setSession(storedSession);
       
-      // Load Rewards (Cloud Sync)
-      cloud.loadRewards().then(data => {
-          if (data) {
-              setRewardsData(data);
-          } else {
-              // Init defaults
-              const initial = JSON.parse(JSON.stringify(INITIAL_REWARDS_DATA));
-              setRewardsData(initial);
-              cloud.saveRewards(initial);
-          }
-      });
-      
-      // If cloud user, try syncing profile in background
-      if (storedSession.role !== 'guest') {
-          cloud.loadProfile().then(p => {
-              if (p) setUserProfile(p as UserProfile);
-              else {
-                  const local = loadUserProfile(storedSession);
-                  setUserProfile(local);
-                  // Init cloud doc
-                  cloud.saveProfile(local); 
-              }
-          });
-      } else {
-          const profile = loadUserProfile(storedSession);
-          setUserProfile(profile);
+      // Guest fallbacks
+      if (storedSession.role === 'guest') {
+          const initial = JSON.parse(JSON.stringify(INITIAL_REWARDS_DATA));
+          setRewardsData(initial);
+          setUserProfile(loadUserProfile(storedSession));
       }
 
       const prefs = loadUserPrefs(storedSession);
       setUserPrefs(prefs);
       applyTheme(prefs);
-
-      // Update Index
-      if (userProfile) updateUserIndex(storedSession, userProfile);
     }
   }, [showToast]);
-
-  // --- Rewards Logic ---
 
   const handleUnlockReward = useCallback(async (rewardId: string) => {
     if (!rewardsData || !session) return;
@@ -170,14 +146,12 @@ const App: React.FC = () => {
     }
   }, [showToast, rewardsData, session]);
 
-  // Event Bus
+  // Event Bus Setup
   useEffect(() => {
     window.FIAOS_EVENTS = {
       emit: (event: string, data?: any) => {
-        console.log(`OS Event: ${event}`, data);
         if (event === 'luna.streak.3') handleUnlockReward('reward.streak3');
         if (event === 'luna.milestone.3') showToast("Meilenstein: 3 Tage Streak! 🔥");
-        
         if (event === 'games.unlock' || event === 'diary.unlock') {
             if (data?.id) handleUnlockReward(data.id);
         }
@@ -196,7 +170,6 @@ const App: React.FC = () => {
              setSession(newSession);
              saveSession(newSession);
              updateUserIndex(newSession, profile);
-             // Sync to cloud
              if (session.role !== 'guest') cloud.saveProfile(profile);
         }
     };
@@ -211,23 +184,16 @@ const App: React.FC = () => {
             }
         }
     };
-
   }, [session, handleUnlockReward, showToast, rewardsData]);
 
-  // --- Auth Handlers ---
-
+  // Auth
   const handleSelectUser = (user: User) => {
-    // Check Ban *before* prompt (using currently loaded config)
-    // Note: If config hasn't synced from cloud yet, this uses local default.
-    // The "attemptLogin" will fail if cloud check reveals ban.
     if (adminConfig && adminConfig.userStatus[user.id]?.banned) {
         showToast("Dieser Account ist gesperrt ⛔");
         return;
     }
-
-    if (user.role === 'guest') {
-      loginSuccess(user);
-    } else {
+    if (user.role === 'guest') loginSuccess(user);
+    else {
       setSelectedUser(user);
       setIsAuthSheetOpen(true);
     }
@@ -237,15 +203,11 @@ const App: React.FC = () => {
     if (!selectedUser) return false;
     
     if (password === selectedUser.password) {
-      // Local Auth Success, now try Cloud
       if (selectedUser.role !== 'guest') {
           const cloudAuthSuccess = await cloud.silentLogin(selectedUser.id, password);
           if (!cloudAuthSuccess) {
-              // If failed, we fall back to offline mode BUT checking if it was an "Auth Failed" or "Network Error"
-              // `silentLogin` handles auto-provisioning. If it returns false, it likely means offline or error.
               showToast("Verbinde im Offline-Modus... ☁️⚠️");
           } else {
-              // Cloud Auth Success -> Check Cloud Ban
               const remoteConfig = await cloud.loadAdminConfig();
               if (remoteConfig && remoteConfig.userStatus[selectedUser.id]?.banned) {
                   showToast("Login verweigert: Account via Cloud gesperrt.");
@@ -253,7 +215,6 @@ const App: React.FC = () => {
               }
           }
       }
-
       loginSuccess(selectedUser);
       return true;
     }
@@ -261,7 +222,6 @@ const App: React.FC = () => {
   };
 
   const loginSuccess = async (user: User) => {
-    // Config re-check
     const config = adminConfig || loadAdminConfig();
     const userStatus = config.userStatus[user.id] || { role: user.role, banned: false };
 
@@ -280,11 +240,9 @@ const App: React.FC = () => {
     setSession(newSession);
     saveSession(newSession);
     
-    // Load Data
     cloud.loadRewards().then(data => {
-        if (data) {
-            setRewardsData(data);
-        } else {
+        if (data) setRewardsData(data);
+        else {
             const initial = JSON.parse(JSON.stringify(INITIAL_REWARDS_DATA));
             setRewardsData(initial);
             cloud.saveRewards(initial);
@@ -324,13 +282,8 @@ const App: React.FC = () => {
     setTimeout(() => setSelectedUser(null), 300);
   };
 
-  // --- Navigation/UI Handlers ---
-
   const handleAppClick = (app: AppItem) => {
-    if (!session) {
-       showToast("Bitte einloggen.");
-       return;
-    }
+    if (!session) { showToast("Bitte einloggen."); return; }
 
     if (adminConfig && !adminConfig.appVisibility[app.id] && app.id !== 'settings') {
          if (session.role !== 'admin' && session.role !== 'developer') {
@@ -363,7 +316,7 @@ const App: React.FC = () => {
     if (session && rewardsData) {
       const updated = setRewardsLastSeen(session.userId, rewardsData);
       setRewardsData(updated);
-      cloud.saveRewards(updated); // Save "seen" state to cloud
+      cloud.saveRewards(updated); 
     }
   };
 

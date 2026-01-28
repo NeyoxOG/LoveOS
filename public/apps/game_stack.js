@@ -1,3 +1,4 @@
+
 /**
  * Game: Hearts Stack
  */
@@ -5,7 +6,6 @@
 const KEYS = {
     SESSION: 'fiaos_session',
     USER_GAMES: 'fiaos_user_', 
-    GLOBAL_ARCADE: 'fiaos_global_arcade'
 };
 
 const canvas = document.getElementById('gameCanvas');
@@ -18,10 +18,15 @@ let blockHeight = 30;
 let speed = 3;
 let currentBlock = { x: 0, y: 0, w: 100, dir: 1 };
 let stack = []; // {x, y, w}
+let cloud = null;
 
 function init() {
     const sessionStr = localStorage.getItem(KEYS.SESSION);
     if (sessionStr) user = JSON.parse(sessionStr);
+
+    if (window.parent.FIAOS && window.parent.FIAOS.cloud) {
+        cloud = window.parent.FIAOS.cloud;
+    }
 
     resize();
     window.addEventListener('resize', resize);
@@ -197,7 +202,7 @@ function checkMilestones(s) {
 function saveScore(s) {
     if (!user) return;
     
-    // 1. User Local
+    // 1. User Local Cache
     const uKey = `${KEYS.USER_GAMES}${user.id}_games`;
     let uData = JSON.parse(localStorage.getItem(uKey) || '{}');
     if (!uData.stack) uData.stack = { best: 0, plays: 0 };
@@ -205,25 +210,12 @@ function saveScore(s) {
     uData.stack.last = s;
     uData.stack.plays++;
     if (s > uData.stack.best) uData.stack.best = s;
-    
     localStorage.setItem(uKey, JSON.stringify(uData));
 
-    // 2. Global Leaderboard
-    const gKey = KEYS.GLOBAL_ARCADE;
-    let gData = JSON.parse(localStorage.getItem(gKey) || '{"stack":[]}');
-    
-    gData.stack.push({
-        userId: user.id,
-        name: user.name,
-        score: s,
-        date: Date.now()
-    });
-    
-    // Sort Desc
-    gData.stack.sort((a,b) => b.score - a.score);
-    gData.stack = gData.stack.slice(0, 10);
-    
-    localStorage.setItem(gKey, JSON.stringify(gData));
+    // 2. Cloud Save
+    if (cloud) {
+        cloud.saveHighscore('stack', s);
+    }
 }
 
 window.restartGame = resetGame;
