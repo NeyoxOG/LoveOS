@@ -1,11 +1,16 @@
-
 import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
+import path from 'path';
 
 export default defineConfig({
   plugins: [react()],
   root: '.',
   base: '/',
+  resolve: {
+    alias: {
+      '@': path.resolve('.')
+    }
+  },
   define: {
     // Prevent "process is not defined" crashes in certain older libraries
     'process.env': {} 
