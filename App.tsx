@@ -173,13 +173,14 @@ const App: React.FC = () => {
 
                     if (profile) {
                         setUserProfile(profile as UserProfile);
-                        // Explicit check logic
-                        if (profile.onboardingCompleted === false) setShowOnboarding(true);
+                        // Check logic: if falsy (false or undefined), show onboarding
+                        if (!profile.onboardingCompleted) setShowOnboarding(true);
                         else setShowOnboarding(false);
                     } else {
                         const local = loadUserProfile(storedSession);
                         setUserProfile(local);
                         cloud.saveProfile(local);
+                        // Local fallback likely means new user locally
                         setShowOnboarding(true);
                     }
 
@@ -312,9 +313,9 @@ const App: React.FC = () => {
     setSession(null);
     setRewardsData(null);
     setOpenedApp(null);
-    setUserProfile(null); // Must be null so onboarding check resets
+    setUserProfile(null); 
     setUserPrefs(null);
-    setShowOnboarding(false); // Explicitly close
+    setShowOnboarding(false); // Explicitly close on logout
     setIsAccountSheetOpen(false);
     setCustomBg(null);
     document.documentElement.style.cssText = ''; 
@@ -405,8 +406,9 @@ const App: React.FC = () => {
     }
     
     setUserProfile(profile);
-    // Correctly set onboarding state based on profile
-    if (profile.onboardingCompleted === false) {
+    
+    // Correctly set onboarding state based on profile (support undefined for new/reset users)
+    if (!profile.onboardingCompleted) {
         setShowOnboarding(true);
     } else {
         setShowOnboarding(false);

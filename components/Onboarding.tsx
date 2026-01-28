@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { ChevronRight, Check, Heart, Power, Sparkles, ShieldCheck, Zap } from 'lucide-react';
+import { ChevronRight, Home, Grid, Share2, Coffee, Heart } from 'lucide-react';
 import { playSound } from '../utils/sound';
 
 interface OnboardingProps {
@@ -9,29 +9,28 @@ interface OnboardingProps {
 }
 
 const Onboarding: React.FC<OnboardingProps> = ({ onComplete }) => {
-  const [step, setStep] = useState(0);
-  const [bootProgress, setBootProgress] = useState(0);
+  const [phase, setPhase] = useState(0); // 0: Logo, 1: Welcome, 2: Cards, 3: Finish
+  const [cardIndex, setCardIndex] = useState(0);
 
-  // Auto-advance step 0 (Boot)
+  // Phase 1: Logo & Phase 2: Welcome Auto-Advance
   useEffect(() => {
-    if (step === 0) {
-      const interval = setInterval(() => {
-        setBootProgress(prev => {
-          if (prev >= 100) {
-            clearInterval(interval);
-            setTimeout(() => setStep(1), 500);
-            return 100;
-          }
-          return prev + 2; // Speed of boot
-        });
-      }, 20);
-      return () => clearInterval(interval);
+    if (phase === 0) {
+      const timer = setTimeout(() => setPhase(1), 2500);
+      return () => clearTimeout(timer);
     }
-  }, [step]);
+    if (phase === 1) {
+      const timer = setTimeout(() => setPhase(2), 3500);
+      return () => clearTimeout(timer);
+    }
+  }, [phase]);
 
-  const nextStep = () => {
+  const nextCard = () => {
     playSound('click');
-    setStep(prev => prev + 1);
+    if (cardIndex < 3) {
+      setCardIndex(prev => prev + 1);
+    } else {
+      setPhase(3);
+    }
   };
 
   const finish = () => {
@@ -39,11 +38,28 @@ const Onboarding: React.FC<OnboardingProps> = ({ onComplete }) => {
     onComplete();
   };
 
-  const variants = {
-    initial: { opacity: 0, y: 20 },
-    animate: { opacity: 1, y: 0 },
-    exit: { opacity: 0, y: -20 }
-  };
+  const cards = [
+    {
+      icon: <Home className="w-12 h-12 text-indigo-400" />,
+      title: "Home",
+      text: "Hier beginnt jeder Tag."
+    },
+    {
+      icon: <Grid className="w-12 h-12 text-pink-400" />,
+      title: "Apps",
+      text: "Alles hat seinen Platz."
+    },
+    {
+      icon: <Share2 className="w-12 h-12 text-blue-400" />,
+      title: "Verbindung",
+      text: "Manches wird geteilt. Manches bleibt bei dir."
+    },
+    {
+      icon: <Coffee className="w-12 h-12 text-emerald-400" />,
+      title: "Ruhe",
+      text: "Nichts drängt. Du bestimmst das Tempo."
+    }
+  ];
 
   return (
     <motion.div 
@@ -53,86 +69,151 @@ const Onboarding: React.FC<OnboardingProps> = ({ onComplete }) => {
       className="fixed inset-0 z-[200] flex flex-col bg-black font-sans text-white select-none overflow-hidden"
     >
       {/* Background Ambience */}
-      <div className="absolute inset-0 bg-gradient-to-b from-indigo-900/20 to-black z-0 pointer-events-none" />
+      <div className="absolute inset-0 bg-gradient-to-br from-indigo-900/10 via-black to-black z-0 pointer-events-none" />
       <div className="absolute inset-0 bg-[url('https://grainy-gradients.vercel.app/noise.svg')] opacity-20 brightness-150 pointer-events-none z-0"></div>
 
       <AnimatePresence mode='wait'>
         
-        {/* STEP 0: BOOT SEQUENCE */}
-        {step === 0 && (
+        {/* PHASE 1: LOGO INTRO */}
+        {phase === 0 && (
             <motion.div 
-                key="boot"
-                className="flex-1 flex flex-col items-center justify-center p-8 z-10"
-                exit={{ opacity: 0, scale: 1.1 }}
+                key="logo"
+                initial={{ opacity: 0, scale: 0.9 }}
+                animate={{ opacity: 1, scale: 1 }}
+                exit={{ opacity: 0, scale: 1.1, filter: "blur(10px)" }}
+                transition={{ duration: 1.5, ease: "easeOut" }}
+                className="flex-1 flex flex-col items-center justify-center z-10"
             >
-                <div className="w-16 h-16 mb-8 relative">
-                    <motion.div 
-                        animate={{ rotate: 360 }}
-                        transition={{ repeat: Infinity, duration: 2, ease: "linear" }}
-                        className="absolute inset-0 border-4 border-indigo-500/30 border-t-indigo-500 rounded-full"
-                    />
-                    <div className="absolute inset-0 flex items-center justify-center">
-                        <Power className="w-6 h-6 text-white" />
-                    </div>
-                </div>
-                <h1 className="text-2xl font-bold tracking-tight mb-2">FiaOS v0.2</h1>
-                <p className="text-white/40 text-xs font-mono mb-8 uppercase tracking-widest">Initialisiere Herz-Protokolle...</p>
-                
-                {/* Progress Bar */}
-                <div className="w-64 h-1 bg-white/10 rounded-full overflow-hidden">
-                    <motion.div 
-                        style={{ width: `${bootProgress}%` }}
-                        className="h-full bg-white shadow-[0_0_10px_white]"
-                    />
-                </div>
+                <motion.div 
+                    animate={{ boxShadow: ["0 0 0px rgba(255,255,255,0)", "0 0 30px rgba(255,255,255,0.2)", "0 0 0px rgba(255,255,255,0)"] }}
+                    transition={{ duration: 2, repeat: Infinity }}
+                    className="w-20 h-20 bg-white rounded-[2rem] flex items-center justify-center mb-6"
+                >
+                    <Heart className="w-8 h-8 text-black fill-black" />
+                </motion.div>
+                <h1 className="text-3xl font-bold tracking-tight bg-clip-text text-transparent bg-gradient-to-b from-white to-white/50">
+                    FiaOS
+                </h1>
             </motion.div>
         )}
 
-        {/* STEP 1: WELCOME & CONNECT */}
-        {step === 1 && (
+        {/* PHASE 2: WELCOME TEXT */}
+        {phase === 1 && (
             <motion.div 
                 key="welcome"
-                variants={variants}
-                initial="initial" animate="animate" exit="exit"
-                className="flex-1 flex flex-col p-8 pt-20 z-10"
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0, y: -20 }}
+                transition={{ duration: 1 }}
+                className="flex-1 flex flex-col items-center justify-center z-10 p-8 text-center"
             >
-                <div className="flex-1">
-                    <div className="w-12 h-12 bg-white rounded-2xl flex items-center justify-center mb-6 shadow-[0_0_30px_rgba(255,255,255,0.2)]">
-                        <Heart className="w-6 h-6 text-black fill-black" />
-                    </div>
-                    <h1 className="text-4xl font-bold mb-4 leading-tight">Hallo.<br/>Willkommen zuhause.</h1>
-                    <p className="text-lg text-white/60 leading-relaxed">
-                        FiaOS ist dein persönlicher Raum. Hier sind unsere Erinnerungen, Ziele und kleinen Momente sicher verwahrt.
-                    </p>
-                </div>
-
-                <button onClick={nextStep} className="w-full bg-white text-black font-bold py-4 rounded-full text-lg flex items-center justify-center gap-2 active:scale-95 transition-transform">
-                    Weiter <ChevronRight className="w-5 h-5" />
-                </button>
+                <motion.h2 
+                    initial={{ y: 20, opacity: 0 }}
+                    animate={{ y: 0, opacity: 1 }}
+                    transition={{ delay: 0.2 }}
+                    className="text-4xl font-light mb-4"
+                >
+                    Willkommen.
+                </motion.h2>
+                <motion.p 
+                    initial={{ y: 20, opacity: 0 }}
+                    animate={{ y: 0, opacity: 1 }}
+                    transition={{ delay: 1.5 }}
+                    className="text-xl text-white/60 font-light"
+                >
+                    Das hier ist euer Raum.
+                </motion.p>
             </motion.div>
         )}
 
-        {/* STEP 2: MODULES CHECK */}
-        {step === 2 && (
+        {/* PHASE 3: CARDS */}
+        {phase === 2 && (
             <motion.div 
-                key="modules"
-                variants={variants}
-                initial="initial" animate="animate" exit="exit"
-                className="flex-1 flex flex-col p-8 pt-20 z-10"
+                key="cards"
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                className="flex-1 flex flex-col z-10 pt-20 pb-12 px-6"
             >
-                <h2 className="text-3xl font-bold mb-8">System Status</h2>
-                
-                <div className="space-y-4 mb-8">
-                    <FeatureRow icon={<ShieldCheck className="w-5 h-5 text-green-400" />} title="Verbindung" desc="Sicher & Verschlüsselt" delay={0.1} />
-                    <FeatureRow icon={<Zap className="w-5 h-5 text-yellow-400" />} title="Synchronisation" desc="Cloud Aktiv" delay={0.3} />
-                    <FeatureRow icon={<Sparkles className="w-5 h-5 text-pink-400" />} title="Love Engine" desc="100% Kapazität" delay={0.5} />
+                <div className="flex-1 flex items-center justify-center">
+                    <AnimatePresence mode='wait'>
+                        <motion.div
+                            key={cardIndex}
+                            initial={{ opacity: 0, x: 50, scale: 0.95 }}
+                            animate={{ opacity: 1, x: 0, scale: 1 }}
+                            exit={{ opacity: 0, x: -50, scale: 0.95 }}
+                            transition={{ type: "spring", stiffness: 300, damping: 30 }}
+                            className="w-full max-w-sm bg-[#1c1c1e] border border-white/10 rounded-[2.5rem] p-8 min-h-[400px] flex flex-col items-center justify-center text-center shadow-2xl relative overflow-hidden"
+                        >
+                            {/* Card Background Glow */}
+                            <div className="absolute inset-0 bg-gradient-to-b from-white/5 to-transparent pointer-events-none" />
+                            
+                            <div className="mb-8 p-6 bg-white/5 rounded-full relative z-10">
+                                {cards[cardIndex].icon}
+                            </div>
+                            
+                            <h3 className="text-3xl font-bold mb-4">{cards[cardIndex].title}</h3>
+                            <p className="text-lg text-white/60 leading-relaxed font-light">
+                                {cards[cardIndex].text}
+                            </p>
+
+                            {/* Pagination Dots inside card or below? Below looks cleaner for iOS style */}
+                        </motion.div>
+                    </AnimatePresence>
                 </div>
 
-                <div className="flex-1" />
+                <div className="mt-8 flex flex-col items-center gap-8">
+                    {/* Dots */}
+                    <div className="flex gap-2">
+                        {cards.map((_, i) => (
+                            <div 
+                                key={i} 
+                                className={`w-2 h-2 rounded-full transition-all duration-300 ${i === cardIndex ? 'bg-white w-6' : 'bg-white/20'}`}
+                            />
+                        ))}
+                    </div>
 
-                <button onClick={finish} className="w-full bg-indigo-600 text-white font-bold py-4 rounded-full text-lg shadow-lg shadow-indigo-900/50 active:scale-95 transition-transform">
-                    System Starten
-                </button>
+                    <button 
+                        onClick={nextCard}
+                        className="w-full max-w-xs bg-white text-black font-bold py-4 rounded-full text-lg flex items-center justify-center gap-2 active:scale-95 transition-transform shadow-[0_0_20px_rgba(255,255,255,0.2)]"
+                    >
+                        {cardIndex === cards.length - 1 ? 'Starten' : 'Weiter'} 
+                        <ChevronRight className="w-5 h-5" />
+                    </button>
+                </div>
+            </motion.div>
+        )}
+
+        {/* PHASE 4: FINISH */}
+        {phase === 3 && (
+            <motion.div 
+                key="finish"
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                className="flex-1 flex flex-col items-center justify-center z-10 p-8 text-center"
+            >
+                <motion.div
+                    initial={{ scale: 0.8, opacity: 0 }}
+                    animate={{ scale: 1, opacity: 1 }}
+                    transition={{ delay: 0.2 }}
+                    className="mb-12"
+                >
+                    <h2 className="text-5xl font-bold mb-6">Bereit?</h2>
+                    <p className="text-xl text-white/50">
+                        FiaOS ist eingerichtet.
+                    </p>
+                </motion.div>
+
+                <motion.button 
+                    initial={{ y: 20, opacity: 0 }}
+                    animate={{ y: 0, opacity: 1 }}
+                    transition={{ delay: 0.5 }}
+                    onClick={finish}
+                    className="w-full max-w-xs bg-indigo-500 text-white font-bold py-5 rounded-full text-xl shadow-lg shadow-indigo-500/30 active:scale-95 transition-transform"
+                >
+                    Ankommen
+                </motion.button>
             </motion.div>
         )}
 
@@ -140,25 +221,5 @@ const Onboarding: React.FC<OnboardingProps> = ({ onComplete }) => {
     </motion.div>
   );
 };
-
-const FeatureRow = ({ icon, title, desc, delay }: { icon: any, title: string, desc: string, delay: number }) => (
-    <motion.div 
-        initial={{ opacity: 0, x: -20 }}
-        animate={{ opacity: 1, x: 0 }}
-        transition={{ delay }}
-        className="flex items-center gap-4 p-4 bg-white/5 rounded-2xl border border-white/5"
-    >
-        <div className="w-10 h-10 rounded-full bg-white/5 flex items-center justify-center">
-            {icon}
-        </div>
-        <div>
-            <div className="font-bold text-white">{title}</div>
-            <div className="text-xs text-white/50">{desc}</div>
-        </div>
-        <div className="ml-auto">
-            <Check className="w-5 h-5 text-white/30" />
-        </div>
-    </motion.div>
-);
 
 export default Onboarding;
