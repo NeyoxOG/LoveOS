@@ -31,89 +31,38 @@
             user-select: none;
         }
 
-        /* Top Bar */
         .topbar {
             padding: 16px 20px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            background: rgba(28, 28, 30, 0.8);
-            backdrop-filter: blur(20px);
-            border-bottom: 1px solid var(--border);
-            z-index: 50;
-            position: relative;
+            display: flex; align-items: center; justify-content: center;
+            background: rgba(28, 28, 30, 0.8); backdrop-filter: blur(20px);
+            border-bottom: 1px solid var(--border); z-index: 50;
         }
         .title { font-size: 17px; font-weight: 600; text-align: center; }
         .badge { background: #4f46e5; color: #fff; font-size: 10px; padding: 2px 6px; border-radius: 4px; margin-left: 6px; font-weight: 700; text-transform: uppercase; }
 
-        /* Tabs */
-        .tabs-container {
-            padding: 12px 16px;
-            background: rgba(28, 28, 30, 0.5);
-        }
+        .tabs-container { padding: 12px 16px; background: rgba(28, 28, 30, 0.5); }
         .segmented-control {
-            background: rgba(118, 118, 128, 0.24);
-            border-radius: 9px;
-            padding: 2px;
-            display: flex;
-            position: relative;
+            background: rgba(118, 118, 128, 0.24); border-radius: 9px; padding: 2px;
+            display: flex; position: relative;
         }
-        .segment-btn {
-            flex: 1;
-            padding: 6px 0;
-            text-align: center;
-            font-size: 13px;
-            font-weight: 500;
-            color: #fff;
-            z-index: 2;
-            cursor: pointer;
-        }
+        .segment-btn { flex: 1; padding: 6px 0; text-align: center; font-size: 13px; font-weight: 500; color: #fff; z-index: 2; cursor: pointer; }
         .segment-indicator {
-            position: absolute;
-            top: 2px; bottom: 2px;
-            width: 25%;
-            background: #636366;
-            border-radius: 7px;
-            box-shadow: 0 3px 8px rgba(0,0,0,0.12);
-            transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-            z-index: 1;
+            position: absolute; top: 2px; bottom: 2px; width: 25%; background: #636366;
+            border-radius: 7px; box-shadow: 0 3px 8px rgba(0,0,0,0.12); transition: transform 0.3s ease; z-index: 1;
         }
 
-        /* Content */
-        .content {
-            flex: 1;
-            overflow-y: auto;
-            padding: 20px;
-            padding-bottom: 80px;
-        }
+        .content { flex: 1; overflow-y: auto; padding: 20px; padding-bottom: 80px; }
         .hidden { display: none; }
 
-        /* Card Styles */
-        .card-group {
-            background: var(--bg-card);
-            border-radius: 12px;
-            overflow: hidden;
-            margin-bottom: 24px;
-        }
+        .card-group { background: var(--bg-card); border-radius: 12px; overflow: hidden; margin-bottom: 24px; }
         .group-title { font-size: 13px; text-transform: uppercase; color: var(--text-dim); margin: 0 0 8px 12px; letter-spacing: 0.5px; }
 
         .list-item {
-            display: flex; align-items: center; justify-content: space-between;
-            padding: 16px;
-            background: var(--bg-card);
-            border-bottom: 1px solid var(--border);
-            font-size: 15px;
+            display: flex; align-items: center; justify-content: space-between; padding: 16px;
+            background: var(--bg-card); border-bottom: 1px solid var(--border); font-size: 15px;
         }
         .list-item:last-child { border-bottom: none; }
-        .list-item-content { display: flex; align-items: center; gap: 12px; }
-        .list-avatar { width: 36px; height: 36px; border-radius: 50%; background: #333; display: flex; justify-content: center; align-items: center; font-size: 18px; }
-        .list-info { display: flex; flex-direction: column; }
-        .list-sub { font-size: 12px; color: var(--text-dim); }
-        .list-tag { font-size: 10px; padding: 2px 6px; border-radius: 4px; background: #333; color: #aaa; margin-left: 6px; font-weight: 600; text-transform: uppercase; }
-        .list-tag.banned { background: rgba(239, 68, 68, 0.2); color: #ef4444; }
-        .list-tag.admin { background: rgba(99, 102, 241, 0.2); color: #818cf8; }
-
-        /* Controls */
+        
         .toggle {
             width: 50px; height: 30px; background: #333; border-radius: 15px; position: relative; transition: 0.3s; cursor: pointer;
         }
@@ -124,40 +73,30 @@
         .toggle.active { background: #34c759; }
         .toggle.active::after { transform: translateX(20px); }
 
-        button.btn {
-            background: #007aff; color: white; border: none; padding: 6px 14px; border-radius: 16px; font-size: 13px; font-weight: 600; cursor: pointer;
-        }
+        button.btn { background: #007aff; color: white; border: none; padding: 6px 14px; border-radius: 16px; font-size: 13px; font-weight: 600; cursor: pointer; }
         button.btn.danger { background: var(--danger); }
-        button.btn.secondary { background: rgba(255,255,255,0.1); }
         button.btn.full { width: 100%; padding: 14px; border-radius: 12px; font-size: 15px; }
+
+        /* JSON Editor */
+        .json-editor {
+            width: 100%; height: 300px; background: #111; color: #0f0; 
+            font-family: monospace; border: 1px solid var(--border); border-radius: 8px; padding: 10px;
+            margin-top: 10px; resize: vertical;
+        }
+        select { background: #2c2c2e; color: white; border: none; padding: 12px; border-radius: 12px; width: 100%; font-size: 16px; margin-top: 8px; }
         
-        /* Modal Overlay */
-        .modal {
-            position: fixed; inset: 0; background: rgba(0,0,0,0.5); backdrop-filter: blur(5px);
-            z-index: 100; display: none; align-items: flex-end;
+        .loading-overlay { 
+            position: absolute; inset:0; background: rgba(0,0,0,0.5); display: flex; align-items: center; justify-content: center; z-index: 10;
         }
-        .modal.active { display: flex; }
-        .modal-sheet {
-            background: #1c1c1e; width: 100%; border-top-left-radius: 20px; border-top-right-radius: 20px;
-            padding: 24px; box-shadow: 0 -10px 40px rgba(0,0,0,0.5); border-top: 1px solid var(--border);
-            animation: slideUp 0.3s ease-out;
-        }
-        @keyframes slideUp { from { transform: translateY(100%); } to { transform: translateY(0); } }
-
-        select {
-            background: #2c2c2e; color: white; border: none; padding: 12px; border-radius: 12px; width: 100%; font-size: 16px; margin-top: 8px; appearance: none;
-        }
-        label { font-size: 12px; color: var(--text-dim); text-transform: uppercase; letter-spacing: 0.5px; display: block; margin-top: 16px; }
-
-        .confirm-actions { display: flex; gap: 12px; margin-top: 30px; }
-        .confirm-actions button { flex: 1; }
+        .spinner { width: 30px; height: 30px; border: 3px solid rgba(255,255,255,0.3); border-top-color: #fff; border-radius: 50%; animation: spin 1s linear infinite; }
+        @keyframes spin { to { transform: rotate(360deg); } }
 
     </style>
 </head>
 <body>
 
     <div class="topbar">
-        <div class="title">Admin Center <span class="badge">PRO</span></div>
+        <div class="title">Admin Center <span class="badge">V2</span></div>
     </div>
 
     <div class="tabs-container">
@@ -165,7 +104,7 @@
             <div class="segment-indicator" id="segIndicator"></div>
             <div class="segment-btn" onclick="switchTab('users', 0)">Users</div>
             <div class="segment-btn" onclick="switchTab('apps', 1)">Apps</div>
-            <div class="segment-btn" onclick="switchTab('rewards', 2)">Rewards</div>
+            <div class="segment-btn" onclick="switchTab('data', 2)">Cloud Data</div>
             <div class="segment-btn" onclick="switchTab('system', 3)">System</div>
         </div>
     </div>
@@ -175,41 +114,43 @@
         <!-- USERS TAB -->
         <div id="tab-users">
             <div class="group-title">User Management</div>
-            <div class="card-group" id="usersList">
-                <!-- Populated by JS -->
-            </div>
+            <div class="card-group" id="usersList"></div>
         </div>
 
         <!-- APPS TAB -->
         <div id="tab-apps" class="hidden">
             <div class="group-title">App Visibility</div>
-            <div class="card-group" id="appsList">
-                <!-- Populated by JS -->
-            </div>
-            <p style="font-size:12px; color:#666; padding:0 16px; text-align:center;">Versteckte Apps sind nicht im Home, Dock oder per Link erreichbar.</p>
+            <div class="card-group" id="appsList"></div>
         </div>
 
-        <!-- REWARDS TAB -->
-        <div id="tab-rewards" class="hidden">
-            <div class="group-title">Unlock Tool</div>
-            <div class="card-group" style="padding:16px;">
-                <label>Target User</label>
-                <select id="rewardUserSelect"></select>
-                
-                <label>Reward ID</label>
-                <select id="rewardIdSelect"></select>
-                
-                <div style="margin-top:20px;">
-                    <button class="btn full" onclick="adminUnlockReward()">Unlock Selected 🔓</button>
+        <!-- DATA INSPECTOR TAB -->
+        <div id="tab-data" class="hidden">
+            <div class="group-title">Cloud Inspector</div>
+            <div class="card-group" style="padding: 16px; position: relative;">
+                <label style="color:#aaa; font-size:12px; text-transform:uppercase;">User / Target</label>
+                <select id="inspUser">
+                    <option value="fia">Fia</option>
+                    <option value="collin">Collin</option>
+                    <option value="guest">Guest (Local Only)</option>
+                </select>
+
+                <label style="color:#aaa; font-size:12px; text-transform:uppercase; margin-top:16px; display:block;">Data Type</label>
+                <select id="inspType">
+                    <option value="profile">User Profile</option>
+                    <option value="rewards">Rewards & Valentine</option>
+                    <option value="prefs">Settings & Themes</option>
+                    <option value="luna">Luna State (Shared)</option>
+                    <option value="adminConfig">Admin Config</option>
+                </select>
+
+                <div style="display:flex; gap:10px; margin-top:20px;">
+                    <button class="btn full" style="background:#333;" onclick="fetchInspectorData()">Fetch JSON</button>
+                    <button class="btn full" onclick="saveInspectorData()">Save Changes</button>
                 </div>
-            </div>
-            
-            <div class="group-title">Mass Actions</div>
-            <div class="card-group">
-                <div class="list-item" onclick="confirmAction('resetRewards')">
-                    <span style="color:var(--text-dim)">Reset ALL Rewards</span>
-                    <button class="btn secondary">Reset</button>
-                </div>
+
+                <textarea id="jsonEditor" class="json-editor" spellcheck="false">// Select data and click Fetch...</textarea>
+                
+                <div id="inspLoading" class="loading-overlay hidden"><div class="spinner"></div></div>
             </div>
         </div>
 
@@ -222,72 +163,12 @@
                     <div class="toggle" id="toggleMaint" onclick="toggleMaintenance()"></div>
                 </div>
             </div>
-
-            <div class="group-title">System Actions</div>
+            <div class="group-title">Actions</div>
             <div class="card-group">
-                <div class="list-item" onclick="confirmAction('lunaReset')">
-                    <span>Luna Reset</span>
-                    <button class="btn danger">Execute</button>
-                </div>
-                <div class="list-item" onclick="confirmAction('dailyReset')">
-                    <span>Daily Reset</span>
-                    <button class="btn danger">Execute</button>
-                </div>
-                <div class="list-item" onclick="confirmAction('globalLogout')">
-                    <span>Global Logout</span>
-                    <button class="btn danger">Execute</button>
-                </div>
-            </div>
-            
-            <div class="group-title">Data</div>
-            <div class="card-group">
-                <div class="list-item" onclick="exportConfig()">
-                    <span>Export Config JSON</span>
-                    <span>›</span>
-                </div>
+                <div class="list-item"><button class="btn danger full" onclick="confirmAction('globalLogout')">Force Global Logout</button></div>
             </div>
         </div>
 
-    </div>
-
-    <!-- User Edit Modal -->
-    <div class="modal" id="userModal">
-        <div class="modal-sheet">
-            <h3 style="margin-top:0; font-size:22px;">Edit User</h3>
-            <p id="editUserName" style="color:#888; margin-bottom:20px; font-size:14px;"></p>
-            
-            <label>Role</label>
-            <select id="editUserRole">
-                <option value="user">User</option>
-                <option value="admin">Admin</option>
-                <option value="guest">Guest</option>
-                <option value="developer">Developer</option>
-            </select>
-
-            <label>Status</label>
-            <div style="background:#2c2c2e; padding:12px; border-radius:12px; display:flex; justify-content:space-between; align-items:center; margin-top:8px;">
-                <span>Banned</span>
-                <div class="toggle" id="editUserBanToggle" onclick="toggleEditBan()"></div>
-            </div>
-
-            <div class="confirm-actions">
-                <button class="btn secondary" onclick="closeModal()">Cancel</button>
-                <button class="btn danger" onclick="forceLogoutUser()">Force Logout</button>
-                <button class="btn" style="background:white; color:black;" onclick="saveUserEdit()">Save</button>
-            </div>
-        </div>
-    </div>
-
-    <!-- Confirmation Modal -->
-    <div class="modal" id="confirmModal">
-        <div class="modal-sheet">
-            <h3 style="margin-top:0; font-size:22px;">Are you sure?</h3>
-            <p id="confirmText" style="color:#888; margin-bottom:20px; font-size:14px;">This action cannot be undone.</p>
-            <div class="confirm-actions">
-                <button class="btn secondary" onclick="closeConfirm()">Cancel</button>
-                <button class="btn danger" id="confirmBtnAction">Confirm</button>
-            </div>
-        </div>
     </div>
 
     <script src="admin.js"></script>

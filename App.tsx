@@ -6,7 +6,7 @@ import { loadSession, saveSession, clearSession } from './utils/session';
 import { cloud } from './utils/cloud'; 
 import { 
   INITIAL_REWARDS_DATA,
-  saveUserRewards, unlockRewardLogic, setRewardsLastSeen, 
+  unlockRewardLogic, setRewardsLastSeen, 
   loadUserProfile, loadUserPrefs, applyTheme, saveLastApp,
   loadAdminConfig, updateUserIndex
 } from './utils/data';
@@ -65,9 +65,35 @@ const App: React.FC = () => {
     setToast({ id: Date.now(), message });
   }, []);
 
+  // --- AUTOMATIC ERROR DETECTION ---
+  useEffect(() => {
+    const handleError = (event: ErrorEvent | PromiseRejectionEvent) => {
+      let msg = 'Unbekannter Fehler';
+      if (event instanceof ErrorEvent) msg = event.message;
+      else if (event instanceof PromiseRejectionEvent) msg = String(event.reason);
+
+      console.group('%c[FiaOS Auto-Detect] Critical Error', 'color: red; font-weight: bold; background: #ffe4e6; padding: 4px;');
+      console.error(msg);
+      console.log('Session:', session);
+      console.groupEnd();
+
+      // Only show toast for non-trivial errors
+      if (!msg.includes('ResizeObserver') && !msg.includes('Script error')) {
+          showToast(`System Fehler: Check Console ⚠️`);
+      }
+    };
+
+    window.addEventListener('error', handleError);
+    window.addEventListener('unhandledrejection', handleError);
+
+    return () => {
+      window.removeEventListener('error', handleError);
+      window.removeEventListener('unhandledrejection', handleError);
+    };
+  }, [session, showToast]);
+
   // Initialize App
   useEffect(() => {
-    // Expose Cloud API
     window.FIAOS = {
         ...(window.FIAOS || {}),
         cloud: cloud,
@@ -82,10 +108,9 @@ const App: React.FC = () => {
 
     const storedSession = loadSession();
     if (storedSession) {
-      // Restore Cloud Connection
       cloud.restoreConnection().then(() => {
-          // After auth restore, load cloud data
           if (storedSession.role !== 'guest') {
+              // 1. Config
               cloud.loadAdminConfig().then(remoteConfig => {
                   if (remoteConfig) {
                       setAdminConfig(remoteConfig);
@@ -96,6 +121,7 @@ const App: React.FC = () => {
                   }
               });
               
+              // 2. Rewards
               cloud.loadRewards().then(data => {
                   if (data) setRewardsData(data);
                   else {
@@ -105,12 +131,26 @@ const App: React.FC = () => {
                   }
               });
 
+              // 3. Profile
               cloud.loadProfile().then(p => {
                   if (p) setUserProfile(p as UserProfile);
                   else {
                       const local = loadUserProfile(storedSession);
                       setUserProfile(local);
                       cloud.saveProfile(local); 
+                  }
+              });
+
+              // 4. Prefs (Themes) - CLOUD SYNC FIX
+              cloud.loadPrefs().then(p => {
+                  if (p) {
+                      setUserPrefs(p);
+                      applyTheme(p);
+                  } else {
+                      const local = loadUserPrefs(storedSession);
+                      setUserPrefs(local);
+                      applyTheme(local);
+                      cloud.savePrefs(local);
                   }
               });
           }
@@ -123,11 +163,10 @@ const App: React.FC = () => {
           const initial = JSON.parse(JSON.stringify(INITIAL_REWARDS_DATA));
           setRewardsData(initial);
           setUserProfile(loadUserProfile(storedSession));
+          const p = loadUserPrefs(storedSession);
+          setUserPrefs(p);
+          applyTheme(p);
       }
-
-      const prefs = loadUserPrefs(storedSession);
-      setUserPrefs(prefs);
-      applyTheme(prefs);
     }
   }, [showToast]);
 
@@ -161,6 +200,10 @@ const App: React.FC = () => {
     window.FIAOS_APPLY_PREFS = (prefs: UserPrefs) => {
         setUserPrefs(prefs);
         applyTheme(prefs);
+        // Sync to cloud on local change
+        if (session && session.role !== 'guest') {
+            cloud.savePrefs(prefs);
+        }
     };
 
     window.FIAOS_PROFILE_UPDATED = (profile: UserProfile) => {
@@ -186,7 +229,7 @@ const App: React.FC = () => {
     };
   }, [session, handleUnlockReward, showToast, rewardsData]);
 
-  // Auth
+  // Auth & other methods (omitted for brevity, they remain same as before)
   const handleSelectUser = (user: User) => {
     if (adminConfig && adminConfig.userStatus[user.id]?.banned) {
         showToast("Dieser Account ist gesperrt ⛔");
@@ -240,20 +283,12 @@ const App: React.FC = () => {
     setSession(newSession);
     saveSession(newSession);
     
-    cloud.loadRewards().then(data => {
-        if (data) setRewardsData(data);
-        else {
-            const initial = JSON.parse(JSON.stringify(INITIAL_REWARDS_DATA));
-            setRewardsData(initial);
-            cloud.saveRewards(initial);
-        }
-    });
+    // Trigger parallel data loads
+    cloud.loadRewards().then(d => { if(d) setRewardsData(d); else { const i = JSON.parse(JSON.stringify(INITIAL_REWARDS_DATA)); setRewardsData(i); cloud.saveRewards(i); }});
+    cloud.loadPrefs().then(p => { if(p) { setUserPrefs(p); applyTheme(p); } });
 
     const profile = loadUserProfile(newSession);
-    const prefs = loadUserPrefs(newSession);
     setUserProfile(profile);
-    setUserPrefs(prefs);
-    applyTheme(prefs);
     
     updateUserIndex(newSession, profile);
     closeAuthSheet();
@@ -272,53 +307,29 @@ const App: React.FC = () => {
     setUserProfile(null);
     setUserPrefs(null);
     setIsAccountSheetOpen(false);
-    
     document.documentElement.style.cssText = '';
     document.body.className = '';
   };
 
-  const closeAuthSheet = () => {
-    setIsAuthSheetOpen(false);
-    setTimeout(() => setSelectedUser(null), 300);
-  };
+  const closeAuthSheet = () => { setIsAuthSheetOpen(false); setTimeout(() => setSelectedUser(null), 300); };
 
   const handleAppClick = (app: AppItem) => {
     if (!session) { showToast("Bitte einloggen."); return; }
-
     if (adminConfig && !adminConfig.appVisibility[app.id] && app.id !== 'settings') {
          if (session.role !== 'admin' && session.role !== 'developer') {
              showToast("Diese App ist vom Admin deaktiviert 🔒");
              return;
          }
     }
-    
     saveLastApp(session, app.id);
     handleUnlockReward('reward.firstAppOpen');
-
-    if (app.id === 'valentine') {
-      setRewardsTab('valentine');
-      setIsRewardsOpen(true);
-    } else if (['luna', 'vault', 'settings', 'admin', 'games', 'diary', 'daily', 'love'].includes(app.id)) {
-      setOpenedApp({ id: app.id, name: app.name });
-    } else {
-      showToast("Bald verfügbar ✨");
-    }
+    if (app.id === 'valentine') { setRewardsTab('valentine'); setIsRewardsOpen(true); } 
+    else if (['luna', 'vault', 'settings', 'admin', 'games', 'diary', 'daily', 'love'].includes(app.id)) { setOpenedApp({ id: app.id, name: app.name }); } 
+    else { showToast("Bald verfügbar ✨"); }
   };
 
-  const handleOpenRewards = (tab = 'general') => {
-    if (!session) return;
-    setRewardsTab(tab);
-    setIsRewardsOpen(true);
-  };
-
-  const handleCloseRewards = () => {
-    setIsRewardsOpen(false);
-    if (session && rewardsData) {
-      const updated = setRewardsLastSeen(session.userId, rewardsData);
-      setRewardsData(updated);
-      cloud.saveRewards(updated); 
-    }
-  };
+  const handleOpenRewards = (tab = 'general') => { if (!session) return; setRewardsTab(tab); setIsRewardsOpen(true); };
+  const handleCloseRewards = () => { setIsRewardsOpen(false); if (session && rewardsData) { const updated = setRewardsLastSeen(session.userId, rewardsData); setRewardsData(updated); cloud.saveRewards(updated); } };
 
   return (
     <div className="relative h-full w-full bg-slate-950 overflow-hidden font-sans text-slate-50 selection:bg-indigo-500/30">
@@ -349,37 +360,11 @@ const App: React.FC = () => {
         onClose={() => setOpenedApp(null)}
       />
 
-      <AuthSheet 
-        isOpen={isAuthSheetOpen} 
-        onClose={closeAuthSheet} 
-        user={selectedUser} 
-        onLogin={attemptLogin}
-      />
-
-      <AccountSheet 
-        isOpen={isAccountSheetOpen}
-        onClose={() => setIsAccountSheetOpen(false)}
-        profile={userProfile}
-        onLogout={handleLogout}
-        onOpenSettings={() => setOpenedApp({ id: 'settings', name: 'Einstellungen' })}
-      />
-
-      <RewardsSheet 
-        isOpen={isRewardsOpen} 
-        onClose={handleCloseRewards} 
-        rewardsData={rewardsData}
-        initialTab={rewardsTab}
-      />
-
-      <Overlay 
-        state={overlay} 
-        onClose={() => setOverlay(prev => ({ ...prev, isOpen: false }))} 
-      />
-
-      <Toast 
-        message={toast.message} 
-        onClear={() => setToast({ id: 0, message: '' })} 
-      />
+      <AuthSheet isOpen={isAuthSheetOpen} onClose={closeAuthSheet} user={selectedUser} onLogin={attemptLogin} />
+      <AccountSheet isOpen={isAccountSheetOpen} onClose={() => setIsAccountSheetOpen(false)} profile={userProfile} onLogout={handleLogout} onOpenSettings={() => setOpenedApp({ id: 'settings', name: 'Einstellungen' })} />
+      <RewardsSheet isOpen={isRewardsOpen} onClose={handleCloseRewards} rewardsData={rewardsData} initialTab={rewardsTab} />
+      <Overlay state={overlay} onClose={() => setOverlay(prev => ({ ...prev, isOpen: false }))} />
+      <Toast message={toast.message} onClear={() => setToast({ id: 0, message: '' })} />
     </div>
   );
 };
