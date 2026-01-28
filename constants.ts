@@ -28,6 +28,7 @@ export const USERS: User[] = [
 export const APPS: AppItem[] = [
   { id:"love", name:"Love", icon:"💞", status:"available" },
   { id:"daily", name:"Daily", icon:"✨", status:"available" },
+  { id:"rewards_app", name:"Belohnungen", icon:"🎁", status:"available" },
   { id:"valentine", name:"Valentinstag", icon:"💘", status:"lockedHint" },
   { id:"luna", name:"Luna", icon:"🐑", status:"lockedHint" },
   { id:"vault", name:"Message Vault", icon:"💌", status:"available" },
@@ -50,6 +51,17 @@ export const REWARD_CATALOG: Reward[] = [
   { id: 'reward.streak3', title: '3 Tage da', description: 'Du brennst für uns! 🔥', icon: '🔥', category: 'general' },
   { id: 'reward.secretLove', title: 'Secret Love', description: 'Du hast das Geheimnis gefunden 💗', icon: '💗', category: 'general' },
   
+  // Special Welcome Gift
+  { 
+    id: 'reward.welcomeTheme', 
+    title: 'Willkommens-Geschenk', 
+    description: 'Theme: Aurora freischalten 🌌', 
+    icon: '🎁', 
+    type: 'theme_unlock', 
+    category: 'general',
+    payload: { themeId: 'aurora' }
+  },
+
   // Games
   { id: 'games.stack.10', title: 'Stapler: Anfänger', description: '10 Herzen gestapelt 🧱', icon: '🧱', category: 'games' },
   { id: 'games.stack.50', title: 'Stapler: Profi', description: '50 Herzen gestapelt 🏗️', icon: '🏗️', category: 'games' },
@@ -57,9 +69,12 @@ export const REWARD_CATALOG: Reward[] = [
   { id: 'games.react.first', title: 'Reflex: Erster Treffer', description: 'Ein perfekter Schlag ⚡', icon: '⚡', category: 'games' },
   { id: 'games.react.combo10', title: 'Reflex: Combo King', description: '10x Perfekt in Folge 🔥', icon: '🔥', category: 'games' },
   { id: 'games.react.200', title: 'Reflex: Speedster', description: 'Über 200 Punkte erreicht 🚀', icon: '🚀', category: 'games' },
-  { id: 'games.fill.first', title: 'Packer: Erste Box', description: 'Ordnung muss sein 📦', icon: '📦', category: 'games' },
-  { id: 'games.fill.300', title: 'Packer: Tetris God', description: 'Über 300 Punkte 🧠', icon: '🧠', category: 'games' },
-  { id: 'games.fill.perfect', title: 'Packer: Perfektion', description: 'Eine Runde ohne Fehler ✨', icon: '✨', category: 'games' },
+  
+  // BlockBlast
+  { id: 'games.block.starter', title: 'Block: Starter', description: '500 Punkte erreicht 🟦', icon: '🟦', category: 'games' },
+  { id: 'games.block.master', title: 'Block: Master', description: '1500 Punkte. Das Grid gehört dir! 🧠', icon: '🧠', category: 'games' },
+  { id: 'games.block.combo', title: 'Block: Combo Love', description: '3 Reihen auf einmal zerstört! 💥', icon: '💥', category: 'games' },
+
   { id: 'games.puzzle.solve', title: 'Puzzle: Gelöst', description: 'Bild zusammengesetzt 🧩', icon: '🧩', category: 'games' },
   { id: 'games.puzzle.sub60', title: 'Puzzle: Schnell', description: 'Unter 60 Sekunden ⏱️', icon: '⏱️', category: 'games' },
   { id: 'games.puzzle.sub40', title: 'Puzzle: Blitz', description: 'Unter 40 Sekunden ⚡', icon: '⚡', category: 'games' },
@@ -142,6 +157,17 @@ export const THEMES: Record<string, ThemeDef> = {
       cardBg: 'rgba(255, 255, 255, 0.08)',
       text: '#fff',
       textDim: 'rgba(255, 255, 255, 0.5)'
+    }
+  },
+  aurora: {
+    id: 'aurora',
+    name: 'Aurora Dreams',
+    unlockRewardId: 'reward.welcomeTheme',
+    colors: {
+      bgGradient: 'linear-gradient(135deg, #2b5876 0%, #4e4376 100%)',
+      cardBg: 'rgba(255, 255, 255, 0.12)',
+      text: '#ffffff',
+      textDim: 'rgba(224, 231, 255, 0.6)'
     }
   },
   softRose: {

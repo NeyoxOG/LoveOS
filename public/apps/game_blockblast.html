@@ -1,0 +1,183 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>BlockBlast</title>
+    <style>
+        :root {
+            --bg-dark: #0f172a;
+            --grid-bg: #1e293b;
+            --cell-bg: rgba(255, 255, 255, 0.05);
+            --primary: #f472b6;
+        }
+
+        body { 
+            margin: 0; padding: 0; 
+            background: var(--bg-dark); color: #fff; 
+            font-family: -apple-system, system-ui, sans-serif; 
+            height: 100vh; overflow: hidden; 
+            display: flex; flex-direction: column; 
+            user-select: none; touch-action: none;
+        }
+
+        .header {
+            padding: 16px 20px;
+            display: flex; justify-content: space-between; align-items: center;
+            z-index: 10;
+        }
+        .score-container { text-align: center; }
+        .score-label { font-size: 12px; color: #94a3b8; text-transform: uppercase; font-weight: 600; }
+        .score-val { font-size: 24px; font-weight: 800; color: #fff; }
+        
+        .btn-close {
+            background: rgba(255,255,255,0.1); width: 40px; height: 40px;
+            border-radius: 50%; border: none; color: white; font-size: 20px;
+            display: flex; align-items: center; justify-content: center; cursor: pointer;
+        }
+
+        .game-area {
+            flex: 1;
+            display: flex; flex-direction: column; align-items: center; justify-content: center;
+            position: relative;
+        }
+
+        /* The Board */
+        .board-wrapper {
+            background: #1e293b; padding: 10px; border-radius: 12px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.3);
+            border: 1px solid rgba(255,255,255,0.1);
+        }
+        .grid {
+            display: grid;
+            grid-template-columns: repeat(10, 1fr);
+            grid-template-rows: repeat(10, 1fr);
+            gap: 2px;
+            width: 320px; height: 320px;
+        }
+        .cell {
+            background: var(--cell-bg);
+            border-radius: 3px;
+            transition: background 0.1s, transform 0.2s;
+        }
+        .cell.filled {
+            box-shadow: inset 0 0 4px rgba(0,0,0,0.2);
+        }
+        .cell.flash {
+            animation: flashCell 0.3s ease-out;
+        }
+        @keyframes flashCell {
+            0% { transform: scale(1); filter: brightness(2); }
+            50% { transform: scale(1.2); }
+            100% { transform: scale(0); opacity: 0; }
+        }
+
+        /* Tray */
+        .tray {
+            height: 160px; width: 100%;
+            display: flex; justify-content: space-evenly; align-items: center;
+            padding: 20px; box-sizing: border-box;
+        }
+        
+        .piece-container {
+            width: 80px; height: 80px;
+            display: flex; justify-content: center; align-items: center;
+        }
+
+        .piece {
+            display: grid; gap: 2px;
+            /* transform will be handled by JS for dragging */
+            touch-action: none;
+        }
+        .block {
+            width: 20px; height: 20px; border-radius: 3px;
+            box-shadow: inset 0 0 2px rgba(0,0,0,0.2);
+        }
+
+        /* Dragging Proxy */
+        .piece.dragging {
+            position: fixed; z-index: 100; pointer-events: none;
+            opacity: 0.9; transform: scale(1.2);
+            filter: drop-shadow(0 10px 20px rgba(0,0,0,0.5));
+        }
+
+        /* Preview Ghost */
+        .cell.preview {
+            background: rgba(255, 255, 255, 0.2);
+        }
+
+        /* Overlay */
+        .overlay {
+            position: absolute; inset: 0; background: rgba(0,0,0,0.85);
+            backdrop-filter: blur(8px); z-index: 200;
+            display: none; flex-direction: column; align-items: center; justify-content: center;
+            text-align: center;
+        }
+        .overlay.active { display: flex; }
+        
+        .overlay h1 { font-size: 32px; color: #fff; margin-bottom: 8px; }
+        .overlay p { color: #cbd5e1; margin-bottom: 24px; font-size: 16px; }
+        
+        .btn-action {
+            background: linear-gradient(135deg, #f472b6, #db2777);
+            border: none; color: white; padding: 14px 32px;
+            border-radius: 30px; font-size: 18px; font-weight: 700;
+            cursor: pointer; box-shadow: 0 4px 15px rgba(219, 39, 119, 0.4);
+            transition: transform 0.1s;
+        }
+        .btn-action:active { transform: scale(0.96); }
+
+        /* Combo Popup */
+        .combo-popup {
+            position: absolute; top: 30%; left: 50%; transform: translate(-50%, -50%) scale(0);
+            font-size: 32px; font-weight: 900; color: #facc15;
+            text-shadow: 0 4px 10px rgba(0,0,0,0.5);
+            pointer-events: none; z-index: 50;
+            transition: transform 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275), opacity 0.3s;
+            opacity: 0;
+        }
+        .combo-popup.show { transform: translate(-50%, -50%) scale(1); opacity: 1; }
+
+    </style>
+</head>
+<body>
+
+    <div class="header">
+        <button class="btn-close" onclick="window.history.back()">✕</button>
+        <div class="score-container">
+            <div class="score-label">Score</div>
+            <div class="score-val" id="score">0</div>
+        </div>
+        <div class="score-container" style="text-align:right">
+            <div class="score-label">Best</div>
+            <div class="score-val" id="best">0</div>
+        </div>
+    </div>
+
+    <div class="game-area">
+        <div class="board-wrapper">
+            <div class="grid" id="grid">
+                <!-- Cells generated by JS -->
+            </div>
+        </div>
+        <div class="combo-popup" id="comboPopup">Combo!</div>
+    </div>
+
+    <div class="tray" id="tray">
+        <div class="piece-container" id="slot-0"></div>
+        <div class="piece-container" id="slot-1"></div>
+        <div class="piece-container" id="slot-2"></div>
+    </div>
+
+    <!-- Game Over Overlay -->
+    <div class="overlay" id="gameOverScreen">
+        <h1>No Moves!</h1>
+        <p>Score: <span id="finalScore">0</span></p>
+        <button class="btn-action" onclick="restartGame()">Try Again</button>
+        <button class="btn-action" style="background:transparent; border:1px solid #555; margin-top:10px; font-size:14px;" onclick="window.history.back()">Exit</button>
+    </div>
+
+    <script src="game_blockblast.js"></script>
+</body>
+</html>

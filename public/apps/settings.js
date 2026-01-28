@@ -1,52 +1,232 @@
 
-const KEYS = { SESSION: 'fiaos_session', PREFS_PREFIX: 'fiaos_user_' };
+/**
+ * Account Settings Logic
+ */
+
+const KEYS = { SESSION: 'fiaos_session' };
+const PREFS_KEY = (uid) => `fiaos_user_${uid}_prefs`; 
+const PROFILE_KEY = (uid) => `fiaos_user_${uid}_profile`;
+
 let user = null;
 let prefs = {};
+let profile = {};
+let rewards = null; // New: Load rewards to check locks
+let cloud = null;
+
+// Emojis for Avatar Picker
+const AVATAR_EMOJIS = ["👽", "🦊", "🐱", "🐶", "🦁", "🐯", "🐨", "🐼", "🐻", "🐰", "🐹", "🐭", "🦄", "🦋", "🍄", "🌺", "🌸", "🌼", "⚡", "🔥", "💧", "❄️", "🌟", "🌙", "🌍", "🪐", "🍕", "🍔", "🍟", "🍩"];
+
+// Themes Defs (Visual) - Added unlock conditions
+const THEMES_UI = [
+    { id: 'roseGlass', name: 'Default', color: '#2e1065', unlockRewardId: null },
+    { id: 'aurora', name: 'Aurora', color: '#2b5876', unlockRewardId: 'reward.welcomeTheme' },
+    { id: 'softRose', name: 'Soft Rose', color: '#be185d', unlockRewardId: 'love_1_month' },
+    { id: 'midnightLove', name: 'Midnight', color: '#1e1b4b', unlockRewardId: 'love_3_month' },
+    { id: 'pastelSky', name: 'Pastel', color: '#7dd3fc', unlockRewardId: 'love_6_month' },
+    { id: 'eternal', name: 'Eternal', color: '#713f12', unlockRewardId: 'love_1_year' }
+];
 
 function init() {
     const s = localStorage.getItem(KEYS.SESSION);
     if (!s) return;
     user = JSON.parse(s);
-    const prefix = user.role === 'guest' ? 'fiaos_guest_' : 'fiaos_user_';
-    
-    // Load local first for speed
-    const pStr = localStorage.getItem(`${prefix}${user.id}_prefs`);
-    prefs = pStr ? JSON.parse(pStr) : { theme: 'roseGlass', accent: '#818cf8', reduceMotion: false };
+
+    if (window.parent.FIAOS && window.parent.FIAOS.cloud) {
+        cloud = window.parent.FIAOS.cloud;
+    }
+
+    loadEverything();
+    updateStatus();
+    setInterval(updateStatus, 5000);
+}
+
+async function loadEverything() {
+    // 1. Prefs & Profile & Rewards
+    if (user.role === 'guest') {
+        const pStr = localStorage.getItem(PREFS_KEY('guest'));
+        prefs = pStr ? JSON.parse(pStr) : defaultPrefs();
+        
+        const profStr = localStorage.getItem('fiaos_guest_guest_profile');
+        profile = profStr ? JSON.parse(profStr) : defaultProfile();
+
+        const rewStr = localStorage.getItem('fiaos_rewards_guest');
+        rewards = rewStr ? JSON.parse(rewStr) : null;
+    } else {
+        if (cloud) {
+            const cPrefs = await cloud.loadPrefs();
+            prefs = cPrefs || defaultPrefs();
+            
+            const cProf = await cloud.loadProfile();
+            profile = cProf || defaultProfile();
+
+            rewards = await cloud.loadRewards();
+        } else {
+            prefs = defaultPrefs();
+            profile = defaultProfile();
+        }
+    }
     
     renderUI();
 }
 
-function savePrefs() {
-    const prefix = user.role === 'guest' ? 'fiaos_guest_' : 'fiaos_user_';
-    localStorage.setItem(`${prefix}${user.id}_prefs`, JSON.stringify(prefs));
+function defaultPrefs() {
+    return {
+        theme: 'roseGlass',
+        accent: '#818cf8',
+        wallpaper: 'gradient_1',
+        reduceMotion: false,
+        uiDensity: 'cozy',
+        quickstartMode: 'lastApp',
+        quickstartApp: ''
+    };
+}
+
+function defaultProfile() {
+    return {
+        userId: user.id,
+        role: user.role,
+        displayName: user.name,
+        avatar: { type: 'emoji', value: user.name.charAt(0) },
+        createdAt: Date.now(),
+        updatedAt: Date.now()
+    };
+}
+
+// --- Render ---
+
+function renderUI() {
+    // Profile
+    document.getElementById('avatarDisplay').innerText = profile.avatar?.value || '👤';
+    document.getElementById('nameInput').value = profile.displayName || user.name;
+
+    // Themes
+    const tList = document.getElementById('themeList');
+    tList.innerHTML = THEMES_UI.map(t => {
+        const isLocked = t.unlockRewardId && (!rewards?.redeemed || !rewards.redeemed[t.unlockRewardId]);
+        const activeClass = prefs.theme === t.id ? 'active' : '';
+        const lockHtml = isLocked ? '<div style="position:absolute; inset:0; background:rgba(0,0,0,0.6); display:flex; justify-content:center; align-items:center; font-size:24px;">🔒</div>' : '';
+        const onclick = isLocked ? `alert('Erst freischalten!')` : `setTheme('${t.id}')`;
+        
+        return `
+        <div class="theme-opt ${activeClass}" onclick="${onclick}">
+            <div class="theme-preview" style="background:${t.color}">
+                ${lockHtml}
+            </div>
+            <div class="theme-name">${t.name}</div>
+        </div>
+    `}).join('');
+
+    // Behavior
+    const tog = document.getElementById('toggleMotion');
+    if (prefs.reduceMotion) tog.classList.add('active'); else tog.classList.remove('active');
+
+    // Quickstart
+    const sel = document.getElementById('quickstartSelect');
+    const label = document.getElementById('quickstartVal');
     
-    // Send to OS to sync with Cloud
+    if (prefs.quickstartMode === 'lastApp') {
+        sel.value = 'lastApp';
+        label.innerText = "Zuletzt geöffnet";
+    } else {
+        sel.value = prefs.quickstartApp || 'luna';
+        const opt = sel.querySelector(`option[value="${sel.value}"]`);
+        label.innerText = opt ? opt.innerText : "App";
+    }
+}
+
+function updateStatus() {
+    const dot = document.getElementById('statusDot');
+    const txt = document.getElementById('statusText');
+    
+    if (user.role === 'guest') {
+        dot.className = 'status-dot offline';
+        txt.innerText = "Lokal gespeichert (Gast)";
+        return;
+    }
+
+    if (cloud) {
+        dot.className = 'status-dot';
+        txt.innerText = "Cloud Synchronisiert";
+    } else {
+        dot.className = 'status-dot offline';
+        txt.innerText = "Offline";
+    }
+}
+
+// --- Actions ---
+
+window.saveProfile = async () => {
+    const name = document.getElementById('nameInput').value.trim();
+    if (name) profile.displayName = name;
+    
+    if (window.parent.FIAOS_PROFILE_UPDATED) {
+        window.parent.FIAOS_PROFILE_UPDATED(profile);
+    }
+    
+    if (user.role === 'guest') {
+        localStorage.setItem('fiaos_guest_guest_profile', JSON.stringify(profile));
+    } else if (cloud) {
+        await cloud.saveProfile(profile);
+    }
+};
+
+window.setTheme = async (id) => {
+    prefs.theme = id;
+    applyPrefs();
+};
+
+window.toggleMotion = () => {
+    prefs.reduceMotion = !prefs.reduceMotion;
+    applyPrefs();
+};
+
+window.saveQuickstart = () => {
+    const val = document.getElementById('quickstartSelect').value;
+    if (val === 'lastApp') {
+        prefs.quickstartMode = 'lastApp';
+        prefs.quickstartApp = '';
+    } else {
+        prefs.quickstartMode = 'fixed';
+        prefs.quickstartApp = val;
+    }
+    applyPrefs();
+};
+
+async function applyPrefs() {
+    renderUI();
+    
     if (window.parent.FIAOS_APPLY_PREFS) {
         window.parent.FIAOS_APPLY_PREFS(prefs);
     }
-    renderUI();
-}
 
-function renderUI() {
-    document.querySelectorAll('.theme-card').forEach(el => {
-        el.classList.toggle('selected', el.innerText === getThemeName(prefs.theme));
-    });
-    const tog = document.getElementById('toggleMotion');
-    if (tog) {
-        if (prefs.reduceMotion) tog.classList.add('active'); else tog.classList.remove('active');
+    if (user.role === 'guest') {
+        localStorage.setItem(PREFS_KEY('guest'), JSON.stringify(prefs));
+    } else if (cloud) {
+        await cloud.savePrefs(prefs);
     }
 }
 
-function getThemeName(id) {
-    const map = { roseGlass: 'Default', softRose: 'Soft Rose', midnightLove: 'Midnight', pastelSky: 'Pastel Sky', eternal: 'Eternal' };
-    return map[id] || 'Default';
-}
+// --- Emoji Picker ---
 
-window.setTheme = (id) => { prefs.theme = id; savePrefs(); };
-window.setAccent = (hex) => { prefs.accent = hex; savePrefs(); };
-window.toggleMotion = () => { prefs.reduceMotion = !prefs.reduceMotion; savePrefs(); };
+window.openEmojiPicker = () => {
+    const grid = document.getElementById('emojiGrid');
+    grid.innerHTML = AVATAR_EMOJIS.map(e => `
+        <div class="emoji-opt" onclick="pickEmoji('${e}')">${e}</div>
+    `).join('');
+    document.getElementById('emojiModal').classList.add('open');
+};
 
-// Render logic for grid omitted for brevity, assumes HTML structure exists
-// ...
+window.closeEmojiPicker = (e) => {
+    if (e.target.id === 'emojiModal') {
+        document.getElementById('emojiModal').classList.remove('open');
+    }
+};
+
+window.pickEmoji = (char) => {
+    profile.avatar = { type: 'emoji', value: char };
+    document.getElementById('emojiModal').classList.remove('open');
+    renderUI();
+    window.saveProfile();
+};
 
 init();

@@ -6,7 +6,8 @@
 const KEYS = { SESSION: 'fiaos_session' };
 const REWARDS_LIST = [
     { id: 'reward.streak3', name: 'Streak: 3 Tage 🔥' },
-    { id: 'valentine.reward.pizza', name: 'Valentine: Pizza Date 🍕' }
+    { id: 'valentine.reward.pizza', name: 'Valentine: Pizza Date 🍕' },
+    { id: 'games.stack.50', name: 'Stack Profi 🧱' }
 ];
 
 let user = null;
@@ -21,32 +22,49 @@ function init() {
 
     if (window.parent.FIAOS && window.parent.FIAOS.cloud) {
         cloud = window.parent.FIAOS.cloud;
-    } else {
-        console.error("Cloud unavailable in Vault");
-        document.querySelector('.empty-state').innerText = "Verbindungsfehler ⚠️";
-        return;
     }
+
+    if (user.role === 'guest') updateFooter('Lokal (Gast)', 'offline');
+    else updateFooter('Verbinde...', 'loading');
 
     loadState();
     bindEvents();
     setInterval(updateTimers, 1000);
 }
 
+function updateFooter(text, status) {
+    document.getElementById('footerText').innerText = text;
+    document.getElementById('footerDot').className = 'status-dot ' + status;
+}
+
 async function loadState() {
     try {
+        if (cloud && user.role !== 'guest') updateFooter('Synchronisiere...', 'loading');
+        
         const data = await cloud.loadVault();
         vaultState = data && data.messages ? data : { messages: [] };
+        
+        if (user.role !== 'guest') updateFooter('Cloud Synchronisiert', 'online');
         renderList();
     } catch (e) {
         console.error("Vault Load Error", e);
         vaultState = { messages: [] };
+        updateFooter('Verbindungsfehler', 'offline');
         renderList();
     }
 }
 
 async function saveState() {
     if (!vaultState) return;
-    await cloud.saveVault(vaultState);
+    
+    if (user.role !== 'guest') updateFooter('Speichere...', 'loading');
+    
+    try {
+        await cloud.saveVault(vaultState);
+        if (user.role !== 'guest') updateFooter('Gespeichert', 'online');
+    } catch(e) {
+        updateFooter('Fehler beim Speichern', 'offline');
+    }
 }
 
 function renderList() {
@@ -67,7 +85,7 @@ function renderList() {
     }).sort((a, b) => b.createdAt - a.createdAt);
 
     if (list.length === 0) {
-        container.innerHTML = '<div class="empty-state">Nichts gefunden.</div>';
+        container.innerHTML = '<div class="empty-state">Der Tresor ist leer. 📭</div>';
         return;
     }
 
@@ -77,38 +95,53 @@ function renderList() {
         el.className = `msg-card ${isOpened ? 'opened' : ''}`;
         el.onclick = () => handleCardClick(msg);
 
-        let lockBadge = '';
+        let statusText = 'Verschlossen';
+        let lockIcon = '🔐';
+        let extraBadge = '';
+
         if (!isOpened) {
             if (msg.lock && msg.lock.type === 'time') {
                 const diff = msg.lock.unlockAt - Date.now();
-                if (diff > 0) lockBadge = `<div class="lock-badge time-lock" data-ts="${msg.lock.unlockAt}">⏳ ...</div>`;
-                else lockBadge = `<div class="lock-badge" style="color:#4ade80">🔓 Jetzt bereit</div>`;
+                if (diff > 0) {
+                    statusText = 'Zeit-Schloss';
+                    lockIcon = '⏳';
+                    extraBadge = `<span class="time-lock" data-ts="${msg.lock.unlockAt}">...</span>`;
+                } else {
+                    statusText = 'Bereit';
+                    lockIcon = '🔓';
+                }
             } else if (msg.lock && msg.lock.type === 'reward') {
-                lockBadge = `<div class="lock-badge">🏆 Reward Lock</div>`;
+                statusText = 'Belohnung';
+                lockIcon = '🏆';
             }
+        } else {
+            statusText = 'Gelesen';
+            lockIcon = '📜';
         }
 
         const authorName = msg.author?.name || 'Unbekannt';
-        const authorAvatar = msg.author?.avatar?.value || authorName.charAt(0);
         const sealColor = msg.style?.sealColor || '#ec4899';
-        const lockIcon = (msg.lock && msg.lock.type !== 'none') ? '🔐' : '💌';
 
         el.innerHTML = `
-            ${!isOpened ? `<div class="envelope-flap"></div><div class="envelope-bg"><div class="seal" style="background:${sealColor}">${lockIcon}</div></div>` : ''}
-            <div class="msg-content">
+            <div class="envelope-layer">
+                <div class="seal" style="background:${sealColor}">${lockIcon}</div>
+            </div>
+            <div class="envelope-flap-top"></div>
+            
+            <div class="card-content">
                 <div>
-                    <div class="msg-header">
-                        <div class="msg-title">${msg.title || 'Nachricht'}</div>
-                        ${msg.isPinned ? '📌' : ''}
-                    </div>
-                    <div class="msg-preview">${isOpened ? (msg.body || '').substring(0, 60) + '...' : 'Inhalt verschlossen'}</div>
+                    <div class="msg-title">${msg.title || 'Nachricht'}</div>
+                    <div class="msg-preview">${isOpened ? (msg.body || '').substring(0, 80) + '...' : 'Inhalt ist sicher verwahrt.'}</div>
                 </div>
-                <div class="msg-meta">
-                    <div class="author-badge">
-                        <div class="author-avatar">${authorAvatar}</div>
+                <div class="msg-footer">
+                    <div class="author-info">
+                        <div class="author-avatar">${authorName.charAt(0)}</div>
                         <span>${authorName}</span>
                     </div>
-                    ${lockBadge || `<span>${new Date(msg.createdAt).toLocaleDateString()}</span>`}
+                    <div style="display:flex; align-items:center; gap:6px;">
+                        ${extraBadge}
+                        <div class="status-badge">${statusText}</div>
+                    </div>
                 </div>
             </div>
         `;
@@ -121,23 +154,37 @@ function handleCardClick(msg) {
     if (msg.openedAt) { openReader(msg); return; }
     
     if (msg.lock && msg.lock.type === 'time') {
-        if (Date.now() < msg.lock.unlockAt) { alert("Noch verschlossen! Geduld. ⏳"); return; }
+        if (Date.now() < msg.lock.unlockAt) { 
+            alert("Diese Nachricht ist noch durch ein Zeitschloss gesichert! ⏳"); 
+            return; 
+        }
     } else if (msg.lock && msg.lock.type === 'reward') {
-        // Fallback: Check local rewards. In prod, better to check cloud rewards via bridge or direct.
-        const rKey = `fiaos_rewards_${user.id}`;
+        // Simple bridge check would be better, but local storage fallback for now
+        const rKey = user.role === 'guest' ? 'fiaos_rewards_guest' : `fiaos_rewards_${user.id}`; // Note: rewards are usually user bound, but we check current user
+        // Actually for vault, unlocking depends on the viewer.
         let unlocked = false;
         try {
+            // Try to get rewards via parent frame bridge if possible, otherwise crude local check
+            // In a real scenario, we'd use cloud.loadRewards()
+            // Let's optimistic check via cloud for correct behavior
+            // But sync might be slow for click handler.
+            // Simplified:
             const rData = JSON.parse(localStorage.getItem(rKey) || '{}');
-            unlocked = rData.rewards?.[msg.lock.rewardId]?.unlocked;
+            unlocked = rData.rewards?.[msg.lock.rewardId]?.unlocked || rData.valentine?.unlocked?.[msg.lock.rewardId];
         } catch(e){}
         
-        if (!unlocked) { alert("Erfolg fehlt noch!"); return; }
+        if (!unlocked) { 
+            alert("Du benötigst einen bestimmten Erfolg, um das zu öffnen! 🏆"); 
+            return; 
+        }
     }
 
-    msg.openedAt = Date.now();
-    saveState();
-    renderList();
-    setTimeout(() => openReader(msg), 300);
+    if (confirm("Siegel brechen und Nachricht öffnen?")) {
+        msg.openedAt = Date.now();
+        saveState();
+        renderList();
+        setTimeout(() => openReader(msg), 400);
+    }
 }
 
 function saveMessage() {
@@ -147,14 +194,13 @@ function saveMessage() {
     
     if (!title || !body) return;
 
-    // Construct Clean Object (Null instead of undefined)
     const newMsg = {
         id: 'msg_' + Date.now(),
         title, body,
         author: { 
             id: user.id, 
             name: user.name, 
-            avatar: user.avatar || { type: 'emoji', value: user.name.charAt(0) } 
+            avatar: { type: 'emoji', value: user.name.charAt(0) } 
         },
         createdAt: Date.now(),
         lock: { type: lockType, unlockAt: null, rewardId: null },
@@ -168,7 +214,7 @@ function saveMessage() {
         if (val) {
             newMsg.lock.unlockAt = new Date(val).getTime();
         } else {
-            newMsg.lock.type = 'none'; // Fallback
+            newMsg.lock.type = 'none';
         }
     } else if (lockType === 'reward') {
         newMsg.lock.rewardId = document.getElementById('inpRewardId').value;
@@ -192,6 +238,9 @@ function openReader(msg) {
 function bindEvents() {
     document.getElementById('btnAdd').onclick = () => {
         document.getElementById('composer').classList.add('active');
+        document.getElementById('inpTitle').value = '';
+        document.getElementById('inpBody').value = '';
+        
         const sel = document.getElementById('inpRewardId');
         sel.innerHTML = REWARDS_LIST.map(r => `<option value="${r.id}">${r.name}</option>`).join('');
     };
@@ -205,12 +254,21 @@ function bindEvents() {
 }
 
 window.filterList = (type, idx) => { activeFilter = type; document.getElementById('segIndicator').style.transform = `translateX(${idx * 100}%)`; renderList(); };
+
 function updateTimers() {
     document.querySelectorAll('.time-lock').forEach(el => {
         const ts = parseInt(el.getAttribute('data-ts'));
         if (!ts) return;
         const diff = ts - Date.now();
-        if (diff <= 0) { el.innerText = "🔓 Jetzt bereit"; el.style.color = "#4ade80"; }
+        if (diff <= 0) { 
+            el.innerText = "Jetzt!"; 
+            el.style.color = "#4ade80"; 
+        } else {
+            const d = Math.floor(diff / (1000*60*60*24));
+            const h = Math.floor((diff % (1000*60*60*24)) / (1000*60*60));
+            const m = Math.floor((diff % (1000*60*60)) / (1000*60));
+            el.innerText = `${d}d ${h}h ${m}m`;
+        }
     });
 }
 

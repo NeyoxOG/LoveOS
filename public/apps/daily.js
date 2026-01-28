@@ -40,12 +40,17 @@ function init() {
     loadData(); // This now triggers renderUI after data is ready
 }
 
+function isAdmin() {
+    return user && (user.role === 'admin' || user.role === 'developer');
+}
+
 function initDevTools() {
     const devTools = document.getElementById('devTools');
-    const isAdmin = user.role === 'admin' || user.role === 'developer';
-    devTools.querySelectorAll('button').forEach(btn => {
-        btn.disabled = !isAdmin;
-    });
+    if (isAdmin()) {
+        devTools.style.display = 'block';
+    } else {
+        devTools.remove();
+    }
 }
 
 async function loadData() {
@@ -398,9 +403,30 @@ function getLocalDailyOffer(seed) {
     return pool[index];
 }
 
-// --- Dev ---
-window.devReset = () => { localStorage.removeItem(`${KEYS.DAILY_STATE}${user.id}_daily_state`); location.reload(); };
-window.devStreakReset = () => { const k = `${KEYS.DAILY_STATE}${user.id}_daily_state`; const s = JSON.parse(localStorage.getItem(k)); s.streak = 0; localStorage.setItem(k, JSON.stringify(s)); location.reload(); };
-window.devReroll = () => { const k = `${KEYS.DAILY_STATE}${user.id}_daily_state`; const s = JSON.parse(localStorage.getItem(k)); s.todaySeed = Math.random().toString(); s.openedToday = false; localStorage.setItem(k, JSON.stringify(s)); location.reload(); };
+// --- Dev Actions (Secure) ---
+window.devReset = () => { 
+    if (!isAdmin()) return alert("Access Denied");
+    localStorage.removeItem(`${KEYS.DAILY_STATE}${user.id}_daily_state`); 
+    location.reload(); 
+};
+
+window.devStreakReset = () => { 
+    if (!isAdmin()) return alert("Access Denied");
+    const k = `${KEYS.DAILY_STATE}${user.id}_daily_state`; 
+    const s = JSON.parse(localStorage.getItem(k)); 
+    s.streak = 0; 
+    localStorage.setItem(k, JSON.stringify(s)); 
+    location.reload(); 
+};
+
+window.devReroll = () => { 
+    if (!isAdmin()) return alert("Access Denied");
+    const k = `${KEYS.DAILY_STATE}${user.id}_daily_state`; 
+    const s = JSON.parse(localStorage.getItem(k)); 
+    s.todaySeed = Math.random().toString(); 
+    s.openedToday = false; 
+    localStorage.setItem(k, JSON.stringify(s)); 
+    location.reload(); 
+};
 
 init();

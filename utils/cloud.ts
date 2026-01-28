@@ -16,7 +16,7 @@ const DEFAULT_ADMIN_CONFIG: AdminConfig = {
   appVisibility: {
     luna: true, rewards: true, settings: true, valentine: true, 
     vault: true, admin: true, messages: true, achievements: true, 
-    games: true, diary: true, daily: true, love: true
+    games: true, diary: true, daily: true, love: true, rewards_app: true
   },
   userStatus: {
     "fia": { role: "user", banned: false },
@@ -286,7 +286,6 @@ export const cloud = {
     async loadDiary() {
         if (isGuest()) return [];
         try {
-            // Simplified for brevity, same logic as before
             const q = query(collection(db, `users/${getUid()}/diary`), orderBy('createdAt', 'desc'));
             const snap = await getDocs(q);
             return snap.docs.map(d => ({ id: d.id, ...d.data() }));
@@ -323,7 +322,13 @@ export const cloud = {
         } catch { return null; }
     },
     async saveProfile(data: any) {
-        if (isGuest()) return;
+        if (isGuest()) {
+            // Local Storage for Guest Profile
+            const uid = getUid(); // Should be 'guest'
+            const key = uid === 'guest' ? 'fiaos_guest_guest_profile' : `fiaos_user_${uid}_profile`;
+            localStorage.setItem(key, JSON.stringify(data));
+            return;
+        }
         try { await setDoc(doc(db, 'users', getUid()), sanitize(data), { merge: true }); } catch {}
     }
 };

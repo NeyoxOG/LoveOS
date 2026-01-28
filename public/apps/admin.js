@@ -45,6 +45,14 @@ function denyAccess() {
     </div>`;
 }
 
+function ensureAdmin() {
+    if (!currentUser || (currentUser.role !== 'admin' && currentUser.role !== 'developer')) {
+        alert("Access Denied");
+        return false;
+    }
+    return true;
+}
+
 async function loadEverything() {
     toggleLoading(true);
     try {
@@ -126,12 +134,17 @@ function renderUsers() {
 
     users.forEach(u => {
         const isBanned = adminConfig.userStatus[u.userId]?.banned;
+        const isGuest = u.userId === 'guest';
         
         const div = document.createElement('div');
         div.className = `user-card ${isBanned ? 'banned' : ''}`;
         
         const avatar = u.avatar?.type === 'emoji' ? u.avatar.value : '👤';
         
+        const toggleStyle = isGuest 
+            ? 'opacity:0.3; cursor:not-allowed; background:#39393d' 
+            : `transform:scale(0.8); background:${isBanned ? '#ff453a' : '#39393d'}`;
+
         div.innerHTML = `
             <div class="user-avatar">${avatar}</div>
             <div class="user-info">
@@ -141,7 +154,7 @@ function renderUsers() {
                 </div>
                 <div style="font-size:12px; color:rgba(255,255,255,0.4);">${u.userId}</div>
             </div>
-            <div class="toggle ${isBanned ? 'active' : ''}" style="transform:scale(0.8); background:${isBanned ? '#ff453a' : '#39393d'}" onclick="toggleBan('${u.userId}')"></div>
+            <div class="toggle ${!isGuest && isBanned ? 'active' : ''}" style="${toggleStyle}" onclick="toggleBan('${u.userId}')"></div>
         `;
         container.appendChild(div);
     });
@@ -163,18 +176,27 @@ window.switchTab = (id, idx) => {
 };
 
 window.toggleMaintenance = async () => {
+    if (!ensureAdmin()) return;
     adminConfig.maintenanceMode = !adminConfig.maintenanceMode;
     await syncConfig();
     renderDashboard();
 };
 
 window.toggleAppVisibility = async (appId) => {
+    if (!ensureAdmin()) return;
     adminConfig.appVisibility[appId] = !adminConfig.appVisibility[appId];
     await syncConfig();
     renderApps();
 };
 
 window.toggleBan = async (userId) => {
+    if (!ensureAdmin()) return;
+    
+    if (userId === 'guest') {
+        alert("Gast-Accounts können nicht gesperrt werden.");
+        return;
+    }
+
     if (!adminConfig.userStatus[userId]) {
         adminConfig.userStatus[userId] = { role: 'user', banned: false };
     }
@@ -198,6 +220,8 @@ async function syncConfig() {
 // --- Cloud Inspector ---
 
 window.fetchData = async () => {
+    if (!ensureAdmin()) return;
+    
     const uid = document.getElementById('inspTarget').value;
     const type = document.getElementById('inspType').value;
     const editor = document.getElementById('jsonEditor');
@@ -237,6 +261,8 @@ window.fetchData = async () => {
 };
 
 window.saveData = async () => {
+    if (!ensureAdmin()) return;
+
     const uid = document.getElementById('inspTarget').value;
     const type = document.getElementById('inspType').value;
     const editor = document.getElementById('jsonEditor');
@@ -266,6 +292,8 @@ window.saveData = async () => {
 // --- Quick Actions ---
 
 window.quickAction = async (action) => {
+    if (!ensureAdmin()) return;
+    
     toggleLoading(true);
     try {
         if (action === 'healLuna') {
@@ -291,6 +319,8 @@ window.quickAction = async (action) => {
 };
 
 window.confirmAction = (type) => {
+    if (!ensureAdmin()) return;
+    
     if (type === 'globalLogout') {
         if (confirm("WARNUNG: Dies zwingt alle Nutzer zum Logout. Fortfahren?")) {
             // Logic: toggle a token in adminConfig that App.tsx listens to?

@@ -3,7 +3,7 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
     <title>Daily</title>
     <style>
         :root {
@@ -22,7 +22,7 @@
             font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
             background: var(--bg-dark);
             color: var(--text);
-            height: 100vh;
+            height: 100dvh; /* Mobile viewport fix */
             display: flex;
             flex-direction: column;
             overflow: hidden;
@@ -32,6 +32,7 @@
         /* Top Bar */
         .topbar {
             padding: 16px 20px;
+            padding-top: calc(16px + env(safe-area-inset-top)); /* Safe area top */
             display: flex;
             align-items: center;
             justify-content: center;
@@ -48,8 +49,10 @@
             flex: 1;
             overflow-y: auto;
             overflow-x: hidden;
+            -webkit-overflow-scrolling: touch;
             padding: 20px;
-            padding-bottom: 100px; /* Space for bottom safe area */
+            /* Ensure bottom content isn't hidden behind home bar */
+            padding-bottom: calc(40px + env(safe-area-inset-bottom));
             display: flex;
             flex-direction: column;
             gap: 24px;
@@ -59,15 +62,22 @@
         .today-card {
             background: linear-gradient(135deg, #1c1c1e 0%, #2c2c2e 100%);
             border-radius: 24px;
-            padding: 30px 20px;
-            display: flex; flex-direction: column; align-items: center; text-align: center;
+            /* Responsive padding using clamp */
+            padding: clamp(20px, 5vw, 30px);
+            display: flex; 
+            flex-direction: column; 
+            align-items: center; 
+            text-align: center;
             border: 1px solid var(--border);
             box-shadow: 0 10px 30px rgba(0,0,0,0.3);
-            position: relative; overflow: hidden;
+            position: relative; 
+            overflow: hidden;
             width: 100%;
-            max-width: 400px;
+            max-width: min(400px, 100%); /* Prevent overflow on small screens */
             margin: 0 auto;
             transition: transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1), box-shadow 0.3s;
+            /* Use gap for spacing instead of margins to prevent collapse issues */
+            gap: clamp(8px, 2vw, 12px);
         }
         
         .shine {
@@ -81,7 +91,7 @@
 
         /* Claim Animation Classes */
         .today-card.claiming {
-            transform: scale(1.05);
+            transform: scale(1.02);
             box-shadow: 0 0 50px rgba(251, 191, 36, 0.3);
             border-color: rgba(251, 191, 36, 0.5);
         }
@@ -94,22 +104,38 @@
             100% { transform: translateY(-50px) scale(0); opacity: 0; }
         }
 
+        /* Elements inside card - Reset margins, use gap from parent */
         .today-icon {
-            font-size: 64px; margin-bottom: 16px;
+            font-size: clamp(56px, 15vw, 72px); /* Responsive icon size */
             filter: drop-shadow(0 0 20px rgba(251, 191, 36, 0.4));
             transition: transform 0.3s;
+            line-height: 1;
+            margin: 4px 0;
         }
-        .today-title { font-size: 24px; font-weight: 800; margin-bottom: 4px; color: #fff; }
-        .today-subtitle { font-size: 14px; color: var(--text-dim); margin-bottom: 24px; max-width: 90%; line-height: 1.4; }
+        .today-title { 
+            font-size: clamp(20px, 6vw, 24px); 
+            font-weight: 800; 
+            color: #fff; 
+            line-height: 1.2;
+        }
+        .today-subtitle { 
+            font-size: clamp(13px, 4vw, 14px); 
+            color: var(--text-dim); 
+            max-width: 95%; 
+            line-height: 1.4;
+            margin-bottom: 8px; /* Extra space before button */
+        }
         
         .claim-btn {
-            background: #fff; color: #000; border: none; padding: 16px 32px; border-radius: 30px;
+            background: #fff; color: #000; border: none; 
+            padding: 14px 24px; 
+            border-radius: 30px;
             font-size: 16px; font-weight: 700; cursor: pointer;
             box-shadow: 0 4px 15px rgba(255,255,255,0.2);
             transition: transform 0.2s, box-shadow 0.2s, opacity 0.3s, background 0.3s;
             position: relative; z-index: 10;
             width: 100%;
-            max-width: 200px;
+            max-width: 220px;
             -webkit-tap-highlight-color: transparent;
         }
         .claim-btn:active { transform: scale(0.95); }
@@ -122,18 +148,21 @@
         }
 
         .streak-row {
-            display: flex; gap: 6px; margin-bottom: 16px; align-items: center;
+            display: flex; gap: 6px; align-items: center;
+            background: rgba(0,0,0,0.2);
+            padding: 6px 12px;
+            border-radius: 20px;
         }
         .streak-fire { font-size: 14px; margin-right: 4px; filter: drop-shadow(0 0 5px #ef4444); }
         .streak-dot {
-            width: 8px; height: 8px; border-radius: 50%; background: rgba(255,255,255,0.1);
+            width: 6px; height: 6px; border-radius: 50%; background: rgba(255,255,255,0.1);
             transition: background 0.3s;
         }
         .streak-dot.active { background: #fbbf24; box-shadow: 0 0 5px #fbbf24; }
 
         /* Couple Bonus Badge */
         .couple-bonus {
-            margin-top: 16px;
+            margin-top: 4px;
             background: linear-gradient(90deg, #ec4899, #8b5cf6);
             padding: 6px 12px; border-radius: 20px;
             font-size: 11px; font-weight: 700; color: #fff;
@@ -153,23 +182,24 @@
             border: 1px solid var(--border);
         }
         .inbox-icon {
-            width: 48px; height: 48px; border-radius: 12px; background: rgba(255,255,255,0.05);
-            display: flex; justify-content: center; align-items: center; font-size: 24px;
+            width: 44px; height: 44px; border-radius: 12px; background: rgba(255,255,255,0.05);
+            display: flex; justify-content: center; align-items: center; font-size: 22px;
+            flex-shrink: 0;
         }
-        .inbox-info { flex: 1; }
-        .inbox-head { font-weight: 600; font-size: 15px; margin-bottom: 2px; }
-        .inbox-body { font-size: 12px; color: var(--text-dim); }
+        .inbox-info { flex: 1; min-width: 0; }
+        .inbox-head { font-weight: 600; font-size: 15px; margin-bottom: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .inbox-body { font-size: 12px; color: var(--text-dim); line-height: 1.3; }
         
         /* History */
-        .history-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(80px, 1fr)); gap: 10px; }
+        .history-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(70px, 1fr)); gap: 8px; }
         .history-card {
             background: var(--bg-card); border-radius: 12px; padding: 10px;
-            display: flex; flex-direction: column; align-items: center; gap: 6px;
+            display: flex; flex-direction: column; align-items: center; gap: 4px;
             border: 1px solid var(--border);
         }
-        .h-date { font-size: 10px; color: var(--text-dim); }
-        .h-icon { font-size: 20px; }
-        .h-type { font-size: 10px; font-weight: 600; color: #fbbf24; text-transform: uppercase; }
+        .h-date { font-size: 9px; color: var(--text-dim); }
+        .h-icon { font-size: 18px; }
+        .h-type { font-size: 9px; font-weight: 600; color: #fbbf24; text-transform: uppercase; }
 
         /* Confetti Overlay */
         .confetti-container {
@@ -189,29 +219,32 @@
             position: fixed; inset: 0; background: rgba(0,0,0,0.8); backdrop-filter: blur(10px);
             z-index: 200; display: none; align-items: center; justify-content: center;
             opacity: 0; transition: opacity 0.3s;
+            padding: 20px;
         }
         .modal.active { display: flex; opacity: 1; }
         
         .modal-card {
             background: #1c1c1e; border-radius: 30px; padding: 40px; text-align: center;
-            width: 90%; max-width: 320px; border: 1px solid rgba(255,255,255,0.1);
+            width: 100%; max-width: 320px; border: 1px solid rgba(255,255,255,0.1);
             transform: scale(0.8); transition: transform 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+            max-height: 80vh; overflow-y: auto;
         }
         .modal.active .modal-card { transform: scale(1); }
         
         .modal-icon { font-size: 80px; margin-bottom: 20px; display: block; animation: bounce 1s infinite; }
-        .modal-title { font-size: 24px; font-weight: 800; margin-bottom: 10px; }
+        .modal-title { font-size: 24px; font-weight: 800; margin-bottom: 10px; color: #fff; }
         .modal-text { font-size: 16px; color: var(--text-dim); margin-bottom: 30px; line-height: 1.5; }
         
         .modal-btn {
-            background: var(--primary); color: #000; border: none; padding: 12px 24px;
+            background: var(--primary); color: #000; border: none; padding: 14px 24px;
             border-radius: 20px; font-weight: 700; cursor: pointer; width: 100%;
+            font-size: 16px;
         }
 
         @keyframes bounce { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-10px); } }
 
-        /* Dev Tools - Visible but disabled */
-        .dev-tools { margin-top: 40px; padding: 20px; border-top: 1px solid var(--border); display: block; }
+        /* Dev Tools - Admin Only - Hidden by default */
+        .dev-tools { margin-top: 20px; padding: 20px; border-top: 1px solid var(--border); padding-bottom: calc(20px + env(safe-area-inset-bottom)); }
         .dev-header { display:flex; justify-content:space-between; align-items:center; margin-bottom:10px; }
         .dev-badge { background:#333; color:#aaa; font-size:10px; padding:2px 6px; border-radius:4px; text-transform:uppercase; font-weight:bold; }
         
@@ -219,7 +252,7 @@
         .dev-btn { 
             background: #333; color: #fff; border: none; padding: 10px 16px; 
             border-radius: 12px; font-size: 12px; cursor: pointer; flex: 1;
-            transition: opacity 0.2s;
+            transition: opacity 0.2s; white-space: nowrap;
         }
         .dev-btn:disabled { opacity: 0.4; cursor: not-allowed; }
 
@@ -266,8 +299,8 @@
             </div>
         </div>
 
-        <!-- Dev -->
-        <div class="dev-tools" id="devTools">
+        <!-- Dev - Securely hidden by default -->
+        <div class="dev-tools" id="devTools" style="display: none;">
             <div class="dev-header">
                 <div class="section-title" style="margin:0">Developer Options</div>
                 <div class="dev-badge">Admin Only</div>

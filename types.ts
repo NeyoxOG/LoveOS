@@ -69,6 +69,7 @@ export interface UserRewardsData {
   version: number;
   rewards: Record<string, RewardProgress>;
   valentine: ValentineProgress;
+  redeemed?: Record<string, number>; // New: Track redemption timestamps by Reward ID
   meta: {
     lastSeenAt: number;
     points: number;
@@ -84,6 +85,7 @@ export interface UserProfile {
   avatar: { type: 'emoji' | 'image', value: string };
   createdAt: number;
   updatedAt: number;
+  onboardingCompleted?: boolean; // New Flag
 }
 
 export interface UserPrefs {
@@ -143,7 +145,7 @@ export interface UserIndex {
 export interface GameStats {
   stack: { best: number, last: number, plays: number };
   reaction: { best: number, last: number, plays: number, bestCombo: number };
-  fillbox: { best: number, last: number, plays: number };
+  blockblast: { best: number, last: number, plays: number }; // Replaced fillbox
   puzzle: { bestTimeMs: number | null, lastTimeMs: number | null, plays: number, bestMoves: number | null };
   snake: { best: number, last: number, plays: number };
   flappy: { best: number, last: number, plays: number };
@@ -160,7 +162,7 @@ export interface LeaderboardEntry {
 export interface GlobalArcadeData {
   stack: LeaderboardEntry[];
   reaction: LeaderboardEntry[];
-  fillbox: LeaderboardEntry[];
+  blockblast: LeaderboardEntry[]; // Replaced fillbox
   puzzle: LeaderboardEntry[];
   snake: LeaderboardEntry[];
   flappy: LeaderboardEntry[];

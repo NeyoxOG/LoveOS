@@ -3,8 +3,8 @@ import React, { useState, useRef, useEffect } from 'react';
 import { Session, AppItem } from '../types';
 import { APPS } from '../constants';
 import { motion } from 'framer-motion';
-import { ChevronDown, Home, Grid as GridIcon, Trophy, User as UserIcon, Heart, Play } from 'lucide-react';
-import { loadLastApp, loadAdminConfig, loadDailyState } from '../utils/data';
+import { ChevronDown, Home, Grid as GridIcon, Trophy, User as UserIcon, Play } from 'lucide-react';
+import { loadLastApp, loadAdminConfig, loadDailyState, loadUserPrefs } from '../utils/data';
 
 interface HomeScreenProps {
   session: Session;
@@ -27,6 +27,7 @@ const HomeScreen: React.FC<HomeScreenProps> = ({
 }) => {
   const [activeTab, setActiveTab] = useState<'home' | 'apps' | 'achievements' | 'profile'>('home');
   const [visibleApps, setVisibleApps] = useState<AppItem[]>(APPS);
+  const containerRef = useRef<HTMLDivElement>(null);
   const appsRef = useRef<HTMLDivElement>(null);
 
   // Load App Visibility & Badges
@@ -62,7 +63,7 @@ const HomeScreen: React.FC<HomeScreenProps> = ({
     setActiveTab(tab);
     
     if (tab === 'home') {
-      window.scrollTo({ top: 0, behavior: 'smooth' });
+      containerRef.current?.scrollTo({ top: 0, behavior: 'smooth' });
     } else if (tab === 'apps') {
       appsRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
     } else if (tab === 'achievements') {
@@ -75,24 +76,43 @@ const HomeScreen: React.FC<HomeScreenProps> = ({
   };
 
   const handleWidgetClick = () => {
-    // Quickstart Logic
-    const lastAppId = loadLastApp(session);
-    // Ensure last app is allowed/visible
-    const appToOpen = visibleApps.find(a => a.id === lastAppId) || visibleApps.find(a => a.id === 'luna');
+    // Quickstart Logic Reworked
+    const prefs = loadUserPrefs(session);
+    let appIdToOpen = 'luna'; // Default fallback
+
+    if (prefs.quickstartMode === 'fixed' && prefs.quickstartApp) {
+        appIdToOpen = prefs.quickstartApp;
+    } else {
+        const last = loadLastApp(session);
+        if (last) appIdToOpen = last;
+    }
+
+    // Verify visibility
+    const appToOpen = visibleApps.find(a => a.id === appIdToOpen);
     
     if (appToOpen) {
         onShowToast(`Starte ${appToOpen.name}... 🚀`);
         setTimeout(() => onAppClick(appToOpen), 300);
     } else {
-        onShowToast("Keine App verfügbar.");
+        // Fallback to Luna if preferred app is hidden
+        const luna = visibleApps.find(a => a.id === 'luna');
+        if (luna) {
+             onShowToast(`Starte ${luna.name}... 🚀`);
+             setTimeout(() => onAppClick(luna), 300);
+        } else {
+             onShowToast("Keine App verfügbar.");
+        }
     }
   };
 
   return (
-    <div className="min-h-full w-full relative z-10 flex flex-col pb-28">
+    <div 
+      ref={containerRef}
+      className="h-full w-full relative z-10 flex flex-col overflow-y-auto overflow-x-hidden no-scrollbar scroll-smooth pb-[calc(8rem+env(safe-area-inset-bottom))]"
+    >
       
       {/* --- Top Bar --- */}
-      <header className="px-6 pt-12 pb-6 flex items-start justify-between">
+      <header className="px-6 pt-12 pb-6 flex items-start justify-between flex-shrink-0">
         <div>
           <h1 className="text-2xl font-bold text-white tracking-tight">FiaOS</h1>
           <p className="text-xs text-white/40 uppercase tracking-widest font-medium mt-0.5">Love OS v0.2</p>
@@ -126,7 +146,7 @@ const HomeScreen: React.FC<HomeScreenProps> = ({
       </header>
 
       {/* --- Widget Section (Quickstart) --- */}
-      <div className="px-6 pb-6">
+      <div className="px-6 pb-6 flex-shrink-0">
         <motion.button
           initial={{ opacity: 0, y: 10 }}
           animate={{ opacity: 1, y: 0 }}
@@ -147,7 +167,7 @@ const HomeScreen: React.FC<HomeScreenProps> = ({
                 Weiter machen
               </p>
               <p className="text-xs text-pink-200/60 font-medium flex items-center gap-1.5">
-                Öffnet zuletzt genutzte App
+                Klicken zum Starten
               </p>
             </div>
             <div className="w-10 h-10 rounded-full bg-white/10 flex items-center justify-center border border-white/10">
@@ -222,7 +242,10 @@ const HomeScreen: React.FC<HomeScreenProps> = ({
       </div>
 
       {/* --- Dock --- */}
-      <div className="fixed bottom-6 left-6 right-6 z-40">
+      <div 
+        className="fixed left-6 right-6 z-40"
+        style={{ bottom: 'calc(1.5rem + env(safe-area-inset-bottom))' }}
+      >
         <div className="bg-black/40 backdrop-blur-2xl border border-white/10 rounded-[2rem] h-20 px-6 flex items-center justify-between shadow-2xl relative overflow-hidden">
            {/* Glass reflection */}
            <div className="absolute inset-x-0 top-0 h-[1px] bg-gradient-to-r from-transparent via-white/20 to-transparent" />

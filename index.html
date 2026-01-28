@@ -3,7 +3,7 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
     <title>FiaOS</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
@@ -18,6 +18,23 @@
       body {
         -webkit-tap-highlight-color: transparent;
         overscroll-behavior: none;
+      }
+
+      /* Aurora Theme Animation */
+      [data-theme="aurora"] body {
+        background-size: 200% 200% !important;
+        animation: auroraMove 20s ease infinite;
+      }
+      [data-theme="aurora"] #root > div > div:first-child {
+        /* Target the background div in App.tsx */
+        background-size: 200% 200% !important;
+        animation: auroraMove 20s ease infinite;
+      }
+
+      @keyframes auroraMove {
+        0% { background-position: 0% 50%; }
+        50% { background-position: 100% 50%; }
+        100% { background-position: 0% 50%; }
       }
     </style>
   <script type="importmap">

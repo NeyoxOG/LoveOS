@@ -6,6 +6,7 @@ export const INITIAL_REWARDS_DATA: UserRewardsData = {
   version: 2,
   rewards: {
     "reward.welcome": { unlocked: true, unlockedAt: Date.now() },
+    "reward.welcomeTheme": { unlocked: true, unlockedAt: Date.now() }, // Auto-unlocked but needs claiming
     "reward.firstLogin": { unlocked: false, unlockedAt: null },
     "reward.firstAppOpen": { unlocked: false, unlockedAt: null },
     "reward.firstReward": { unlocked: false, unlockedAt: null },
@@ -45,7 +46,8 @@ const INITIAL_ADMIN_CONFIG: AdminConfig = {
     games: true,
     diary: true,
     daily: true,
-    love: true
+    love: true,
+    rewards_app: true
   },
   userStatus: {
     "fia": { role: "user", banned: false },
@@ -190,6 +192,9 @@ export const loadUserPrefs = (session: Session): UserPrefs => {
 export const applyTheme = (prefs: UserPrefs) => {
     const theme = THEMES[prefs.theme] || THEMES['roseGlass'];
     const root = document.documentElement;
+    
+    // Set theme ID attribute for CSS selectors
+    root.setAttribute('data-theme', theme.id);
     
     if (theme) {
         root.style.setProperty('--bg-gradient', theme.colors.bgGradient);

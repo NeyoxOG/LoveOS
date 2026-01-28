@@ -82,6 +82,9 @@
             overflow-y: auto;
             padding: 20px;
             padding-bottom: 80px;
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
         }
         .hidden { display: none; }
 
@@ -185,15 +188,15 @@
                 </div>
             </div>
 
-            <div class="game-card" onclick="playGame('fillbox')">
-                <div class="card-header" style="background: linear-gradient(135deg, #f59e0b, #d97706);">
-                    <div class="card-icon">📦</div>
+            <div class="game-card" onclick="playGame('blockblast')">
+                <div class="card-header" style="background: linear-gradient(135deg, #2563eb, #3b82f6);">
+                    <div class="card-icon">🟦</div>
                 </div>
                 <div class="card-body">
-                    <div class="game-title">Fill-the-Box</div>
-                    <div class="game-desc">Packe die Box effizient. Tetris Vibes!</div>
+                    <div class="game-title">BlockBlast</div>
+                    <div class="game-desc">Block Puzzle. Entspannend & Süchtig.</div>
                     <div class="game-meta">
-                        <span class="score-badge" id="best-fillbox">Best: 0</span>
+                        <span class="score-badge" id="best-blockblast">Best: 0</span>
                         <button class="play-btn">SPIELEN</button>
                     </div>
                 </div>
@@ -218,8 +221,8 @@
                     <div class="card-icon">🐍</div>
                 </div>
                 <div class="card-body">
-                    <div class="game-title">Snake</div>
-                    <div class="game-desc">Der Klassiker. Sammle Herzen, werde länger!</div>
+                    <div class="game-title">Snake v2</div>
+                    <div class="game-desc">Upgrade: Gegner + Swipe + LoveOS Design</div>
                     <div class="game-meta">
                         <span class="score-badge" id="best-snake">Best: 0</span>
                         <button class="play-btn">SPIELEN</button>

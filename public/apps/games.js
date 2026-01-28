@@ -27,8 +27,24 @@ async function loadLeaderboard(gameId) {
 }
 
 function renderUI() {
-    // Local bests are still fine from local storage for instant feedback in cards
-    // But Leaderboard tab needs cloud
+    // Local bests from cache for instant feedback
+    const key = `fiaos_user_${user.id}_games`;
+    const data = JSON.parse(localStorage.getItem(key) || '{}');
+    
+    updateBadge('stack', data.stack?.best);
+    updateBadge('reaction', data.reaction?.best);
+    updateBadge('blockblast', data.blockblast?.best);
+    updateBadge('snake', data.snake?.best);
+    updateBadge('flappy', data.flappy?.best);
+    
+    if (data.puzzle?.bestTimeMs) {
+        document.getElementById('best-puzzle').innerText = `Best: ${(data.puzzle.bestTimeMs/1000).toFixed(1)}s`;
+    }
+}
+
+function updateBadge(id, score) {
+    const el = document.getElementById(`best-${id}`);
+    if(el) el.innerText = `Best: ${score || 0}`;
 }
 
 window.switchTab = async (id, idx) => {
@@ -43,8 +59,9 @@ window.switchTab = async (id, idx) => {
         const games = [
             { key: 'stack', title: 'Hearts Stack' },
             { key: 'reaction', title: 'Reaction Tap' },
-            { key: 'fillbox', title: 'Fill-the-Box' },
-            { key: 'snake', title: 'Snake' }
+            { key: 'blockblast', title: 'BlockBlast' },
+            { key: 'snake', title: 'Snake' },
+            { key: 'flappy', title: 'Flappy Love' }
         ];
 
         let html = '';

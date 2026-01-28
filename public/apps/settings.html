@@ -4,14 +4,14 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Einstellungen</title>
+    <title>Account</title>
     <style>
         :root {
-            --bg-dark: #000;
+            --bg-body: #000;
             --bg-card: #1c1c1e;
-            --primary: #818cf8;
-            --text: #ffffff;
-            --text-dim: rgba(255, 255, 255, 0.5);
+            --primary: #0a84ff;
+            --text: #fff;
+            --text-sec: rgba(235, 235, 245, 0.6);
             --border: rgba(255, 255, 255, 0.1);
         }
 
@@ -19,22 +19,42 @@
 
         body {
             margin: 0; padding: 0;
-            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-            background: var(--bg-dark);
+            font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            background: var(--bg-body);
             color: var(--text);
             height: 100vh;
-            overflow-y: auto;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
             user-select: none;
+        }
+
+        /* Nav */
+        .navbar {
+            padding: 16px;
+            background: rgba(28, 28, 30, 0.8);
+            backdrop-filter: blur(20px);
+            text-align: center;
+            font-weight: 600;
+            font-size: 17px;
+            border-bottom: 1px solid var(--border);
+            z-index: 50;
+        }
+
+        /* Scroll Area */
+        .content {
+            flex: 1;
+            overflow-y: auto;
             padding: 20px;
             padding-bottom: 80px;
         }
 
-        h1 { font-size: 32px; font-weight: 700; margin: 0 0 20px 0; }
-        
-        h2 { 
-            font-size: 13px; text-transform: uppercase; color: var(--text-dim); 
-            margin: 30px 0 10px 10px; letter-spacing: 0.5px;
+        /* Sections */
+        .section-title {
+            font-size: 13px; color: var(--text-sec); text-transform: uppercase;
+            margin: 24px 0 8px 16px; letter-spacing: 0.5px;
         }
+        .section-title:first-child { margin-top: 0; }
 
         .card-group {
             background: var(--bg-card);
@@ -43,127 +63,181 @@
         }
 
         .list-item {
+            padding: 14px 16px;
             display: flex; align-items: center; justify-content: space-between;
-            padding: 16px;
             background: var(--bg-card);
             border-bottom: 1px solid var(--border);
-            font-size: 16px;
+            font-size: 17px;
+            min-height: 48px;
         }
         .list-item:last-child { border-bottom: none; }
-        .list-item:active { background: rgba(255,255,255,0.1); }
-
-        .item-label { font-weight: 500; }
-        .item-val { color: var(--text-dim); display: flex; align-items: center; gap: 8px; }
         
-        .avatar-preview { width: 32px; height: 32px; border-radius: 50%; background: #333; display: flex; justify-content: center; align-items: center; font-size: 16px; }
+        .list-label { flex: 1; }
+        .list-value { color: var(--text-sec); display: flex; align-items: center; gap: 8px; }
+        .chevron { opacity: 0.3; width: 8px; height: 12px; display: inline-block; background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 8 12'%3E%3Cpath fill='none' stroke='white' stroke-width='2' d='M1 1l5 5-5 5'/%3E%3C/svg%3E"); background-size: cover; }
 
-        input[type="text"] {
-            background: transparent; border: none; color: #fff; text-align: right; font-size: 16px; outline: none; width: 150px;
+        /* Profile Special */
+        .profile-header {
+            display: flex; flex-direction: column; align-items: center; margin-bottom: 24px;
         }
+        .avatar-edit {
+            position: relative; width: 100px; height: 100px; margin-bottom: 16px;
+        }
+        .avatar-circle {
+            width: 100%; height: 100%; border-radius: 50%;
+            background: linear-gradient(135deg, #4f46e5, #9333ea);
+            display: flex; align-items: center; justify-content: center;
+            font-size: 48px; box-shadow: 0 10px 30px rgba(0,0,0,0.3);
+            border: 4px solid #000;
+            cursor: pointer;
+            transition: transform 0.2s;
+        }
+        .avatar-circle:active { transform: scale(0.95); }
+        .edit-badge {
+            position: absolute; bottom: 0; right: 0;
+            background: #0a84ff; color: white;
+            width: 28px; height: 28px; border-radius: 50%;
+            display: flex; align-items: center; justify-content: center;
+            font-size: 14px; border: 3px solid #000;
+            pointer-events: none;
+        }
+
+        .name-input {
+            background: transparent; border: none;
+            font-size: 24px; font-weight: 700; color: #fff;
+            text-align: center; outline: none; width: 100%;
+            padding: 4px; border-radius: 8px;
+        }
+        .name-input:focus { background: rgba(255,255,255,0.1); }
+
+        /* Theme Selector */
+        .theme-scroll {
+            display: flex; gap: 12px; padding: 16px; overflow-x: auto;
+            scroll-snap-type: x mandatory;
+        }
+        .theme-opt {
+            flex: 0 0 100px; height: 120px;
+            background: #333; border-radius: 12px;
+            scroll-snap-align: start;
+            position: relative; cursor: pointer;
+            border: 2px solid transparent; overflow: hidden;
+            transition: transform 0.2s;
+        }
+        .theme-opt.active { border-color: var(--primary); }
+        .theme-opt:active { transform: scale(0.95); }
+        
+        .theme-preview { height: 70%; width: 100%; }
+        .theme-name { font-size: 12px; font-weight: 600; text-align: center; padding: 8px; }
 
         /* Toggles */
         .toggle {
-            width: 50px; height: 30px; background: #333; border-radius: 15px; position: relative; transition: 0.3s; cursor: pointer;
+            width: 51px; height: 31px; background: #39393d; border-radius: 15.5px;
+            position: relative; transition: 0.3s; cursor: pointer;
         }
         .toggle::after {
-            content: ''; position: absolute; top: 2px; left: 2px; width: 26px; height: 26px;
-            background: #fff; border-radius: 50%; transition: 0.3s;
+            content: ''; position: absolute; top: 2px; left: 2px;
+            width: 27px; height: 27px; background: #fff; border-radius: 50%;
+            box-shadow: 0 3px 8px rgba(0,0,0,0.15); transition: 0.3s cubic-bezier(0.2, 0.8, 0.2, 1);
         }
-        .toggle.active { background: #34c759; }
+        .toggle.active { background: #32d74b; }
         .toggle.active::after { transform: translateX(20px); }
 
-        /* Grids */
-        .grid-select {
-            display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; padding: 16px;
+        /* Select Input */
+        select.hidden-select {
+            background: transparent; border: none; color: transparent;
+            position: absolute; inset: 0; opacity: 0; cursor: pointer;
         }
-        .theme-card {
-            background: #333; border-radius: 8px; height: 60px; display: flex; align-items: center; justify-content: center;
-            font-size: 13px; font-weight: 600; cursor: pointer; border: 2px solid transparent; position: relative;
-        }
-        .theme-card.selected { border-color: var(--primary); }
 
-        .color-grid {
-            display: flex; gap: 10px; padding: 16px; overflow-x: auto;
+        /* Footer */
+        .footer-status {
+            text-align: center; margin-top: 40px;
+            font-size: 13px; color: var(--text-sec);
         }
-        .color-swatch {
-            width: 40px; height: 40px; border-radius: 50%; cursor: pointer; border: 2px solid transparent; flex-shrink: 0;
+        .status-dot {
+            display: inline-block; width: 8px; height: 8px; border-radius: 50%;
+            background: #32d74b; margin-right: 6px;
         }
-        .color-swatch.selected { border-color: #fff; }
+        .status-dot.offline { background: #ff9f0a; }
 
-        .btn-action {
-            width: 100%; text-align: center; color: #007aff; padding: 16px; cursor: pointer; font-size: 16px; background: var(--bg-card); border:none;
-            transition: opacity 0.2s;
+        /* Emoji Picker Modal */
+        .modal {
+            position: fixed; inset: 0; background: rgba(0,0,0,0.8); z-index: 100;
+            display: none; flex-direction: column; justify-content: flex-end;
         }
-        .btn-destructive { color: #ff3b30; }
-        .btn-action:disabled { opacity: 0.3; cursor: not-allowed; color: #888; }
-
-        .hidden { display: none; }
-        
-        .dev-badge { float:right; font-size:10px; background:#333; padding:2px 6px; border-radius:4px; color:#aaa; margin-top:2px; }
+        .modal.open { display: flex; }
+        .emoji-sheet {
+            background: #1c1c1e; border-top-left-radius: 20px; border-top-right-radius: 20px;
+            padding: 20px; max-height: 50vh; overflow-y: auto;
+            display: grid; grid-template-columns: repeat(5, 1fr); gap: 10px;
+        }
+        .emoji-opt {
+            font-size: 32px; padding: 10px; text-align: center; background: rgba(255,255,255,0.05);
+            border-radius: 12px; cursor: pointer;
+        }
+        .emoji-opt:active { background: rgba(255,255,255,0.2); }
 
     </style>
 </head>
 <body>
 
-    <h1>Einstellungen</h1>
+    <div class="navbar">Account</div>
 
-    <h2>Account</h2>
-    <div class="card-group">
-        <div class="list-item">
-            <span class="item-label">Avatar</span>
-            <div class="item-val" onclick="promptAvatar()">
-                <div class="avatar-preview" id="avatarPreview">👤</div>
-                <span>›</span>
+    <div class="content">
+        
+        <!-- Profile -->
+        <div class="profile-header">
+            <div class="avatar-edit" onclick="openEmojiPicker()">
+                <div class="avatar-circle" id="avatarDisplay">👤</div>
+                <div class="edit-badge">✎</div>
             </div>
+            <input type="text" class="name-input" id="nameInput" value="Benutzer" onblur="saveProfile()">
         </div>
-        <div class="list-item">
-            <span class="item-label">Name</span>
-            <input type="text" id="inpName" placeholder="Dein Name" onchange="saveProfile()">
-        </div>
-        <div class="list-item">
-            <span class="item-label">Rolle</span>
-            <span class="item-val" id="valRole">User</span>
-        </div>
-    </div>
 
-    <h2>Look & Feel</h2>
-    <div class="card-group">
-        <div class="list-item" style="flex-direction: column; align-items: flex-start;">
-            <span class="item-label" style="margin-bottom: 10px;">Theme</span>
-            <div class="grid-select" style="width:100%; padding:0; gap:8px;" id="themeGrid">
-                <!-- JS populates -->
-            </div>
-        </div>
-        <div class="list-item" style="flex-direction: column; align-items: flex-start;">
-            <span class="item-label" style="margin-bottom: 10px;">Akzentfarbe</span>
-            <div class="color-grid" style="width:100%; padding:0;" id="accentGrid">
-                <div class="color-swatch" style="background: #ef4444" onclick="setAccent('#ef4444')"></div>
-                <div class="color-swatch" style="background: #f97316" onclick="setAccent('#f97316')"></div>
-                <div class="color-swatch" style="background: #eab308" onclick="setAccent('#eab308')"></div>
-                <div class="color-swatch" style="background: #22c55e" onclick="setAccent('#22c55e')"></div>
-                <div class="color-swatch" style="background: #06b6d4" onclick="setAccent('#06b6d4')"></div>
-                <div class="color-swatch" style="background: #3b82f6" onclick="setAccent('#3b82f6')"></div>
-                <div class="color-swatch" style="background: #8b5cf6" onclick="setAccent('#8b5cf6')"></div>
-                <div class="color-swatch" style="background: #ec4899" onclick="setAccent('#ec4899')"></div>
-            </div>
-        </div>
-        <div class="list-item">
-            <span class="item-label">Bewegung reduzieren</span>
-            <div class="toggle" id="toggleMotion" onclick="toggleMotion()"></div>
-        </div>
-    </div>
-
-    <h2>Daten</h2>
-    <div class="card-group">
-        <button class="btn-action" onclick="exportData()">Daten exportieren (JSON)</button>
-        <button class="btn-action btn-destructive" onclick="resetData()">Lokale Daten löschen</button>
-    </div>
-
-    <div id="devSection">
-        <h2>Developer <span class="dev-badge">ADMIN ONLY</span></h2>
+        <!-- Design -->
+        <div class="section-title">Design</div>
         <div class="card-group">
-            <button class="btn-action dev-btn" onclick="devUnlockRewards()">All Rewards Unlock</button>
-            <button class="btn-action btn-destructive dev-btn" onclick="devResetLuna()">Reset Luna</button>
+            <!-- Theme Horizontal Scroll embedded or just a container -->
+            <div class="theme-scroll" id="themeList">
+                <!-- JS Populates -->
+            </div>
+        </div>
+
+        <!-- Behavior -->
+        <div class="section-title">Verhalten</div>
+        <div class="card-group">
+            <div class="list-item">
+                <span class="list-label">Bewegung reduzieren</span>
+                <div class="toggle" id="toggleMotion" onclick="toggleMotion()"></div>
+            </div>
+            <div class="list-item" style="position: relative;">
+                <span class="list-label">Schnellstart App</span>
+                <div class="list-value">
+                    <span id="quickstartVal">Zuletzt geöffnet</span>
+                    <span class="chevron"></span>
+                </div>
+                <select class="hidden-select" id="quickstartSelect" onchange="saveQuickstart()">
+                    <option value="lastApp">Zuletzt geöffnet</option>
+                    <option value="luna">Luna 🐑</option>
+                    <option value="daily">Daily ✨</option>
+                    <option value="rewards_app">Belohnungen 🎁</option>
+                    <option value="games">Arcade 🕹️</option>
+                    <option value="diary">Tagebuch 📔</option>
+                </select>
+            </div>
+        </div>
+
+        <!-- Footer -->
+        <div class="footer-status">
+            <span class="status-dot" id="statusDot"></span>
+            <span id="statusText">Verbinde...</span>
+        </div>
+
+    </div>
+
+    <!-- Emoji Picker -->
+    <div class="modal" id="emojiModal" onclick="closeEmojiPicker(event)">
+        <div class="emoji-sheet" id="emojiGrid">
+            <!-- JS Populates -->
         </div>
     </div>
 

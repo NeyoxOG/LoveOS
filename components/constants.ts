@@ -28,6 +28,7 @@ export const USERS: User[] = [
 export const APPS: AppItem[] = [
   { id:"love", name:"Love", icon:"💞", status:"available" },
   { id:"daily", name:"Daily", icon:"✨", status:"available" },
+  { id:"rewards_app", name:"Belohnungen", icon:"🎁", status:"available" },
   { id:"valentine", name:"Valentinstag", icon:"💘", status:"lockedHint" },
   { id:"luna", name:"Luna", icon:"🐑", status:"lockedHint" },
   { id:"vault", name:"Message Vault", icon:"💌", status:"available" },
