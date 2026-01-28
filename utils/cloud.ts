@@ -14,19 +14,19 @@ const DEFAULT_ADMIN_CONFIG: AdminConfig = {
   appVisibility: {
     luna: true, rewards: true, settings: true, valentine: true, 
     vault: true, admin: true, messages: true, achievements: true, 
-    games: true, diary: true, daily: true, love: true, rewards_app: true
+    games: true, diary: true, daily: true, love: true, rewards_app: true, story: true
   },
   userStatus: {
     "fia": { role: "user", banned: false },
     "collin": { role: "admin", banned: false },
     "guest": { role: "guest", banned: false }
   },
-  maintenanceMode: false, // Default
+  maintenanceMode: false,
   lastEditedBy: "system",
   updatedAt: Date.now()
 };
 
-// --- Helper: Deep Sanitize (Fixes "Invalid Argument" crashes) ---
+// --- Helper: Deep Sanitize ---
 const sanitize = (obj: any): any => {
     if (obj === undefined) return null;
     if (obj === null) return null;
@@ -101,44 +101,57 @@ export const cloud = {
         }
     },
 
-    // --- Admin Inspector (Raw JSON Access) ---
-    async adminGetData(targetUid: string, type: 'profile' | 'rewards' | 'prefs' | 'luna' | 'adminConfig'): Promise<any> {
+    // --- Admin Inspector ---
+    async adminGetData(targetUid: string, type: string): Promise<any> {
         try {
             let path = '';
-            if (type === 'profile') path = `users/${targetUid}`;
-            else if (type === 'rewards') path = `users/${targetUid}/data/rewards`;
-            else if (type === 'prefs') path = `users/${targetUid}/data/prefs`;
-            else if (type === 'luna') path = `couples/${COUPLE_ID}/apps/luna`;
-            else if (type === 'adminConfig') path = `globals/system_config`;
+            if (type === 'daily_state') path = `users/${targetUid}/data/daily_state`;
+            // Add other types as needed
+            if (!path) return null;
 
             const snap = await db.doc(path).get();
             return snap.exists ? snap.data() : null;
-        } catch(e) {
-            console.error("[Admin] Fetch Failed", e);
-            return { error: "Fetch failed", details: e };
-        }
+        } catch(e) { return null; }
     },
 
     async adminSetData(targetUid: string, type: string, data: any) {
         try {
             let path = '';
-            if (type === 'profile') path = `users/${targetUid}`;
-            else if (type === 'rewards') path = `users/${targetUid}/data/rewards`;
-            else if (type === 'prefs') path = `users/${targetUid}/data/prefs`;
-            else if (type === 'luna') path = `couples/${COUPLE_ID}/apps/luna`;
-            else if (type === 'adminConfig') path = `globals/system_config`;
-
-            await db.doc(path).set(sanitize(data), { merge: true });
-            return true;
-        } catch(e) {
-            console.error("[Admin] Save Failed", e);
+            if (type === 'daily_state') path = `users/${targetUid}/data/daily_state`;
+            
+            if (path) {
+                await db.doc(path).set(sanitize(data), { merge: true });
+                return true;
+            }
             return false;
+        } catch(e) { return false; }
+    },
+
+    // --- Admin Actions ---
+    
+    async adminResetUser(targetUid: string) {
+        try {
+            // Delete subcollections manually or just main docs ref
+            // Note: Firestore requires deleting docs individually for subcollections, 
+            // but here we just reset main config docs.
+            
+            await db.doc(`users/${targetUid}/data/rewards`).delete();
+            await db.doc(`users/${targetUid}/data/prefs`).delete();
+            await db.doc(`users/${targetUid}/data/daily_state`).delete();
+            
+            // Reset Profile (don't delete, just reset fields)
+            await db.collection('users').doc(targetUid).update({ 
+                onboardingCompleted: false,
+                avatar: { type: 'emoji', value: targetUid.charAt(0).toUpperCase() } 
+            });
+            
+            return true;
+        } catch (e) { 
+            console.error("Reset failed", e);
+            return false; 
         }
     },
 
-    // --- Specific Admin Actions ---
-    
-    // Reset Onboarding
     async adminResetOnboarding(targetUid: string) {
         try {
             await db.collection('users').doc(targetUid).update({ onboardingCompleted: false });
@@ -146,7 +159,6 @@ export const cloud = {
         } catch (e) { return false; }
     },
 
-    // Force Logout
     async adminForceLogout(targetUid: string) {
         try {
             await db.collection('users').doc(targetUid).update({ forceLogoutAt: Date.now() });
@@ -219,6 +231,28 @@ export const cloud = {
     },
 
     // --- Daily ---
+    async loadDailyState(targetUid?: string) {
+        const uid = targetUid || getUid();
+        if (uid === 'guest') return JSON.parse(localStorage.getItem('fiaos_guest_daily_state') || 'null');
+        try {
+            const ref = db.doc(`users/${uid}/data/daily_state`);
+            const snap = await ref.get();
+            return snap.exists ? snap.data() : null;
+        } catch { return null; }
+    },
+
+    async saveDailyState(data: any, targetUid?: string) {
+        const uid = targetUid || getUid();
+        if (uid === 'guest') {
+            localStorage.setItem('fiaos_guest_daily_state', JSON.stringify(data));
+            return;
+        }
+        try {
+            const ref = db.doc(`users/${uid}/data/daily_state`);
+            await ref.set(sanitize(data), { merge: true });
+        } catch (e) {}
+    },
+
     async getDailyShared(dateIso: string): Promise<string[]> {
         if (isGuest()) return [];
         try {
@@ -248,17 +282,7 @@ export const cloud = {
             const ref = db.collection('couples').doc(COUPLE_ID).collection('apps').doc('luna');
             const snap = await ref.get();
             if (snap.exists) return snap.data();
-            
-            const initial = {
-                stats: { hunger: 50, energy: 50, hygiene: 50, fun: 50, love: 50 },
-                mood: 'happy',
-                lastActions: {},
-                daily: { dayKey: new Date().toISOString().split('T')[0], fedToday: false, missedDays: 0 },
-                streak: { count: 0 },
-                history: []
-            };
-            await ref.set(sanitize(initial));
-            return initial;
+            return null; // Let app init default
         } catch { return null; }
     },
 
@@ -275,10 +299,8 @@ export const cloud = {
     },
 
     async addLunaHistory(item: any) {
-        const current = await this.loadLuna();
-        let history = current?.history || [];
-        if (!Array.isArray(history)) history = []; // Safety
-        
+        const current = await this.loadLuna() || { history: [] };
+        let history = current.history || [];
         history.unshift(item);
         const trimmed = history.slice(0, 50);
         await this.updateLuna({ history: trimmed });
@@ -289,7 +311,7 @@ export const cloud = {
         if (isGuest()) {
             const local = JSON.parse(localStorage.getItem('fiaos_guest_messages') || '[]');
             callback(local);
-            return () => {}; // No-op unsubscribe
+            return () => {}; 
         }
         try {
             const q = db.collection('couples').doc(COUPLE_ID).collection('messages')
@@ -323,35 +345,51 @@ export const cloud = {
         } catch(e) { console.error("Send Msg Error", e); }
     },
 
-    // --- Vault, Diary, Games, Profile (Standard) ---
+    // --- Vault & Diary ---
     async loadVault() {
-        if (isGuest()) return { messages: [] };
+        if (isGuest()) return JSON.parse(localStorage.getItem('fiaos_guest_vault') || '{"messages":[]}');
         try {
             const ref = db.collection('couples').doc(COUPLE_ID).collection('apps').doc('vault');
             const snap = await ref.get();
             return snap.exists ? snap.data() : { messages: [] };
         } catch { return { messages: [] }; }
     },
+    
     async saveVault(state: any) {
-        if (isGuest()) return;
+        if (isGuest()) {
+            localStorage.setItem('fiaos_guest_vault', JSON.stringify(state));
+            return;
+        }
         try {
+            // IMPORTANT: Completely overwrite or carefully merge messages array
             await db.collection('couples').doc(COUPLE_ID).collection('apps').doc('vault').set(sanitize(state));
         } catch {}
     },
+    
     async loadDiary() {
-        if (isGuest()) return [];
+        if (isGuest()) return JSON.parse(localStorage.getItem('fiaos_guest_diary') || '[]');
         try {
             const q = db.collection('users').doc(getUid()).collection('diary').orderBy('createdAt', 'desc');
             const snap = await q.get();
             return snap.docs.map(d => ({ id: d.id, ...d.data() }));
         } catch { return []; }
     },
+    
     async saveDiaryEntry(entry: any) {
-        if (isGuest()) return;
+        if (isGuest()) {
+            const local = JSON.parse(localStorage.getItem('fiaos_guest_diary') || '[]');
+            const idx = local.findIndex((e:any) => e.id === entry.id);
+            if (idx >= 0) local[idx] = entry; else local.push(entry);
+            localStorage.setItem('fiaos_guest_diary', JSON.stringify(local));
+            return;
+        }
         try {
+            // Merge true updates fields, doesn't delete existing
             await db.collection('users').doc(getUid()).collection('diary').doc(entry.id).set(sanitize(entry), { merge: true });
         } catch {}
     },
+
+    // --- Games & Profile ---
     async saveHighscore(gameId: string, score: number, extra: any = {}) {
         if (isGuest()) return;
         try {
@@ -361,6 +399,7 @@ export const cloud = {
             }), { merge: true });
         } catch {}
     },
+    
     async getLeaderboard(gameId: string) {
         if (isGuest()) return [];
         try {
@@ -369,6 +408,7 @@ export const cloud = {
             return snap.docs.map(d => d.data());
         } catch { return []; }
     },
+    
     async loadProfile() {
         if (isGuest()) return null;
         try {
@@ -376,6 +416,7 @@ export const cloud = {
             return snap.exists ? snap.data() : null;
         } catch { return null; }
     },
+    
     async saveProfile(data: any) {
         if (isGuest()) {
             const uid = getUid(); 

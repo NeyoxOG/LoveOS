@@ -140,7 +140,7 @@
             cursor: pointer; transition: background 0.2s;
         }
         .action-card:active { background: var(--bg-hover); }
-        .action-card.danger { color: var(--danger); }
+        .action-card.danger { color: var(--danger); border: 1px solid rgba(255, 69, 58, 0.3); }
         
         /* --- Rewards List --- */
         .reward-toggle-item {
@@ -182,6 +182,9 @@
         .hidden { display: none !important; }
         .status-dot { width: 8px; height: 8px; border-radius: 50%; background: #666; display: inline-block; margin-right: 6px; }
         .status-dot.online { background: var(--success); box-shadow: 0 0 8px var(--success); }
+
+        .input-row { display: flex; align-items: center; gap: 10px; padding: 10px 16px; border-bottom: 1px solid var(--border); }
+        .input-row input { flex: 1; background: #2c2c2e; border: 1px solid var(--border); padding: 8px; color: white; border-radius: 8px; }
 
     </style>
 </head>
@@ -235,16 +238,29 @@
                 </div>
             </div>
 
-            <div class="section-title">Aktionen</div>
+            <div class="section-title">Danger Zone</div>
             <div class="user-actions-grid">
-                <div class="action-card" onclick="actionResetOnboarding()">
-                    <span style="font-size:24px;">🚀</span>
-                    <span style="font-weight:600; font-size:13px;">Reset Intro</span>
+                <div class="action-card danger" onclick="actionResetUser()">
+                    <span style="font-size:24px;">💥</span>
+                    <span style="font-weight:600; font-size:13px;">RESET ALL</span>
                 </div>
                 <div class="action-card" onclick="actionForceLogout()">
                     <span style="font-size:24px;">🔌</span>
                     <span style="font-weight:600; font-size:13px;">Force Logout</span>
                 </div>
+            </div>
+
+            <div class="section-title">Daily Stats</div>
+            <div class="card">
+                <div class="input-row">
+                    <span>Streak:</span>
+                    <input type="number" id="inpStreak" placeholder="0">
+                </div>
+                <div class="input-row">
+                    <span>Points:</span>
+                    <input type="number" id="inpPoints" placeholder="0">
+                </div>
+                <button class="btn-block" style="margin: 10px; width: calc(100% - 20px);" onclick="actionSaveDaily()">Speichern</button>
             </div>
 
             <div class="section-title">Status</div>

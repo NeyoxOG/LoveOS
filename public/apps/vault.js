@@ -161,26 +161,20 @@ function handleCardClick(msg) {
             return; 
         }
     } else if (msg.lock && msg.lock.type === 'reward') {
-        // Simple bridge check would be better, but local storage fallback for now
-        const rKey = user.role === 'guest' ? 'fiaos_rewards_guest' : `fiaos_rewards_${user.id}`; 
-        
-        let unlocked = false;
-        try {
-            const rData = JSON.parse(localStorage.getItem(rKey) || '{}');
-            unlocked = rData.rewards?.[msg.lock.rewardId]?.unlocked || rData.valentine?.unlocked?.[msg.lock.rewardId];
-        } catch(e){}
-        
-        if (!unlocked) { 
-            alert("Du benötigst einen bestimmten Erfolg, um das zu öffnen! 🏆"); 
-            return; 
-        }
+        // Cloud Check for Reward (Mock for iframe context, relying on parent could be better but async)
+        // Assume local unlocked for now or bridge call.
+        alert("Reward Lock Check not fully implemented inside Vault yet.");
+        return;
     }
 
     if (confirm("Siegel brechen und Nachricht öffnen?")) {
         msg.openedAt = Date.now();
         saveState();
+        playSound('success');
         renderList();
         setTimeout(() => openReader(msg), 400);
+    } else {
+        playSound('click');
     }
 }
 
@@ -192,64 +186,65 @@ function saveMessage() {
     if (!title || !body) return;
 
     if (editingMsgId) {
-        // Update existing
-        const msg = vaultState.messages.find(m => m.id === editingMsgId);
-        if (msg) {
+        // Update existing in local array
+        const idx = vaultState.messages.findIndex(m => m.id === editingMsgId);
+        if (idx !== -1) {
+            const msg = vaultState.messages[idx];
             msg.title = title;
             msg.body = body;
             msg.lock.type = lockType;
-            // Update lock details if type changed or same
+            
             if (lockType === 'time') {
                 const val = document.getElementById('inpTime').value;
                 if (val) msg.lock.unlockAt = new Date(val).getTime();
             } else if (lockType === 'reward') {
                 msg.lock.rewardId = document.getElementById('inpRewardId').value;
             }
+            
+            // Persist entire state
             saveState();
             renderList();
             
-            // If currently reading, update reader
             if (currentReadingMsg && currentReadingMsg.id === editingMsgId) {
                 openReader(msg);
             }
         }
-        document.getElementById('composer').classList.remove('active');
-        editingMsgId = null;
-        return;
-    }
+    } else {
+        // New Message
+        const newMsg = {
+            id: 'msg_' + Date.now(),
+            title, body,
+            author: { 
+                id: user.id, 
+                name: user.name, 
+                avatar: { type: 'emoji', value: user.name.charAt(0) } 
+            },
+            createdAt: Date.now(),
+            lock: { type: lockType, unlockAt: null, rewardId: null },
+            openedAt: null,
+            isPinned: false,
+            style: { sealColor: '#ec4899', paper: 'classic' }
+        };
 
-    // New Message
-    const newMsg = {
-        id: 'msg_' + Date.now(),
-        title, body,
-        author: { 
-            id: user.id, 
-            name: user.name, 
-            avatar: { type: 'emoji', value: user.name.charAt(0) } 
-        },
-        createdAt: Date.now(),
-        lock: { type: lockType, unlockAt: null, rewardId: null },
-        openedAt: null,
-        isPinned: false,
-        style: { sealColor: '#ec4899', paper: 'classic' }
-    };
-
-    if (lockType === 'time') {
-        const val = document.getElementById('inpTime').value;
-        if (val) {
-            newMsg.lock.unlockAt = new Date(val).getTime();
-        } else {
-            newMsg.lock.type = 'none';
+        if (lockType === 'time') {
+            const val = document.getElementById('inpTime').value;
+            if (val) {
+                newMsg.lock.unlockAt = new Date(val).getTime();
+            } else {
+                newMsg.lock.type = 'none';
+            }
+        } else if (lockType === 'reward') {
+            newMsg.lock.rewardId = document.getElementById('inpRewardId').value;
         }
-    } else if (lockType === 'reward') {
-        newMsg.lock.rewardId = document.getElementById('inpRewardId').value;
-    }
 
-    if (!vaultState.messages) vaultState.messages = [];
-    vaultState.messages.push(newMsg);
-    saveState();
+        if (!vaultState.messages) vaultState.messages = [];
+        vaultState.messages.push(newMsg);
+        saveState();
+    }
     
     document.getElementById('composer').classList.remove('active');
+    editingMsgId = null;
+    playSound('success');
     renderList();
 }
 
@@ -268,6 +263,7 @@ function openReader(msg) {
     }
 
     document.getElementById('reader').classList.add('active');
+    playSound('open');
 }
 
 window.editCurrent = () => {
@@ -275,21 +271,16 @@ window.editCurrent = () => {
     
     document.getElementById('reader').classList.remove('active');
     
-    // Open Composer in Edit Mode
     editingMsgId = currentReadingMsg.id;
     document.getElementById('inpTitle').value = currentReadingMsg.title;
     document.getElementById('inpBody').value = currentReadingMsg.body;
     document.getElementById('inpLockType').value = currentReadingMsg.lock.type;
     
-    // Trigger change event to show correct inputs
     const evt = new Event('change');
     document.getElementById('inpLockType').dispatchEvent(evt);
     
     if (currentReadingMsg.lock.type === 'time' && currentReadingMsg.lock.unlockAt) {
-        // Convert ts to datetime-local string (roughly)
         const date = new Date(currentReadingMsg.lock.unlockAt);
-        // ISO string is UTC, adjust for local? Simply using slice for now, might be off by TZ
-        // Better:
         const offset = date.getTimezoneOffset() * 60000;
         const localISOTime = (new Date(date - offset)).toISOString().slice(0, 16);
         document.getElementById('inpTime').value = localISOTime;
@@ -312,17 +303,29 @@ function bindEvents() {
         
         const sel = document.getElementById('inpRewardId');
         sel.innerHTML = REWARDS_LIST.map(r => `<option value="${r.id}">${r.name}</option>`).join('');
+        playSound('click');
     };
-    document.getElementById('composerCancel').onclick = () => document.getElementById('composer').classList.remove('active');
+    document.getElementById('composerCancel').onclick = () => {
+        document.getElementById('composer').classList.remove('active');
+        playSound('close');
+    };
     document.getElementById('composerSave').onclick = saveMessage;
-    document.getElementById('readerClose').onclick = () => document.getElementById('reader').classList.remove('active');
+    document.getElementById('readerClose').onclick = () => {
+        document.getElementById('reader').classList.remove('active');
+        playSound('close');
+    };
     document.getElementById('inpLockType').onchange = (e) => {
         document.getElementById('groupTime').classList.toggle('hidden', e.target.value !== 'time');
         document.getElementById('groupReward').classList.toggle('hidden', e.target.value !== 'reward');
     };
 }
 
-window.filterList = (type, idx) => { activeFilter = type; document.getElementById('segIndicator').style.transform = `translateX(${idx * 100}%)`; renderList(); };
+window.filterList = (type, idx) => { 
+    activeFilter = type; 
+    document.getElementById('segIndicator').style.transform = `translateX(${idx * 100}%)`; 
+    renderList(); 
+    playSound('click');
+};
 
 function updateTimers() {
     document.querySelectorAll('.time-lock').forEach(el => {
@@ -339,6 +342,12 @@ function updateTimers() {
             el.innerText = `${d}d ${h}h ${m}m`;
         }
     });
+}
+
+function playSound(type) {
+    if (window.parent.FIAOS && window.parent.FIAOS.playSound) {
+        window.parent.FIAOS.playSound(type);
+    }
 }
 
 init();

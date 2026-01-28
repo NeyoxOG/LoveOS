@@ -5,8 +5,6 @@
 
 const KEYS = { SESSION: 'fiaos_session' };
 
-// Manual definitions for rewards that might not be in catalog or for nice grouping
-// In a real app, this would come from a unified catalog.
 const CATEGORY_NAMES = {
     general: 'Allgemein',
     love: 'Love & Beziehung',
@@ -31,7 +29,6 @@ function init() {
         cloud = window.parent.FIAOS.cloud;
     }
 
-    // Full Catalog Mock (Synced with constants.ts)
     catalog = [
         { id: 'reward.welcome', title: 'Willkommen', icon: '✨', category: 'general' },
         { id: 'reward.welcomeTheme', title: 'Willkommens-Geschenk', description: 'Theme: Aurora freischalten 🌌', icon: '🎁', category: 'general', type: 'theme_unlock', payload: { themeId: 'aurora' } },
@@ -46,6 +43,7 @@ function init() {
         { id: 'daily.total10', title: 'Daily Sammler', icon: '🎁', category: 'daily' },
         { id: 'love_1_month', title: '1 Monat Wir', icon: '🌹', category: 'love', type: 'theme_unlock', payload: { themeId: 'softRose' } },
         { id: 'love_1_year', title: '1 Jahr', icon: '💍', category: 'love', type: 'theme_unlock', payload: { themeId: 'eternal' } },
+        { id: 'daily.points100', title: 'Daily 100', icon: '👑', category: 'daily', type: 'theme_unlock', payload: { themeId: 'royal' } },
     ];
 
     loadData();
@@ -54,6 +52,8 @@ function init() {
 async function loadData() {
     if (cloud) {
         rewardsData = await cloud.loadRewards();
+    } else {
+        rewardsData = JSON.parse(localStorage.getItem(user.role === 'guest' ? 'fiaos_rewards_guest' : `fiaos_rewards_${user.id}`));
     }
     render();
 }
@@ -71,9 +71,11 @@ function render() {
     const items = [];
 
     // 1. Standard Rewards
-    for (const [id, prog] of Object.entries(rewardsData.rewards)) {
-        if (prog.unlocked) {
-            items.push({ id, unlockedAt: prog.unlockedAt, ...getMeta(id) });
+    if (rewardsData.rewards) {
+        for (const [id, prog] of Object.entries(rewardsData.rewards)) {
+            if (prog.unlocked) {
+                items.push({ id, unlockedAt: prog.unlockedAt, ...getMeta(id) });
+            }
         }
     }
 
@@ -86,7 +88,7 @@ function render() {
         }
     }
 
-    // Filter by Tab
+    // Filter logic update
     const filtered = items.filter(item => {
         const isRedeemed = rewardsData.redeemed && rewardsData.redeemed[item.id];
         return currentFilter === 'active' ? !isRedeemed : isRedeemed;
@@ -144,7 +146,6 @@ function render() {
 function getMeta(id) {
     const found = catalog.find(c => c.id === id);
     if (found) return found;
-    // Fallback for unknown IDs (e.g. dynamic games rewards)
     return { title: id, icon: '🏆', category: 'general', description: 'Freigeschaltet' };
 }
 
@@ -158,6 +159,7 @@ window.redeem = async (id) => {
 
     // Confetti
     fireConfetti();
+    if (window.parent.FIAOS) window.parent.FIAOS.playSound('success');
 
     // Update Local Data
     if (!rewardsData.redeemed) rewardsData.redeemed = {};
@@ -166,19 +168,19 @@ window.redeem = async (id) => {
     // Save
     if (cloud) {
         await cloud.saveRewards(rewardsData);
+    } else {
+        // Local save fallback
+        localStorage.setItem(user.role === 'guest' ? 'fiaos_rewards_guest' : `fiaos_rewards_${user.id}`, JSON.stringify(rewardsData));
     }
 
     // Theme Unlock Logic
     if (item.type === 'theme_unlock' && item.payload?.themeId) {
         const newThemeId = item.payload.themeId;
-        // Apply instantly
         if (window.parent.FIAOS) {
-            // Load current prefs first to keep other settings
             const prefs = await cloud.loadPrefs();
             if (prefs) {
                 prefs.theme = newThemeId;
                 await cloud.savePrefs(prefs);
-                // Broadcast to update UI globally
                 if (window.parent.FIAOS_APPLY_PREFS) {
                     window.parent.FIAOS_APPLY_PREFS(prefs);
                 }
@@ -194,6 +196,7 @@ window.redeem = async (id) => {
 window.filterList = (filter, idx) => {
     currentFilter = filter;
     document.getElementById('segIndicator').style.transform = `translateX(${idx * 100}%)`;
+    if (window.parent.FIAOS) window.parent.FIAOS.playSound('click');
     render();
 };
 

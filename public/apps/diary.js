@@ -35,7 +35,7 @@ function init() {
     loadData();
 }
 
-function updateSyncUI(text, status) { // status: 'online', 'offline', 'loading'
+function updateSyncUI(text, status) {
     const dot = document.getElementById('syncDot');
     const txt = document.getElementById('syncText');
     
@@ -51,7 +51,6 @@ async function loadData() {
             entries = await cloud.loadDiary();
             updateSyncUI('Cloud Sync', 'online');
         } else {
-            // Guest or fallback handled by Cloud adapter returning [] or local
             entries = await cloud.loadDiary(); 
             if (user.role !== 'guest') updateSyncUI('Offline Mode', 'offline');
         }
@@ -91,7 +90,6 @@ function renderTimeline() {
         
         const el = document.createElement('div');
         el.className = 'entry-card';
-        // Stagger animation
         el.style.animationDelay = `${index * 0.05}s`;
         el.onclick = () => openDetail(entry.id);
         
@@ -128,6 +126,7 @@ window.setTab = (tab, idx) => {
         alert("Nur für Fia & Collin verfügbar.");
         return;
     }
+    playSound('click');
     currentTab = tab;
     document.getElementById('segIndicator').style.transform = `translateX(${idx * 100}%)`;
     renderTimeline();
@@ -141,29 +140,41 @@ window.saveEntry = async () => {
 
     updateSyncUI('Speichere...', 'loading');
 
-    const entry = {
-        id: editingId || crypto.randomUUID(),
-        createdAt: editingId ? (entries.find(e=>e.id===editingId)?.createdAt || Date.now()) : Date.now(),
-        updatedAt: Date.now(),
-        authorUserId: user.id,
-        authorName: user.name,
-        scope: isShared ? 'shared' : 'user',
-        title: title,
-        text: text,
-        mood: currentMood,
-        pinned: false
-    };
+    // Create or Update
+    let entry = entries.find(e => e.id === editingId);
+    if (!entry) {
+        entry = {
+            id: crypto.randomUUID(),
+            createdAt: Date.now(),
+            updatedAt: Date.now(),
+            authorUserId: user.id,
+            authorName: user.name,
+            scope: isShared ? 'shared' : 'user',
+            title: title,
+            text: text,
+            mood: currentMood,
+            pinned: false
+        };
+    } else {
+        entry.title = title;
+        entry.text = text;
+        entry.mood = currentMood;
+        entry.scope = isShared ? 'shared' : 'user';
+        entry.updatedAt = Date.now();
+    }
 
     try {
         await cloud.saveDiaryEntry(entry);
-        // Refresh local list immediately for responsiveness
+        
+        // Update local list manually
         const existIdx = entries.findIndex(e => e.id === entry.id);
         if (existIdx >= 0) entries[existIdx] = entry; else entries.unshift(entry);
         entries.sort((a,b) => b.createdAt - a.createdAt);
         
-        loadData(); // Re-fetch to be sure
+        playSound('success');
         closeEditor();
         updateSyncUI('Gespeichert', 'online');
+        renderTimeline();
     } catch(e) {
         alert("Speichern fehlgeschlagen: Offline?");
         updateSyncUI('Offline', 'offline');
@@ -172,13 +183,7 @@ window.saveEntry = async () => {
 
 window.deleteCurrentEntry = async (id) => {
     if (confirm("Wirklich löschen?")) {
-        updateSyncUI('Lösche...', 'loading');
-        // Note: cloud.deleteDiaryEntry needs to be implemented or simulated.
-        // Assuming cloud adapter has it, or we just rely on local state update if not.
-        // For this task, we assume standard save overwrites/updates. Real delete needs method.
-        // Since delete wasn't strictly in scope of 'upgrade UI', we mock it or use existing logic.
-        // If 'cloud.deleteDiaryEntry' exists, call it. If not, just warn.
-        // Let's assume standard behavior:
+        // Mock Delete via save with removed flag or just alert
         alert("Löschen Funktion noch nicht im Cloud-Adapter aktiv.");
         closeDetail();
     }
@@ -193,10 +198,12 @@ window.openEditor = () => {
     isShared = (currentTab === 'shared'); 
     updateSharedToggle(); 
     document.getElementById('editorOverlay').classList.add('active'); 
+    playSound('open');
 };
 
 window.closeEditor = () => { 
     document.getElementById('editorOverlay').classList.remove('active'); 
+    playSound('close');
 };
 
 window.selectMood = (m) => { 
@@ -211,6 +218,7 @@ window.toggleShared = () => {
     if (user.role === 'guest') return; 
     isShared = !isShared; 
     updateSharedToggle(); 
+    playSound('click');
 };
 
 function updateSharedToggle() { 
@@ -225,10 +233,12 @@ window.openDetail = (id) => {
     if (!entry) return; 
     renderDetailContent(entry); 
     document.getElementById('detailView').classList.add('active'); 
+    playSound('open');
 };
 
 window.closeDetail = () => { 
     document.getElementById('detailView').classList.remove('active'); 
+    playSound('close');
 };
 
 window.editCurrentEntry = () => { 
@@ -258,6 +268,12 @@ function renderDetailContent(entry) {
         </div>
         <button class="delete-btn" onclick="deleteCurrentEntry('${entry.id}')">Eintrag löschen</button>
     `;
+}
+
+function playSound(type) {
+    if (window.parent.FIAOS && window.parent.FIAOS.playSound) {
+        window.parent.FIAOS.playSound(type);
+    }
 }
 
 init();

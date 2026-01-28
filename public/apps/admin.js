@@ -1,15 +1,15 @@
 
 /**
- * AdminOS Logic v2.5
+ * AdminOS Logic v2.6
  */
 
-const KEYS = { SESSION: 'fiaos_session', USER_INDEX: 'fiaos_global_user_index' };
+const KEYS = { SESSION: 'fiaos_session' };
 
 let currentUser = null;
 let adminConfig = null;
 let cloud = null;
 let selectedUserId = null;
-let userRewardsData = null; // Cache for rewards editing
+let userRewardsData = null; 
 
 // App Definitions for the Grid
 const APP_DEFS = [
@@ -22,31 +22,18 @@ const APP_DEFS = [
     { id: 'daily', name: 'Daily', icon: '✨' },
     { id: 'love', name: 'Love', icon: '💞' },
     { id: 'messages', name: 'Chat', icon: '💬' },
-    { id: 'settings', name: 'Settings', icon: '⚙️' }
+    { id: 'settings', name: 'Settings', icon: '⚙️' },
+    { id: 'story', name: 'Story', icon: '🎞️' }
 ];
 
-// Simplified Catalog for Admin Toggle
+// Simplified Catalog for Admin Toggle (Partial list)
 const REWARD_CATALOG_MOCK = [
     { id: 'reward.welcome', title: 'Willkommen' },
     { id: 'reward.welcomeTheme', title: 'Theme: Aurora' },
-    { id: 'reward.firstLogin', title: 'Erster Login' },
-    { id: 'reward.firstAppOpen', title: 'Erste App' },
-    { id: 'reward.firstReward', title: 'Erster Erfolg' },
     { id: 'reward.streak3', title: '3 Tage Streak' },
     { id: 'reward.secretLove', title: 'Secret Love' },
-    { id: 'custom_theme_unlock', title: 'Theme: Custom' },
     { id: 'daily.points100', title: 'Theme: Royal' },
-    { id: 'love_1_month', title: 'Theme: Soft Rose' },
-    { id: 'love_3_month', title: 'Theme: Midnight' },
-    { id: 'love_6_month', title: 'Theme: Pastel' },
-    { id: 'love_1_year', title: 'Theme: Eternal' },
-    // Valentine
-    { id: 'valentine.reward.pizza', title: 'Val: Pizza' },
-    { id: 'valentine.reward.photo', title: 'Val: Foto' },
-    { id: 'valentine.reward.letter', title: 'Val: Brief' },
-    { id: 'valentine.reward.care', title: 'Val: Care' },
-    { id: 'valentine.reward.art', title: 'Val: Art' },
-    { id: 'valentine.reward.secret', title: 'Val: Secret' }
+    { id: 'valentine.reward.pizza', title: 'Val: Pizza' }
 ];
 
 function init() {
@@ -96,12 +83,10 @@ async function loadSystemData() {
 // --- Renderers ---
 
 function renderSystemTab() {
-    // Maint Toggle
     const maintToggle = document.getElementById('dashMaintToggle');
     if (adminConfig.maintenanceMode) maintToggle.classList.add('active');
     else maintToggle.classList.remove('active');
 
-    // Apps Grid
     const grid = document.getElementById('appsGrid');
     grid.innerHTML = '';
     APP_DEFS.forEach(app => {
@@ -125,10 +110,24 @@ function renderUserTab(uid) {
     document.getElementById('uDetailName').innerText = uid.charAt(0).toUpperCase() + uid.slice(1);
     document.getElementById('uDetailId').innerText = uid;
     
-    // Status
     const isBanned = adminConfig.userStatus[uid]?.banned;
     const banToggle = document.getElementById('uDetailBanToggle');
     if (isBanned) banToggle.classList.add('active'); else banToggle.classList.remove('active');
+    
+    // Load Daily Stats
+    loadDailyStats(uid);
+}
+
+async function loadDailyStats(uid) {
+    if (!cloud) return;
+    const daily = await cloud.adminGetData(uid, 'daily_state');
+    if (daily) {
+        document.getElementById('inpStreak').value = daily.streak || 0;
+        document.getElementById('inpPoints').value = daily.points || 0;
+    } else {
+        document.getElementById('inpStreak').value = 0;
+        document.getElementById('inpPoints').value = 0;
+    }
 }
 
 async function loadUserRewardsList() {
@@ -140,7 +139,6 @@ async function loadUserRewardsList() {
         if (cloud) {
             userRewardsData = await cloud.loadRewards(uid);
         } else {
-            // Local fallback simulation
             userRewardsData = JSON.parse(localStorage.getItem(uid === 'guest' ? 'fiaos_rewards_guest' : `fiaos_rewards_${uid}`) || 'null');
         }
 
@@ -152,7 +150,6 @@ async function loadUserRewardsList() {
         container.innerHTML = '';
         REWARD_CATALOG_MOCK.forEach(r => {
             let unlocked = false;
-            // Check reward or valentine
             if (r.id.startsWith('valentine.')) {
                 unlocked = userRewardsData.valentine?.unlocked?.[r.id] || false;
             } else {
@@ -179,13 +176,11 @@ async function loadUserRewardsList() {
 // --- Actions ---
 
 window.switchTab = (id, idx) => {
-    // UI Update
     document.querySelectorAll('.segment-btn').forEach((b, i) => {
         if (i === idx) b.classList.add('active'); else b.classList.remove('active');
     });
     document.getElementById('segIndicator').style.transform = `translateX(${idx * 100}%)`;
 
-    // Views
     document.getElementById('tab-system').classList.add('hidden');
     document.getElementById('tab-user-detail').classList.add('hidden');
     document.getElementById('tab-rewards').classList.add('hidden');
@@ -197,13 +192,11 @@ window.switchTab = (id, idx) => {
         document.getElementById('tab-rewards').classList.remove('hidden');
         loadUserRewardsList();
     } else {
-        // User Tab
         document.getElementById('tab-user-detail').classList.remove('hidden');
-        renderUserTab(id); // 'fia' or 'collin'
+        renderUserTab(id);
     }
 };
 
-// System Actions
 window.toggleMaintenance = async () => {
     adminConfig.maintenanceMode = !adminConfig.maintenanceMode;
     await syncConfig();
@@ -229,32 +222,32 @@ window.actionToggleBan = async () => {
     renderUserTab(selectedUserId);
 };
 
-window.actionResetOnboarding = async () => {
+window.actionResetUser = async () => {
     if (!selectedUserId) return;
-    if (!confirm(`Intro für ${selectedUserId} zurücksetzen?`)) return;
+    const confirmCode = Math.floor(1000 + Math.random() * 9000);
+    const input = prompt(`WARNUNG: Dies setzt den User KOMPLETT zurück (Rewards, Diary, etc.).\nBestätigen mit Code: ${confirmCode}`);
     
-    toggleLoading(true);
-    if (cloud) {
-        await cloud.adminResetOnboarding(selectedUserId);
-        alert("Erledigt. Beim nächsten Login sieht der User das Intro.");
-    } else {
-        alert("Nur mit Cloud möglich.");
+    if (input == confirmCode) {
+        toggleLoading(true);
+        if (cloud) {
+            await cloud.adminResetUser(selectedUserId);
+            alert("User wurde zurückgesetzt.");
+        } else {
+            alert("Offline Reset nicht implementiert.");
+        }
+        toggleLoading(false);
     }
-    toggleLoading(false);
 };
 
-window.actionForceLogout = async () => {
-    if (!selectedUserId) return;
-    if (!confirm(`${selectedUserId} ausloggen?`)) return;
+window.actionSaveDaily = async () => {
+    if (!selectedUserId || !cloud) return;
+    const streak = parseInt(document.getElementById('inpStreak').value) || 0;
+    const points = parseInt(document.getElementById('inpPoints').value) || 0;
     
     toggleLoading(true);
-    if (cloud) {
-        await cloud.adminForceLogout(selectedUserId);
-        alert("Logout Signal gesendet.");
-    } else {
-        alert("Nur mit Cloud möglich.");
-    }
+    await cloud.adminSetData(selectedUserId, 'daily_state', { streak, points });
     toggleLoading(false);
+    alert("Daily Stats gespeichert.");
 };
 
 // Reward Action
@@ -262,8 +255,6 @@ window.toggleReward = async (rId, uid) => {
     if (!userRewardsData) return;
     
     toggleLoading(true);
-    
-    // Toggle Logic
     let newVal = false;
     if (rId.startsWith('valentine.')) {
         newVal = !userRewardsData.valentine.unlocked[rId];
@@ -276,27 +267,17 @@ window.toggleReward = async (rId, uid) => {
         if (newVal) userRewardsData.rewards[rId].unlockedAt = Date.now();
     }
 
-    if (cloud) {
-        await cloud.saveRewards(userRewardsData, uid);
-    } else {
-        // local save simulation
-        localStorage.setItem(uid === 'guest' ? 'fiaos_rewards_guest' : `fiaos_rewards_${uid}`, JSON.stringify(userRewardsData));
-    }
+    if (cloud) await cloud.saveRewards(userRewardsData, uid);
+    else localStorage.setItem(uid === 'guest' ? 'fiaos_rewards_guest' : `fiaos_rewards_${uid}`, JSON.stringify(userRewardsData));
     
-    await loadUserRewardsList(); // Refresh UI
+    await loadUserRewardsList();
     toggleLoading(false);
 };
 
 async function syncConfig() {
-    if (cloud) {
-        await cloud.saveAdminConfig(adminConfig);
-    } else {
-        localStorage.setItem('fiaos_global_admin_config', JSON.stringify(adminConfig));
-    }
-    // Broadcast
-    if (window.parent.FIAOS_ADMIN_CONFIG_UPDATED) {
-        window.parent.FIAOS_ADMIN_CONFIG_UPDATED(adminConfig);
-    }
+    if (cloud) await cloud.saveAdminConfig(adminConfig);
+    else localStorage.setItem('fiaos_global_admin_config', JSON.stringify(adminConfig));
+    if (window.parent.FIAOS_ADMIN_CONFIG_UPDATED) window.parent.FIAOS_ADMIN_CONFIG_UPDATED(adminConfig);
 }
 
 function toggleLoading(show) {

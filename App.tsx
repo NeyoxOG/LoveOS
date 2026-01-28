@@ -4,6 +4,7 @@ import { User, Session, AppItem, ToastState, OverlayState, UserRewardsData, User
 import { NOISE_BG, REWARD_CATALOG, THEMES } from './constants';
 import { loadSession, saveSession, clearSession } from './utils/session';
 import { cloud } from './utils/cloud'; 
+import { playSound } from './utils/sound';
 import { 
   INITIAL_REWARDS_DATA,
   unlockRewardLogic, setRewardsLastSeen, 
@@ -21,26 +22,20 @@ import AppWindow from './components/AppWindow';
 import Onboarding from './components/Onboarding';
 import MaintenanceScreen from './components/MaintenanceScreen';
 
-// Debug Interface Extension
 declare global {
   interface Window {
-    FIAOS_DEBUG?: {
-      unlock: (rewardId: string) => void;
-      unlockAll: () => void;
-    };
-    FIAOS_EVENTS?: {
-      emit: (event: string, data?: any) => void;
-    };
     FIAOS?: {
         bridgeUnlockReward: (data: { projectId?: string, rewardId: string, scope?: string }) => void;
         bridgeUnlockTheme: (data: { themeId: string }) => void;
         bridgeUnlockApp: (data: { appId: string }) => void;
         bridgeLunaBoost: (data: any) => void;
+        playSound: (type: string) => void; // New Bridge Method
         cloud: typeof cloud; 
     };
     FIAOS_APPLY_PREFS?: (prefs: UserPrefs) => void;
     FIAOS_PROFILE_UPDATED?: (profile: UserProfile) => void;
     FIAOS_ADMIN_CONFIG_UPDATED?: (config: AdminConfig) => void;
+    FIAOS_EVENTS?: { emit: (event: string, data?: any) => void; };
   }
 }
 
@@ -85,6 +80,7 @@ const App: React.FC = () => {
       const rewardInfo = REWARD_CATALOG.find(r => r.id === rewardId);
       const rewardTitle = rewardInfo ? rewardInfo.title : "Unbekannter Erfolg";
       showToast(`Erfolg freigeschaltet: ${rewardTitle} ✨`);
+      playSound('success');
     }
   }, [showToast, rewardsData, session]);
 
@@ -97,31 +93,7 @@ const App: React.FC = () => {
       }
   }, []);
 
-  // --- AUTOMATIC ERROR DETECTION ---
-  useEffect(() => {
-    const handleError = (event: ErrorEvent | PromiseRejectionEvent) => {
-      let msg = 'Unbekannter Fehler';
-      if (event instanceof ErrorEvent) msg = event.message;
-      else if (event instanceof PromiseRejectionEvent) msg = String(event.reason);
-
-      if (msg.includes('ResizeObserver') || msg.includes('Script error')) return;
-
-      console.group('%c[FiaOS Auto-Detect] Critical Error', 'color: red; font-weight: bold; background: #ffe4e6; padding: 4px;');
-      console.error(msg);
-      console.log('Session:', session);
-      console.groupEnd();
-    };
-
-    window.addEventListener('error', handleError);
-    window.addEventListener('unhandledrejection', handleError);
-
-    return () => {
-      window.removeEventListener('error', handleError);
-      window.removeEventListener('unhandledrejection', handleError);
-    };
-  }, [session]);
-
-  // --- INITIALIZATION & BAN CHECK ---
+  // --- INITIALIZATION ---
   useEffect(() => {
     const initApp = async () => {
         // 1. Setup Bridge
@@ -131,20 +103,17 @@ const App: React.FC = () => {
             bridgeUnlockReward: ({ rewardId }) => handleUnlockReward(rewardId),
             bridgeUnlockTheme: ({ themeId }) => showToast(`Neues Theme verfügbar: ${themeId} 🎨`),
             bridgeUnlockApp: ({ appId }) => showToast(`Neue App freigeschaltet: ${appId} 📲`),
-            bridgeLunaBoost: (data) => showToast("Luna fühlt sich besser! 🐑💖")
+            bridgeLunaBoost: (data) => showToast("Luna fühlt sich besser! 🐑💖"),
+            playSound: (type: any) => playSound(type)
         } as any;
 
-        // 2. Load Local Config (Fast)
+        // 2. Load Local Config
         let config = loadAdminConfig();
         setAdminConfig(config);
 
         const storedSession = loadSession();
         
-        // 3. Early Maintenance Check (Local)
-        if (config.maintenanceMode && (!storedSession || (storedSession.role !== 'admin' && storedSession.role !== 'developer'))) {
-             // Let it fall through to render logic which handles maintenance screen
-        }
-
+        // 3. Cloud Verification
         if (!storedSession) {
             try {
                 const remoteConfig = await cloud.loadAdminConfig();
@@ -154,35 +123,15 @@ const App: React.FC = () => {
             return;
         }
 
-        // 4. Local Ban Check (Instant)
-        if (config.userStatus[storedSession.userId]?.banned) {
-            console.warn("User banned locally.");
-            clearSession();
-            setSession(null);
-            showToast("Account ist lokal gesperrt. ⛔");
-            setIsVerifying(false);
-            return;
-        }
-
-        // 5. Cloud Verification
+        // 4. Banned / Maint Checks happens in periodic effect or render logic
+        
         try {
             await cloud.restoreConnection();
             
             if (storedSession.role !== 'guest') {
                 const remoteConfig = await cloud.loadAdminConfig();
-                if (remoteConfig) {
-                    setAdminConfig(remoteConfig);
-                    // Remote Ban Check
-                    if (remoteConfig.userStatus[storedSession.userId]?.banned) {
-                        clearSession();
-                        setSession(null);
-                        showToast("Account wurde gesperrt. ⛔");
-                        setIsVerifying(false);
-                        return;
-                    }
-                }
+                if (remoteConfig) setAdminConfig(remoteConfig);
 
-                // Load User Data
                 const [rewards, profile, prefs] = await Promise.all([
                     cloud.loadRewards(),
                     cloud.loadProfile(),
@@ -217,15 +166,12 @@ const App: React.FC = () => {
                     checkCustomWallpaper(local);
                     cloud.savePrefs(local);
                 }
-
             } else {
-                // Guest Data Load
+                // Guest
                 const initial = JSON.parse(JSON.stringify(INITIAL_REWARDS_DATA));
                 setRewardsData(initial);
-                
                 const p = loadUserProfile(storedSession);
                 setUserProfile(p);
-                
                 const prefs = loadUserPrefs(storedSession);
                 setUserPrefs(prefs);
                 applyTheme(prefs);
@@ -245,48 +191,25 @@ const App: React.FC = () => {
     initApp();
   }, [showToast, handleUnlockReward, checkCustomWallpaper]); 
 
-  // --- PERIODIC CHECKS (Ban & Logout & Maintenance) ---
+  // --- PERIODIC CHECKS (Ban & Maintenance) ---
   useEffect(() => {
-    // 1. Maintenance Auto-Logout
-    if (adminConfig?.maintenanceMode && session) {
-        if (session.role !== 'admin' && session.role !== 'developer' && !maintenanceBypass) {
-            handleLogout();
-            showToast("Wartungsarbeiten haben begonnen. 🛠️");
-            return;
-        }
-    }
-
     const checkStatus = async () => {
         const remoteConfig = await cloud.loadAdminConfig();
         if (remoteConfig) {
             setAdminConfig(remoteConfig);
             
-            // Check Ban
-            if (session && remoteConfig.userStatus[session.userId]?.banned) {
-                handleLogout();
-                showToast("Zugriff entzogen: Account gesperrt. 🔒");
-                return;
-            }
-            // Check Maintenance (Late catch)
-            if (remoteConfig.maintenanceMode && session) {
-                 if (session.role !== 'admin' && session.role !== 'developer' && !maintenanceBypass) {
+            if (session) {
+                // Check Ban
+                if (remoteConfig.userStatus[session.userId]?.banned) {
                     handleLogout();
-                    showToast("Wartungsarbeiten haben begonnen. 🛠️");
+                    showToast("Zugriff entzogen: Account gesperrt. 🔒");
                     return;
-                 }
-            }
-        }
-        
-        if (session && session.role !== 'guest') {
-            const profile = await cloud.loadProfile() as any;
-            if (profile && profile.forceLogoutAt && session.lastLoginAt < profile.forceLogoutAt) {
-                handleLogout();
-                showToast("Sitzung wurde fern-beendet. 🔌");
+                }
             }
         }
     };
 
-    const interval = setInterval(checkStatus, 5000); // Check every 5s for faster maintenance response
+    const interval = setInterval(checkStatus, 3000); 
     return () => clearInterval(interval);
   }, [session, showToast, adminConfig, maintenanceBypass]);
 
@@ -326,26 +249,17 @@ const App: React.FC = () => {
 
     window.FIAOS_ADMIN_CONFIG_UPDATED = (config: AdminConfig) => {
         setAdminConfig(config);
-        // Instant check upon update
-        if (config.maintenanceMode && session && session.role !== 'admin' && session.role !== 'developer') {
-             handleLogout();
-        }
     };
   }, [session, handleUnlockReward, showToast, rewardsData, checkCustomWallpaper]);
 
   const handleSelectUser = (user: User) => {
-    // Immediate Checks
-    if (adminConfig && adminConfig.userStatus[user.id]?.banned) {
-        showToast("Dieser Account ist gesperrt ⛔");
+    if (adminConfig?.maintenanceMode && user.role !== 'admin' && user.role !== 'developer' && !maintenanceBypass) {
+        playSound('error');
+        // Do nothing visual, the maintenance screen will be rendered instead
         return;
     }
     
-    // Check Maintenance
-    if (adminConfig?.maintenanceMode && user.role !== 'admin' && user.role !== 'developer' && !maintenanceBypass) {
-        showToast("Wartungsarbeiten aktiv. Login nicht möglich. 🔒");
-        return;
-    }
-
+    playSound('click');
     if (user.role === 'guest') loginSuccess(user);
     else {
       setSelectedUser(user);
@@ -356,7 +270,6 @@ const App: React.FC = () => {
   const attemptLogin = async (password: string): Promise<boolean> => {
     if (!selectedUser) return false;
     
-    // Check Maintenance again just in case
     if (adminConfig?.maintenanceMode && selectedUser.role !== 'admin' && selectedUser.role !== 'developer' && !maintenanceBypass) {
         showToast("Wartungsmodus aktiv.");
         return false;
@@ -367,24 +280,13 @@ const App: React.FC = () => {
           const cloudAuthSuccess = await cloud.silentLogin(selectedUser.id, password);
           if (!cloudAuthSuccess) {
               showToast("Verbinde im Offline-Modus... ☁️⚠️");
-          } else {
-              const remoteConfig = await cloud.loadAdminConfig();
-              if (remoteConfig) {
-                  setAdminConfig(remoteConfig);
-                  if (remoteConfig.userStatus[selectedUser.id]?.banned) {
-                      showToast("Zugriff verweigert: Account gesperrt. ⛔");
-                      return false;
-                  }
-                  if (remoteConfig.maintenanceMode && selectedUser.role !== 'admin' && selectedUser.role !== 'developer') {
-                      showToast("System ist im Wartungsmodus. ⛔");
-                      return false;
-                  }
-              }
           }
       }
+      playSound('success');
       loginSuccess(selectedUser);
       return true;
     }
+    playSound('error');
     return false;
   };
 
@@ -446,6 +348,7 @@ const App: React.FC = () => {
   };
 
   const handleOnboardingComplete = () => {
+      playSound('success');
       setShowOnboarding(false);
       if (userProfile) {
           const updated = { ...userProfile, onboardingCompleted: true };
@@ -457,6 +360,7 @@ const App: React.FC = () => {
   };
 
   const handleLogout = () => {
+    playSound('close');
     clearSession();
     setSession(null);
     setRewardsData(null);
@@ -466,7 +370,6 @@ const App: React.FC = () => {
     setShowOnboarding(false);
     setIsAccountSheetOpen(false);
     setCustomBg(null);
-    // Reset Theme to default visually
     document.documentElement.style.cssText = ''; 
     document.documentElement.removeAttribute('data-theme');
   };
@@ -474,6 +377,7 @@ const App: React.FC = () => {
   const closeAuthSheet = () => { setIsAuthSheetOpen(false); setTimeout(() => setSelectedUser(null), 300); };
 
   const handleAppClick = (app: AppItem) => {
+    playSound('open');
     if (!session) { showToast("Bitte einloggen."); return; }
     
     if (adminConfig && adminConfig.appVisibility[app.id] === false && app.id !== 'settings') {
@@ -488,33 +392,27 @@ const App: React.FC = () => {
     
     if (app.id === 'valentine') { setRewardsTab('valentine'); setIsRewardsOpen(true); }
     else if (app.id === 'achievements') { setIsRewardsOpen(true); } 
-    // Added 'story' to allow list
     else if (['luna', 'vault', 'settings', 'admin', 'games', 'diary', 'daily', 'love', 'rewards_app', 'messages', 'story'].includes(app.id)) { 
         setOpenedApp({ id: app.id, name: app.name }); 
     } 
     else { showToast("Bald verfügbar ✨"); }
   };
 
-  const handleOpenRewards = (tab = 'general') => { if (!session) return; setRewardsTab(tab); setIsRewardsOpen(true); };
-  const handleCloseRewards = () => { setIsRewardsOpen(false); if (session && rewardsData) { const updated = setRewardsLastSeen(session.userId, rewardsData); setRewardsData(updated); cloud.saveRewards(updated); } };
+  const handleOpenRewards = (tab = 'general') => { if (!session) return; playSound('open'); setRewardsTab(tab); setIsRewardsOpen(true); };
+  const handleCloseRewards = () => { playSound('close'); setIsRewardsOpen(false); if (session && rewardsData) { const updated = setRewardsLastSeen(session.userId, rewardsData); setRewardsData(updated); cloud.saveRewards(updated); } };
 
-  // --- MAINTENANCE CHECK RENDER ---
+  // --- RENDER ---
+  
+  // 1. Maintenance Check
   const isMaintenance = adminConfig?.maintenanceMode;
   const isAdmin = session?.role === 'admin' || session?.role === 'developer';
   
+  // Force maintenance screen if active and not admin (even if logged in)
   if (isMaintenance && !isAdmin && !maintenanceBypass) {
       return <MaintenanceScreen onBypass={() => setMaintenanceBypass(true)} />;
   }
 
-  // --- THEME BACKGROUND LOGIC ---
-  // Fix: Directly access THEMES definition for accurate background rendering
-  const activeThemeId = userPrefs?.theme || 'roseGlass';
-  const activeThemeDef = THEMES[activeThemeId] || THEMES['roseGlass'];
-  
-  const bgStyle = customBg 
-    ? { backgroundImage: `url(${customBg})`, backgroundSize: 'cover', backgroundPosition: 'center' }
-    : { background: activeThemeDef.colors.bgGradient };
-
+  // 2. Loading
   if (isVerifying) {
       return (
           <div className="fixed inset-0 bg-black flex flex-col items-center justify-center z-[200]">
@@ -523,6 +421,14 @@ const App: React.FC = () => {
           </div>
       );
   }
+
+  // 3. Theme & Main App
+  const activeThemeId = userPrefs?.theme || 'roseGlass';
+  const activeThemeDef = THEMES[activeThemeId] || THEMES['roseGlass'];
+  
+  const bgStyle = customBg 
+    ? { backgroundImage: `url(${customBg})`, backgroundSize: 'cover', backgroundPosition: 'center' }
+    : { background: activeThemeDef.colors.bgGradient };
 
   return (
     <div className="relative h-full w-full bg-slate-950 overflow-hidden font-sans text-slate-50 selection:bg-indigo-500/30">
@@ -542,7 +448,7 @@ const App: React.FC = () => {
                 onShowToast={showToast}
                 onOpenOverlay={(t, c) => setOverlay({isOpen:true, title:t, content:c})}
                 onOpenRewards={handleOpenRewards}
-                onOpenAccountSheet={() => setIsAccountSheetOpen(true)}
+                onOpenAccountSheet={() => { playSound('open'); setIsAccountSheetOpen(true); }}
             />
           </>
         ) : (
@@ -554,11 +460,11 @@ const App: React.FC = () => {
         isOpen={!!openedApp} 
         appId={openedApp?.id || null}
         appName={openedApp?.name || ''}
-        onClose={() => setOpenedApp(null)}
+        onClose={() => { playSound('close'); setOpenedApp(null); }}
       />
 
       <AuthSheet isOpen={isAuthSheetOpen} onClose={closeAuthSheet} user={selectedUser} onLogin={attemptLogin} />
-      <AccountSheet isOpen={isAccountSheetOpen} onClose={() => setIsAccountSheetOpen(false)} profile={userProfile} onLogout={handleLogout} onOpenSettings={() => setOpenedApp({ id: 'settings', name: 'Einstellungen' })} />
+      <AccountSheet isOpen={isAccountSheetOpen} onClose={() => { playSound('close'); setIsAccountSheetOpen(false); }} profile={userProfile} onLogout={handleLogout} onOpenSettings={(sub) => setOpenedApp({ id: 'settings', name: 'Einstellungen' })} />
       <RewardsSheet isOpen={isRewardsOpen} onClose={handleCloseRewards} rewardsData={rewardsData} initialTab={rewardsTab} />
       <Overlay state={overlay} onClose={() => setOverlay(prev => ({ ...prev, isOpen: false }))} />
       <Toast message={toast.message} onClear={() => setToast({ id: 0, message: '' })} />
