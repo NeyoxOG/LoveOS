@@ -23,7 +23,9 @@ const THEMES_UI = [
     { id: 'softRose', name: 'Soft Rose', color: '#be185d', unlockRewardId: 'love_1_month' },
     { id: 'midnightLove', name: 'Midnight', color: '#1e1b4b', unlockRewardId: 'love_3_month' },
     { id: 'pastelSky', name: 'Pastel', color: '#7dd3fc', unlockRewardId: 'love_6_month' },
-    { id: 'eternal', name: 'Eternal', color: '#713f12', unlockRewardId: 'love_1_year' }
+    { id: 'eternal', name: 'Eternal', color: '#713f12', unlockRewardId: 'love_1_year' },
+    { id: 'royal', name: 'Royal', color: '#d97706', unlockRewardId: 'daily.points100' },
+    { id: 'custom', name: 'Eigene', color: '#333', unlockRewardId: 'custom_theme_unlock' }
 ];
 
 function init() {
@@ -102,10 +104,14 @@ function renderUI() {
     // Themes
     const tList = document.getElementById('themeList');
     tList.innerHTML = THEMES_UI.map(t => {
-        const isLocked = t.unlockRewardId && (!rewards?.redeemed || !rewards.redeemed[t.unlockRewardId]);
+        // Unlock check: generic rewards OR valentine rewards
+        const isUnlocked = !t.unlockRewardId || 
+                           (rewards?.rewards?.[t.unlockRewardId]?.unlocked) || 
+                           (rewards?.valentine?.unlocked?.[t.unlockRewardId]);
+                           
         const activeClass = prefs.theme === t.id ? 'active' : '';
-        const lockHtml = isLocked ? '<div style="position:absolute; inset:0; background:rgba(0,0,0,0.6); display:flex; justify-content:center; align-items:center; font-size:24px;">🔒</div>' : '';
-        const onclick = isLocked ? `alert('Erst freischalten!')` : `setTheme('${t.id}')`;
+        const lockHtml = !isUnlocked ? '<div style="position:absolute; inset:0; background:rgba(0,0,0,0.6); display:flex; justify-content:center; align-items:center; font-size:24px;">🔒</div>' : '';
+        const onclick = !isUnlocked ? `alert('Erst freischalten!')` : `setTheme('${t.id}')`;
         
         return `
         <div class="theme-opt ${activeClass}" onclick="${onclick}">
@@ -115,6 +121,11 @@ function renderUI() {
             <div class="theme-name">${t.name}</div>
         </div>
     `}).join('');
+
+    // Custom Upload Visibility
+    const uploadDiv = document.getElementById('customUpload');
+    if (prefs.theme === 'custom') uploadDiv.classList.add('visible');
+    else uploadDiv.classList.remove('visible');
 
     // Behavior
     const tog = document.getElementById('toggleMotion');
@@ -173,6 +184,24 @@ window.saveProfile = async () => {
 window.setTheme = async (id) => {
     prefs.theme = id;
     applyPrefs();
+};
+
+window.uploadWallpaper = () => {
+    const input = document.getElementById('bgInput');
+    if (input.files && input.files[0]) {
+        const reader = new FileReader();
+        reader.onload = function(e) {
+            // Save to LocalStorage (Browser specific)
+            try {
+                localStorage.setItem('fiaos_wallpaper_custom', e.target.result);
+                alert("Bild gespeichert! (Nur dieses Gerät)");
+                applyPrefs(); // Force refresh in parent
+            } catch(err) {
+                alert("Bild zu groß für Speicher! Bitte kleineres Bild wählen.");
+            }
+        };
+        reader.readAsDataURL(input.files[0]);
+    }
 };
 
 window.toggleMotion = () => {

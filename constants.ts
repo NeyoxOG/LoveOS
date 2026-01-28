@@ -29,13 +29,13 @@ export const APPS: AppItem[] = [
   { id:"love", name:"Love", icon:"💞", status:"available" },
   { id:"daily", name:"Daily", icon:"✨", status:"available" },
   { id:"rewards_app", name:"Belohnungen", icon:"🎁", status:"available" },
+  { id:"messages", name:"Nachrichten", icon:"💬", status:"available" }, // Enabled
   { id:"valentine", name:"Valentinstag", icon:"💘", status:"lockedHint" },
   { id:"luna", name:"Luna", icon:"🐑", status:"lockedHint" },
   { id:"vault", name:"Message Vault", icon:"💌", status:"available" },
   { id:"diary", name:"Tagebuch", icon:"📔", status:"available" },
   { id:"games", name:"Arcade", icon:"🕹️", status:"available" },
   { id:"achievements", name:"Erfolge", icon:"🏆", status:"available" },
-  { id:"messages", name:"Nachrichten", icon:"💬", status:"comingSoon" },
   { id:"settings", name:"Einstellungen", icon:"⚙️", status:"available" },
   { id:"admin", name:"Admin Center", icon:"🛠️", status:"available" }
 ];
@@ -81,6 +81,7 @@ export const REWARD_CATALOG: Reward[] = [
   { id: 'snake_score_10', title: 'Snake: Anfänger', description: '10 Punkte erreicht 🐍', icon: '🐍', category: 'games' },
   { id: 'snake_score_25', title: 'Snake: Jäger', description: '25 Punkte. Schlange wächst! 🍎', icon: '🍎', category: 'games' },
   { id: 'snake_score_50', title: 'Snake: Legende', description: '50 Punkte. Das Display wird eng. 🏆', icon: '🏆', category: 'games' },
+  { id: 'snake.survival', title: 'Snake: No Fear', description: '30s mit Gegner überlebt 👿', icon: '👿', category: 'games' },
   
   // Flappy Love
   { id: 'flappy_score_5', title: 'Flappy: Start', description: 'Die ersten 5 Hindernisse 🐦', icon: '🐦', category: 'games' },
@@ -99,6 +100,7 @@ export const REWARD_CATALOG: Reward[] = [
   { id: 'daily.streak3', title: 'Daily: 3 Tage', description: 'Die Sonne geht auf 🔥', icon: '🔥', category: 'general' },
   { id: 'daily.streak7', title: 'Daily: Eine Woche', description: 'Treue Seele 🗓️', icon: '🗓️', category: 'general' },
   { id: 'daily.total10', title: 'Daily: Sammler', description: '10 Belohnungen gesammelt 🎁', icon: '🎁', category: 'general' },
+  { id: 'daily.points100', title: 'Daily: 100 Punkte', description: 'Royal Theme freigeschaltet 👑', icon: '👑', category: 'general', type: 'theme_unlock', payload: { themeId: 'royal' } },
 
   // Love & Themes
   { 
@@ -137,6 +139,15 @@ export const REWARD_CATALOG: Reward[] = [
     category: 'love',
     payload: { themeId: 'eternal' } 
   },
+  {
+    id: 'custom_theme_unlock',
+    title: 'Designer',
+    description: 'Custom Theme freigeschaltet 🎨',
+    icon: '🎨',
+    type: 'theme_unlock',
+    category: 'general',
+    payload: { themeId: 'custom' }
+  }
 ];
 
 export const VALENTINE_REWARDS: Reward[] = [
@@ -212,6 +223,28 @@ export const THEMES: Record<string, ThemeDef> = {
       cardBg: 'rgba(253, 224, 71, 0.1)',
       text: '#fefce8',
       textDim: '#fef08a'
+    }
+  },
+  royal: {
+    id: 'royal',
+    name: 'Royal Gold',
+    unlockRewardId: 'daily.points100',
+    colors: {
+      bgGradient: 'linear-gradient(135deg, #422006, #78350f)',
+      cardBg: 'rgba(251, 191, 36, 0.15)',
+      text: '#fffbeb',
+      textDim: '#fde68a'
+    }
+  },
+  custom: {
+    id: 'custom',
+    name: 'Eigene Bilder',
+    unlockRewardId: 'custom_theme_unlock',
+    colors: {
+      bgGradient: '#000', // Overridden by image
+      cardBg: 'rgba(255, 255, 255, 0.1)',
+      text: '#fff',
+      textDim: 'rgba(255, 255, 255, 0.6)'
     }
   }
 };

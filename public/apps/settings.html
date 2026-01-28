@@ -129,6 +129,17 @@
         .theme-preview { height: 70%; width: 100%; }
         .theme-name { font-size: 12px; font-weight: 600; text-align: center; padding: 8px; }
 
+        /* Custom Wallpaper Input */
+        .file-upload-container {
+            display: none; padding: 16px; text-align: center;
+        }
+        .file-upload-container.visible { display: block; }
+        .file-input { display: none; }
+        .btn-upload {
+            background: #333; color: white; border: 1px solid var(--border); padding: 10px 20px;
+            border-radius: 8px; cursor: pointer; font-size: 13px; font-weight: 600;
+        }
+
         /* Toggles */
         .toggle {
             width: 51px; height: 31px; background: #39393d; border-radius: 15.5px;
@@ -199,6 +210,14 @@
             <!-- Theme Horizontal Scroll embedded or just a container -->
             <div class="theme-scroll" id="themeList">
                 <!-- JS Populates -->
+            </div>
+            <!-- Custom Wallpaper Upload (Visible only if Custom Theme selected) -->
+            <div class="file-upload-container" id="customUpload">
+                <label class="btn-upload">
+                    Bild hochladen 🖼️
+                    <input type="file" class="file-input" id="bgInput" accept="image/*" onchange="uploadWallpaper()">
+                </label>
+                <div style="font-size:10px; color:#aaa; margin-top:8px;">(Nur lokal auf diesem Gerät)</div>
             </div>
         </div>
 

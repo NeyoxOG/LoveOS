@@ -7,6 +7,7 @@ export const INITIAL_REWARDS_DATA: UserRewardsData = {
   rewards: {
     "reward.welcome": { unlocked: true, unlockedAt: Date.now() },
     "reward.welcomeTheme": { unlocked: true, unlockedAt: Date.now() }, // Auto-unlocked but needs claiming
+    "custom_theme_unlock": { unlocked: true, unlockedAt: Date.now() }, // Unlock Custom by default or via achievement, setting to true for easier access as requested
     "reward.firstLogin": { unlocked: false, unlockedAt: null },
     "reward.firstAppOpen": { unlocked: false, unlockedAt: null },
     "reward.firstReward": { unlocked: false, unlockedAt: null },
@@ -16,14 +17,14 @@ export const INITIAL_REWARDS_DATA: UserRewardsData = {
   valentine: {
     total: 6,
     unlocked: {
-      "valentine.reward.pizza": true,
-      "valentine.reward.photo": true,
-      "valentine.reward.letter": true,
-      "valentine.reward.care": true,
-      "valentine.reward.art": true,
-      "valentine.reward.secret": true,
+      "valentine.reward.pizza": false,
+      "valentine.reward.photo": false,
+      "valentine.reward.letter": false,
+      "valentine.reward.care": false,
+      "valentine.reward.art": false,
+      "valentine.reward.secret": false,
     },
-    completedAt: Date.now()
+    completedAt: null
   },
   meta: {
     lastSeenAt: Date.now(),

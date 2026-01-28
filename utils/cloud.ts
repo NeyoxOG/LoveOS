@@ -1,6 +1,6 @@
 
 import { db, auth } from './firebase';
-import { doc, getDoc, setDoc, updateDoc, collection, getDocs, query, orderBy, limit, serverTimestamp } from 'firebase/firestore';
+import { doc, getDoc, setDoc, updateDoc, collection, getDocs, query, orderBy, limit, serverTimestamp, addDoc, onSnapshot } from 'firebase/firestore';
 import { signInWithEmailAndPassword, createUserWithEmailAndPassword } from 'firebase/auth';
 import { UserRewardsData, AdminConfig, UserPrefs } from '../types';
 import { USERS } from '../constants';
@@ -266,6 +266,44 @@ export const cloud = {
         history.unshift(item);
         const trimmed = history.slice(0, 50);
         await this.updateLuna({ history: trimmed });
+    },
+
+    // --- Messages ---
+    listenToMessages(callback: (msgs: any[]) => void) {
+        if (isGuest()) {
+            const local = JSON.parse(localStorage.getItem('fiaos_guest_messages') || '[]');
+            callback(local);
+            return () => {}; // No-op unsubscribe
+        }
+        try {
+            const q = query(collection(db, 'couples', COUPLE_ID, 'messages'), orderBy('createdAt', 'desc'), limit(50));
+            return onSnapshot(q, (snapshot) => {
+                const msgs = snapshot.docs.map(d => ({ id: d.id, ...d.data() }));
+                callback(msgs.reverse());
+            });
+        } catch (e) { console.error("Msg Listen Error", e); return () => {}; }
+    },
+
+    async sendMessage(text: string) {
+        const msg = {
+            text,
+            senderId: getUid(),
+            senderName: JSON.parse(localStorage.getItem('fiaos_session') || '{}').name || 'Unknown',
+            createdAt: serverTimestamp() // Firestore
+        };
+
+        if (isGuest()) {
+            const local = JSON.parse(localStorage.getItem('fiaos_guest_messages') || '[]');
+            local.push({ ...msg, createdAt: Date.now() });
+            localStorage.setItem('fiaos_guest_messages', JSON.stringify(local));
+            // Trigger storage event manually or just callback update if within same context? 
+            // In guest mode, real-time isn't critical.
+            return;
+        }
+
+        try {
+            await addDoc(collection(db, 'couples', COUPLE_ID, 'messages'), sanitize(msg));
+        } catch(e) { console.error("Send Msg Error", e); }
     },
 
     // --- Vault, Diary, Games, Profile (Standard) ---

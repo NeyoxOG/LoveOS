@@ -63,7 +63,7 @@
             background: linear-gradient(135deg, #1c1c1e 0%, #2c2c2e 100%);
             border-radius: 24px;
             /* Responsive padding using clamp */
-            padding: clamp(20px, 5vw, 30px);
+            padding: 24px;
             display: flex; 
             flex-direction: column; 
             align-items: center; 
@@ -73,11 +73,12 @@
             position: relative; 
             overflow: hidden;
             width: 100%;
-            max-width: min(400px, 100%); /* Prevent overflow on small screens */
+            max-width: 400px; /* Prevent overflow on small screens */
             margin: 0 auto;
             transition: transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1), box-shadow 0.3s;
             /* Use gap for spacing instead of margins to prevent collapse issues */
-            gap: clamp(8px, 2vw, 12px);
+            gap: 12px;
+            flex-shrink: 0;
         }
         
         .shine {
@@ -106,20 +107,20 @@
 
         /* Elements inside card - Reset margins, use gap from parent */
         .today-icon {
-            font-size: clamp(56px, 15vw, 72px); /* Responsive icon size */
+            font-size: 60px; /* Fixed robust size */
             filter: drop-shadow(0 0 20px rgba(251, 191, 36, 0.4));
             transition: transform 0.3s;
             line-height: 1;
             margin: 4px 0;
         }
         .today-title { 
-            font-size: clamp(20px, 6vw, 24px); 
+            font-size: 22px; 
             font-weight: 800; 
             color: #fff; 
             line-height: 1.2;
         }
         .today-subtitle { 
-            font-size: clamp(13px, 4vw, 14px); 
+            font-size: 13px; 
             color: var(--text-dim); 
             max-width: 95%; 
             line-height: 1.4;
@@ -171,6 +172,15 @@
         }
         .couple-bonus.active { display: inline-block; }
         @keyframes pulse { 0% { transform: scale(1); } 50% { transform: scale(1.05); } 100% { transform: scale(1); } }
+
+        /* Points Bar */
+        .points-bar {
+            background: #27272a; border-radius: 12px; padding: 12px;
+            display: flex; justify-content: space-between; align-items: center;
+            margin-bottom: 20px;
+        }
+        .points-val { color: var(--primary); font-weight: 800; font-size: 16px; }
+        .points-next { font-size: 11px; color: var(--text-dim); }
 
         /* Inbox */
         .section-title { font-size: 13px; text-transform: uppercase; color: var(--text-dim); letter-spacing: 1px; margin-bottom: 10px; padding-left: 4px; }
@@ -266,6 +276,15 @@
 
     <div class="content">
         
+        <!-- Points -->
+        <div class="points-bar">
+            <div>
+                <div style="font-size:11px; text-transform:uppercase; letter-spacing:1px; color:#aaa;">Punkte</div>
+                <div class="points-val" id="pointsVal">0</div>
+            </div>
+            <div class="points-next" id="pointsNext">Noch 100 bis Royal Theme 👑</div>
+        </div>
+
         <!-- Today -->
         <div class="today-card" id="todayCard">
             <div class="shine"></div>

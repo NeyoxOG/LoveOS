@@ -135,14 +135,6 @@ function loop(timestamp) {
         updateEnemy();
     }
     
-    // Check Survival Achievement (Simple approximation)
-    if (enemyActive) {
-        // We just check real time delta or accumulate frames?
-        // Let's use simple logic: if enemy active, we consider it survival.
-        // Actually, we can check it in updatePlayer or separate timer.
-        // Simplified: check at Game Over based on start time of enemy.
-    }
-
     draw();
     requestAnimationFrame(loop);
 }
@@ -232,10 +224,6 @@ function updateEnemy() {
         // Self collision check (Enemy)
         if (enemy.some(e => e.x === nx && e.y === ny)) continue;
         
-        // Player collision check (Don't run into player head-on ideally, but collisions kill player)
-        // If enemy moves into player body, player dies (game over).
-        // So any move into player is "valid" for enemy logic, but leads to game over.
-        
         bestMove = m;
         break;
     }
@@ -251,7 +239,6 @@ function updateEnemy() {
         
         enemy.unshift(newHead);
         
-        // Enemy grows? Prompt says optional/simple. Let's make it fixed length 5 for now.
         if (enemy.length > 5) enemy.pop();
     }
 }
@@ -284,9 +271,6 @@ function placeFood() {
 function draw() {
     ctx.clearRect(0, 0, canvas.width, canvas.height);
     
-    // Draw Grid (Subtle)
-    // Actually handled by CSS, but let's clear.
-    
     // Draw Food (Heart)
     drawHeart(food.x, food.y);
     
@@ -313,7 +297,6 @@ function draw() {
         if (i === 0) {
             ctx.fillStyle = '#064e3b';
             const eyeOff = s/4;
-            // Simple logic for eyes based on direction? Keeping it simple centered for now
             ctx.beginPath();
             ctx.arc(x + s/3, y + s/3, 2, 0, Math.PI*2);
             ctx.arc(x + s*2/3, y + s/3, 2, 0, Math.PI*2);
@@ -335,7 +318,7 @@ function draw() {
             ctx.fill();
             
             if (i===0) { // Enemy Eyes
-                ctx.fillStyle = '#fff'; // Angry eyes
+                ctx.fillStyle = '#fff';
                 ctx.beginPath();
                 ctx.moveTo(x + 5, y + 5); ctx.lineTo(x + 10, y + 10);
                 ctx.moveTo(x + s - 5, y + 5); ctx.lineTo(x + s - 10, y + 10);
@@ -354,7 +337,6 @@ function drawHeart(gx, gy) {
     ctx.shadowColor = '#ef4444';
     ctx.shadowBlur = 15;
     
-    // Pulse
     const pulse = 1 + Math.sin(Date.now() / 200) * 0.1;
     
     ctx.save();
@@ -362,7 +344,6 @@ function drawHeart(gx, gy) {
     ctx.scale(pulse, pulse);
     
     ctx.beginPath();
-    // Simple heart path
     const topCurveHeight = size * 0.3;
     ctx.moveTo(0, topCurveHeight);
     ctx.bezierCurveTo(0, 0, -size, 0, -size, topCurveHeight);
@@ -402,8 +383,8 @@ function setupTouchControls() {
         const dx = ex - sx;
         const dy = ey - sy;
         
-        // Deadzone 30px
-        if (Math.abs(dx) < 30 && Math.abs(dy) < 30) return;
+        // Reduced Deadzone for better sensitivity (was 30px)
+        if (Math.abs(dx) < 15 && Math.abs(dy) < 15) return;
         
         if (Math.abs(dx) > Math.abs(dy)) {
             if (dx > 0 && dir.x !== -1) nextDir = { x: 1, y: 0 };
@@ -418,16 +399,13 @@ function setupTouchControls() {
 function setupDPad() {
     const btns = document.querySelectorAll('.dpad-btn');
     btns.forEach(btn => {
-        btn.addEventListener('touchstart', (e) => {
+        const trigger = (e) => {
             e.preventDefault();
             const k = btn.dataset.key;
             handleKey({ key: k });
-        });
-        btn.addEventListener('mousedown', (e) => {
-            e.preventDefault();
-            const k = btn.dataset.key;
-            handleKey({ key: k });
-        });
+        };
+        btn.addEventListener('touchstart', trigger);
+        btn.addEventListener('mousedown', trigger);
     });
 }
 
@@ -449,9 +427,8 @@ window.toggleControls = () => {
 function gameOver() {
     isPlaying = false;
     
-    // Check survival time if enemy was active
     if (enemyActive && Date.now() - enemyStartTime > 30000) {
-        unlock('snake.survival'); // "No Fear" hook
+        unlock('snake.survival');
     }
 
     document.getElementById('finalScore').innerText = score;

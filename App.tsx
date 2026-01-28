@@ -64,6 +64,7 @@ const App: React.FC = () => {
   const [adminConfig, setAdminConfig] = useState<AdminConfig | null>(null);
 
   const [showOnboarding, setShowOnboarding] = useState(false);
+  const [customBg, setCustomBg] = useState<string | null>(null);
 
   const showToast = useCallback((message: string) => {
     setToast({ id: Date.now(), message });
@@ -175,10 +176,12 @@ const App: React.FC = () => {
                 if (prefs) {
                     setUserPrefs(prefs);
                     applyTheme(prefs);
+                    checkCustomWallpaper(prefs);
                 } else {
                     const local = loadUserPrefs(storedSession);
                     setUserPrefs(local);
                     applyTheme(local);
+                    checkCustomWallpaper(local);
                     cloud.savePrefs(local);
                 }
 
@@ -194,6 +197,7 @@ const App: React.FC = () => {
                 const prefs = loadUserPrefs(storedSession);
                 setUserPrefs(prefs);
                 applyTheme(prefs);
+                checkCustomWallpaper(prefs);
             }
 
             setSession(storedSession);
@@ -209,6 +213,15 @@ const App: React.FC = () => {
 
     initApp();
   }, [showToast]);
+
+  const checkCustomWallpaper = (prefs: UserPrefs) => {
+      if (prefs.theme === 'custom') {
+          const bg = localStorage.getItem('fiaos_wallpaper_custom');
+          setCustomBg(bg);
+      } else {
+          setCustomBg(null);
+      }
+  };
 
   // --- PERIODIC BAN CHECK ---
   useEffect(() => {
@@ -256,6 +269,7 @@ const App: React.FC = () => {
     window.FIAOS_APPLY_PREFS = (prefs: UserPrefs) => {
         setUserPrefs(prefs);
         applyTheme(prefs);
+        checkCustomWallpaper(prefs);
         if (session && session.role !== 'guest') {
             cloud.savePrefs(prefs);
         }
@@ -354,7 +368,7 @@ const App: React.FC = () => {
     // Load Data Post-Login
     if (user.role !== 'guest') {
         cloud.loadRewards().then(d => { if(d) setRewardsData(d); else { const i = JSON.parse(JSON.stringify(INITIAL_REWARDS_DATA)); setRewardsData(i); cloud.saveRewards(i); }});
-        cloud.loadPrefs().then(p => { if(p) { setUserPrefs(p); applyTheme(p); } });
+        cloud.loadPrefs().then(p => { if(p) { setUserPrefs(p); applyTheme(p); checkCustomWallpaper(p); } });
     } else {
         // Guest loads
         const initial = JSON.parse(JSON.stringify(INITIAL_REWARDS_DATA));
@@ -362,6 +376,7 @@ const App: React.FC = () => {
         const prefs = loadUserPrefs(newSession);
         setUserPrefs(prefs);
         applyTheme(prefs);
+        checkCustomWallpaper(prefs);
     }
 
     // Check Profile / Onboarding
@@ -397,6 +412,7 @@ const App: React.FC = () => {
           setUserProfile(updated);
           cloud.saveProfile(updated); // Works for Guest now too
           showToast("Viel Spaß mit FiaOS! 🚀");
+          handleUnlockReward('custom_theme_unlock'); // Ensure functionality unlocked
       }
   };
 
@@ -409,6 +425,7 @@ const App: React.FC = () => {
     setUserPrefs(null);
     setShowOnboarding(false);
     setIsAccountSheetOpen(false);
+    setCustomBg(null);
     document.documentElement.style.cssText = '';
     document.body.className = '';
   };
@@ -431,7 +448,7 @@ const App: React.FC = () => {
     
     if (app.id === 'valentine') { setRewardsTab('valentine'); setIsRewardsOpen(true); }
     else if (app.id === 'achievements') { setIsRewardsOpen(true); } 
-    else if (['luna', 'vault', 'settings', 'admin', 'games', 'diary', 'daily', 'love', 'rewards_app'].includes(app.id)) { 
+    else if (['luna', 'vault', 'settings', 'admin', 'games', 'diary', 'daily', 'love', 'rewards_app', 'messages'].includes(app.id)) { 
         setOpenedApp({ id: app.id, name: app.name }); 
     } 
     else { showToast("Bald verfügbar ✨"); }
@@ -450,11 +467,16 @@ const App: React.FC = () => {
       );
   }
 
+  // Calculate Background Style
+  const bgStyle = customBg 
+    ? { backgroundImage: `url(${customBg})`, backgroundSize: 'cover', backgroundPosition: 'center' }
+    : { background: 'var(--bg-primary, linear-gradient(to bottom right, #0f1016, #08080a))' };
+
   return (
     <div className="relative h-full w-full bg-slate-950 overflow-hidden font-sans text-slate-50 selection:bg-indigo-500/30">
-      <div className="absolute inset-0 bg-gradient-to-br from-[#0f1016] via-[#161622] to-[#08080a] z-0 transition-colors duration-500" style={{ background: 'var(--bg-primary, linear-gradient(to bottom right, #0f1016, #08080a))' }} />
-      <div className="absolute top-[-20%] left-[-20%] w-[80%] h-[80%] bg-indigo-500/20 rounded-full blur-[100px] pointer-events-none opacity-40 mix-blend-screen animate-pulse duration-[10000ms]" style={{ backgroundColor: 'var(--accent)' }} />
-      <div className="absolute inset-0 z-0 pointer-events-none opacity-40 mix-blend-overlay" style={{ backgroundImage: `url("${NOISE_BG}")` }} />
+      <div className="absolute inset-0 bg-gradient-to-br from-[#0f1016] via-[#161622] to-[#08080a] z-0 transition-colors duration-500" style={bgStyle} />
+      {!customBg && <div className="absolute top-[-20%] left-[-20%] w-[80%] h-[80%] bg-indigo-500/20 rounded-full blur-[100px] pointer-events-none opacity-40 mix-blend-screen animate-pulse duration-[10000ms]" style={{ backgroundColor: 'var(--accent)' }} />}
+      {!customBg && <div className="absolute inset-0 z-0 pointer-events-none opacity-40 mix-blend-overlay" style={{ backgroundImage: `url("${NOISE_BG}")` }} />}
 
       <main className="relative h-full z-10 flex flex-col overflow-hidden">
         {session ? (

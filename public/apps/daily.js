@@ -66,11 +66,17 @@ async function loadData() {
             lastClaimDateISO: null,
             streak: 0,
             totalClaims: 0,
+            points: 0, // Added points
             todaySeed: `${user.id}_${todayISO}`,
             openedToday: false,
             lastOpenAt: 0
         };
         localStorage.setItem(stateKey, JSON.stringify(state));
+    }
+    
+    // Migration: ensure points exist
+    if (state.points === undefined) {
+        state.points = state.totalClaims * 10;
     }
 
     // Refresh Seed if new day
@@ -107,6 +113,17 @@ async function loadData() {
 }
 
 function renderUI() {
+    // Points
+    document.getElementById('pointsVal').innerText = state.points || 0;
+    const nextGoal = 100;
+    const remaining = Math.max(0, nextGoal - (state.points || 0));
+    const nextTxt = document.getElementById('pointsNext');
+    if (remaining > 0) {
+        nextTxt.innerText = `Noch ${remaining} bis Royal Theme 👑`;
+    } else {
+        nextTxt.innerText = `Royal Theme verfügbar! 👑`;
+    }
+
     // 1. Today Card
     if (state.openedToday) {
         setCardState('claimed');
@@ -284,6 +301,11 @@ async function processClaim() {
     state.lastClaimDateISO = todayISO;
     state.totalClaims++;
     
+    // Add Points based on rarity
+    const pointsMap = { 'common': 10, 'rare': 20, 'epic': 50 };
+    const earned = pointsMap[offer.rarity] || 10;
+    state.points = (state.points || 0) + earned;
+    
     localStorage.setItem(`${KEYS.DAILY_STATE}${user.id}_daily_state`, JSON.stringify(state));
 
     const histKey = `${KEYS.DAILY_HISTORY}${user.id}_daily_history`;
@@ -335,6 +357,9 @@ function executePayload(offer) {
     if (state.totalClaims === 10) bridge.bridgeUnlockReward({ rewardId: 'daily.total10' });
     if (state.streak === 3) bridge.bridgeUnlockReward({ rewardId: 'daily.streak3' });
     if (state.streak === 7) bridge.bridgeUnlockReward({ rewardId: 'daily.streak7' });
+    
+    // Points threshold unlock
+    if (state.points >= 100) bridge.bridgeUnlockReward({ rewardId: 'daily.points100' });
 }
 
 function addInboxItem(item) {
