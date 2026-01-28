@@ -84,8 +84,8 @@ const App: React.FC = () => {
         bridgeLunaBoost: (data) => showToast("Luna fühlt sich besser! 🐑💖")
     } as any;
 
-    // Load Global Config first
-    const config = loadAdminConfig();
+    // Load Local Admin Config (Fast fallback)
+    let config = loadAdminConfig();
     setAdminConfig(config);
 
     const storedSession = loadSession();
@@ -98,19 +98,20 @@ const App: React.FC = () => {
           localStorage.removeItem(`fiaos_user_${storedSession.userId}_session_flag`); // Clear flag
           return;
       }
-
-      // 2. Check Ban Status from Config
-      const userStatus = config.userStatus[storedSession.userId];
-      if (userStatus && userStatus.banned) {
-          handleLogout();
-          showToast("Account deaktiviert.");
-          return;
-      }
-
-      // 3. Update Role from Config
-      if (userStatus && userStatus.role !== storedSession.role) {
-          storedSession.role = userStatus.role;
-          saveSession(storedSession); // Sync
+      
+      // 2. Load Cloud Config (Async update)
+      if (storedSession.role !== 'guest') {
+          cloud.loadAdminConfig().then(remoteConfig => {
+              if (remoteConfig) {
+                  setAdminConfig(remoteConfig);
+                  // Check Ban immediately after cloud load
+                  const status = remoteConfig.userStatus[storedSession.userId];
+                  if (status && status.banned) {
+                      handleLogout();
+                      showToast("Account via Cloud gesperrt. ⛔");
+                  }
+              }
+          });
       }
 
       setSession(storedSession);
@@ -155,10 +156,6 @@ const App: React.FC = () => {
   // --- Rewards Logic ---
 
   const handleUnlockReward = useCallback(async (rewardId: string) => {
-    // Reload latest to prevent conflicts, or use optimistic state
-    // For simplicity, we use current loaded state, but in production we might need to fetch latest
-    // For this prototype, using rewardsData state is acceptable
-    
     if (!rewardsData || !session) return;
 
     const { updatedData, wasUnlocked } = unlockRewardLogic(rewardsData, rewardId);
@@ -220,12 +217,11 @@ const App: React.FC = () => {
   // --- Auth Handlers ---
 
   const handleSelectUser = (user: User) => {
-    // Check Ban *before* prompt
-    const config = loadAdminConfig();
-    const userStatus = config.userStatus[user.id];
-    
-    if (userStatus && userStatus.banned) {
-        showToast("Dieser Account wurde gesperrt ⛔");
+    // Check Ban *before* prompt (using currently loaded config)
+    // Note: If config hasn't synced from cloud yet, this uses local default.
+    // The "attemptLogin" will fail if cloud check reveals ban.
+    if (adminConfig && adminConfig.userStatus[user.id]?.banned) {
+        showToast("Dieser Account ist gesperrt ⛔");
         return;
     }
 
@@ -241,16 +237,20 @@ const App: React.FC = () => {
     if (!selectedUser) return false;
     
     if (password === selectedUser.password) {
-      // Local Auth Success
-      
-      // Trigger Silent Cloud Auth if not guest
+      // Local Auth Success, now try Cloud
       if (selectedUser.role !== 'guest') {
-          // Fire and forget, or await? Awaiting ensures session validity
           const cloudAuthSuccess = await cloud.silentLogin(selectedUser.id, password);
           if (!cloudAuthSuccess) {
-              console.warn("Cloud login failed, falling back to local simulation mode (could be network)");
-              // We allow login but features might be limited. Or show toast.
-              showToast("Offline Modus: Cloud-Verbindung fehlgeschlagen ☁️❌");
+              // If failed, we fall back to offline mode BUT checking if it was an "Auth Failed" or "Network Error"
+              // `silentLogin` handles auto-provisioning. If it returns false, it likely means offline or error.
+              showToast("Verbinde im Offline-Modus... ☁️⚠️");
+          } else {
+              // Cloud Auth Success -> Check Cloud Ban
+              const remoteConfig = await cloud.loadAdminConfig();
+              if (remoteConfig && remoteConfig.userStatus[selectedUser.id]?.banned) {
+                  showToast("Login verweigert: Account via Cloud gesperrt.");
+                  return false;
+              }
           }
       }
 
@@ -261,8 +261,8 @@ const App: React.FC = () => {
   };
 
   const loginSuccess = async (user: User) => {
-    // Re-load config to be safe
-    const config = loadAdminConfig();
+    // Config re-check
+    const config = adminConfig || loadAdminConfig();
     const userStatus = config.userStatus[user.id] || { role: user.role, banned: false };
 
     if (userStatus.banned) {
@@ -280,7 +280,7 @@ const App: React.FC = () => {
     setSession(newSession);
     saveSession(newSession);
     
-    // Load Data with Cloud support
+    // Load Data
     cloud.loadRewards().then(data => {
         if (data) {
             setRewardsData(data);
@@ -315,7 +315,6 @@ const App: React.FC = () => {
     setUserPrefs(null);
     setIsAccountSheetOpen(false);
     
-    // Reset Theme
     document.documentElement.style.cssText = '';
     document.body.className = '';
   };
@@ -335,7 +334,7 @@ const App: React.FC = () => {
 
     if (adminConfig && !adminConfig.appVisibility[app.id] && app.id !== 'settings') {
          if (session.role !== 'admin' && session.role !== 'developer') {
-             showToast("Diese App ist aktuell nicht verfügbar 🔒");
+             showToast("Diese App ist vom Admin deaktiviert 🔒");
              return;
          }
     }

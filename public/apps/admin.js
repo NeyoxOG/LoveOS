@@ -1,11 +1,11 @@
 
 /**
- * Admin App Logic v2
+ * Admin App Logic v2 (Cloud Enabled)
  */
 
 const KEYS = {
     SESSION: 'fiaos_session',
-    CONFIG: 'fiaos_global_admin_config',
+    // CONFIG key removed, using cloud obj directly
     USER_INDEX: 'fiaos_global_user_index'
 };
 
@@ -14,6 +14,7 @@ let adminConfig = null;
 let userIndex = null;
 let editingUserId = null;
 let pendingAction = null;
+let cloud = null;
 
 // Mock Data for Rewards List (Matches constants.ts)
 const REWARDS = [
@@ -31,15 +32,20 @@ function init() {
     if (currentUser.role !== 'admin' && currentUser.role !== 'developer') {
         return denyAccess();
     }
+    
+    // Get Cloud
+    if (window.parent.FIAOS && window.parent.FIAOS.cloud) {
+        cloud = window.parent.FIAOS.cloud;
+    }
 
     // 2. Load Data
-    loadData();
-
-    // 3. Render
-    renderUsers();
-    renderApps();
-    renderRewardsUI();
-    renderSystem();
+    loadData().then(() => {
+        // 3. Render
+        renderUsers();
+        renderApps();
+        renderRewardsUI();
+        renderSystem();
+    });
 }
 
 function denyAccess() {
@@ -51,15 +57,17 @@ function denyAccess() {
     `;
 }
 
-function loadData() {
-    // Config
-    const cfg = localStorage.getItem(KEYS.CONFIG);
-    if (cfg) {
-        adminConfig = JSON.parse(cfg);
-        // Ensure new structure
-        if (!adminConfig.userStatus) adminConfig.userStatus = {};
+async function loadData() {
+    // Config from Cloud
+    if (cloud) {
+        adminConfig = await cloud.loadAdminConfig();
     } else {
-        // Fallback default
+        // Fallback Local
+        const cfg = localStorage.getItem('fiaos_global_admin_config');
+        if (cfg) adminConfig = JSON.parse(cfg);
+    }
+    
+    if (!adminConfig) {
         adminConfig = { 
             appVisibility: { luna: true, valentine: true, vault: true }, 
             userStatus: {}, 
@@ -67,8 +75,9 @@ function loadData() {
             updatedAt: Date.now()
         };
     }
+    if (!adminConfig.userStatus) adminConfig.userStatus = {};
 
-    // User Index
+    // User Index (Still local mostly, but admin usually has latest)
     const idx = localStorage.getItem(KEYS.USER_INDEX);
     if (idx) userIndex = JSON.parse(idx);
     else userIndex = { users: [] };
@@ -77,9 +86,14 @@ function loadData() {
 function saveConfig() {
     adminConfig.updatedAt = Date.now();
     adminConfig.lastEditedBy = currentUser.name;
-    localStorage.setItem(KEYS.CONFIG, JSON.stringify(adminConfig));
     
-    // Notify OS via Window Bridge
+    if (cloud) {
+        cloud.saveAdminConfig(adminConfig);
+    } else {
+        localStorage.setItem('fiaos_global_admin_config', JSON.stringify(adminConfig));
+    }
+    
+    // Notify OS via Window Bridge for immediate local update
     if (window.parent.FIAOS_ADMIN_CONFIG_UPDATED) {
         window.parent.FIAOS_ADMIN_CONFIG_UPDATED(adminConfig);
     }
@@ -168,9 +182,11 @@ window.forceLogoutUser = (targetId) => {
     const uid = targetId || editingUserId;
     if (!uid) return;
     
+    // Currently this flag is local only in this v0.2. 
+    // In v0.3 full cloud, this would set a flag in user doc that App.tsx listens to.
     localStorage.setItem(`fiaos_user_${uid}_session_flag`, 'forceLogout');
     
-    if (!targetId) { // If called from modal
+    if (!targetId) { 
         alert("Logout flag set for " + uid);
         closeModal();
     }
@@ -229,19 +245,10 @@ window.adminUnlockReward = async () => {
     const uid = document.getElementById('rewardUserSelect').value;
     const rid = document.getElementById('rewardIdSelect').value;
     
-    // Use Cloud API exposed on window
-    if (!window.parent.FIAOS || !window.parent.FIAOS.cloud) {
-        alert("Cloud API not available.");
-        return;
-    }
-    
-    const cloud = window.parent.FIAOS.cloud;
+    if (!cloud) { alert("Cloud Offline"); return; }
     
     let data = await cloud.loadRewards(uid);
     if (!data) {
-        // If data is missing (e.g. user never logged in to initialize), creating from scratch might be needed
-        // For simplicity, we advise user to login first or assume null means fresh
-        // Try creating minimal structure
         data = { 
             version: 2, 
             rewards: {}, 
@@ -250,7 +257,6 @@ window.adminUnlockReward = async () => {
         };
     }
     
-    // Safety
     if (!data.rewards) data.rewards = {};
     if (!data.valentine) data.valentine = { unlocked: {}, total: 6, completedAt: null };
     
@@ -268,10 +274,9 @@ window.confirmAction = (action) => {
     const modal = document.getElementById('confirmModal');
     const txt = document.getElementById('confirmText');
     
-    if (action === 'lunaReset') txt.innerText = "Reset Luna Status (Hunger, Mood, Streak)? Affects shared state.";
+    if (action === 'lunaReset') txt.innerText = "Reset Luna Status? This affects Shared Cloud State.";
     if (action === 'dailyReset') txt.innerText = "Reset Daily Claims for all users?";
     if (action === 'globalLogout') txt.innerText = "Log out ALL users immediately?";
-    if (action === 'resetRewards') txt.innerText = "Wipe ALL rewards for ALL users?";
     
     document.getElementById('confirmBtnAction').onclick = executePendingAction;
     modal.classList.add('active');
@@ -286,11 +291,8 @@ async function executePendingAction() {
     if (!pendingAction) return;
     
     if (pendingAction === 'lunaReset') {
-        localStorage.removeItem('fiaos_guest_luna_state');
-        if (window.parent.FIAOS && window.parent.FIAOS.cloud) {
-            // Need a reset method exposed or manually update?
-            // Simple update to default state via cloud
-            await window.parent.FIAOS.cloud.updateLuna({
+        if (cloud) {
+            await cloud.updateLuna({
                 stats: { hunger: 50, energy: 50, hygiene: 50, fun: 50, love: 50 },
                 mood: 'happy',
                 streak: { count: 0 },
@@ -299,28 +301,17 @@ async function executePendingAction() {
         }
     }
     else if (pendingAction === 'dailyReset') {
+        // Daily state is per-user doc, heavy op.
+        // For v0.2 just clear local storage flag simulation
         userIndex.users.forEach(u => {
             localStorage.removeItem(`fiaos_user_${u.userId}_daily_state`);
         });
-        // Note: Daily state is still local per user even in cloud mode for now (Prompt 19/20 didn't explicitly move daily state to cloud, only rewards/luna/diary/vault)
-        // If Daily moves to cloud, this needs update.
     }
     else if (pendingAction === 'globalLogout') {
         userIndex.users.forEach(u => {
             localStorage.setItem(`fiaos_user_${u.userId}_session_flag`, 'forceLogout');
         });
-        // Also self
         localStorage.setItem(`fiaos_user_${currentUser.id}_session_flag`, 'forceLogout');
-    }
-    else if (pendingAction === 'resetRewards') {
-        // Warning: This is heavy. Reset cloud rewards for everyone?
-        // Just local for now as "Reset" implies emergency wipe.
-        userIndex.users.forEach(u => {
-             localStorage.removeItem(`fiaos_rewards_${u.userId}`);
-             // If we wanted to wipe cloud, we'd need to iterate users and call cloud.saveRewards with empty data.
-             // Skipping loop cloud wipe for safety/speed in v0.3
-        });
-        localStorage.removeItem('fiaos_rewards_guest');
     }
     
     alert("Action Executed.");

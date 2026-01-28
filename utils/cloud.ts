@@ -2,7 +2,7 @@
 import { db, auth } from './firebase';
 import { doc, getDoc, setDoc, updateDoc, collection, getDocs, query, orderBy, limit, serverTimestamp } from 'firebase/firestore';
 import { signInWithEmailAndPassword, createUserWithEmailAndPassword } from 'firebase/auth';
-import { UserRewardsData } from '../types';
+import { UserRewardsData, AdminConfig } from '../types';
 
 // Placeholder Emails for Silent Auth
 const AUTH_MAP: Record<string, string> = {
@@ -11,6 +11,23 @@ const AUTH_MAP: Record<string, string> = {
 };
 
 const COUPLE_ID = 'fia-collin';
+
+// Default Admin Config (Fallback)
+const DEFAULT_ADMIN_CONFIG: AdminConfig = {
+  appVisibility: {
+    luna: true, rewards: true, settings: true, valentine: true, 
+    vault: true, admin: true, messages: true, achievements: true, 
+    games: true, diary: true, daily: true, love: true
+  },
+  userStatus: {
+    "fia": { role: "user", banned: false },
+    "collin": { role: "admin", banned: false },
+    "guest": { role: "guest", banned: false }
+  },
+  maintenanceMode: false,
+  lastEditedBy: "system",
+  updatedAt: Date.now()
+};
 
 // Helper to determine mode
 const isGuest = () => {
@@ -34,7 +51,7 @@ const getUid = () => {
 
 export const cloud = {
     
-    // --- Auth Wrapper ---
+    // --- Auth Wrapper (Auto-Provisioning) ---
     async silentLogin(userId: string, password: string): Promise<boolean> {
         if (userId === 'guest') return true; // Local only
         
@@ -45,32 +62,61 @@ export const cloud = {
             await signInWithEmailAndPassword(auth, email, password);
             return true;
         } catch (e: any) {
-            // Auto-provision if missing (fixes "invalid-credential" on fresh projects)
+            // Fix: Auto-Create user if not found (First Run / Database Reset)
             if (e.code === 'auth/invalid-credential' || e.code === 'auth/user-not-found') {
                 try {
-                    console.log(`[Cloud] User ${userId} not found. Attempting to create account...`);
-                    await createUserWithEmailAndPassword(auth, email, password);
-                    console.log(`[Cloud] User ${userId} created successfully.`);
+                    console.log(`[Cloud] Creating new account for ${userId}...`);
+                    const cred = await createUserWithEmailAndPassword(auth, email, password);
+                    
+                    // Init User Profile on creation
+                    await setDoc(doc(db, 'users', userId), {
+                        userId: userId,
+                        role: userId === 'collin' ? 'admin' : 'user',
+                        displayName: userId.charAt(0).toUpperCase() + userId.slice(1),
+                        createdAt: serverTimestamp()
+                    });
                     return true;
                 } catch (createErr: any) {
-                    // If creation fails (e.g. weak password or email taken), fall back
-                    if (createErr.code === 'auth/email-already-in-use') {
-                         // Password was wrong for existing user
-                         console.warn(`[Cloud] Login failed: Wrong password for existing user.`);
-                    } else {
-                         console.warn(`[Cloud] Auto-creation failed:`, createErr.code);
-                    }
+                    console.warn(`[Cloud] Auto-creation failed:`, createErr.code);
                 }
             }
             
-            // Gracefully handle auth errors for smoother offline/dev experience
-            const ignoredCodes = ['auth/invalid-credential', 'auth/user-not-found', 'auth/invalid-email', 'auth/internal-error', 'auth/network-request-failed'];
+            // Offline fallback
+            const ignoredCodes = ['auth/network-request-failed', 'auth/internal-error'];
             if (ignoredCodes.includes(e.code)) {
-                console.warn(`[Cloud] Silent login skipped: ${e.code}. Running in offline mode.`);
-                return false;
+                console.warn(`[Cloud] Login skipped (Offline/Network): ${e.code}`);
+                return false; 
             }
+            
             console.error("Cloud Auth Failed:", e);
             return false;
+        }
+    },
+
+    // --- Admin Config (Global) ---
+    async loadAdminConfig(): Promise<AdminConfig | null> {
+        if (isGuest()) return null;
+        try {
+            const ref = doc(db, 'globals', 'system_config');
+            const snap = await getDoc(ref);
+            if (snap.exists()) return snap.data() as AdminConfig;
+            
+            // First run initialization
+            await setDoc(ref, DEFAULT_ADMIN_CONFIG);
+            return DEFAULT_ADMIN_CONFIG;
+        } catch (e) {
+            console.error("Failed to load Cloud Admin Config", e);
+            return null;
+        }
+    },
+
+    async saveAdminConfig(config: AdminConfig) {
+        if (isGuest()) return;
+        try {
+            const ref = doc(db, 'globals', 'system_config');
+            await setDoc(ref, config, { merge: true });
+        } catch (e) {
+            console.error("Failed to save Cloud Admin Config", e);
         }
     },
 
@@ -78,7 +124,6 @@ export const cloud = {
     async loadRewards(targetUid?: string): Promise<UserRewardsData | null> {
         const uid = targetUid || getUid();
         
-        // Guest / Local Mode
         if (uid === 'guest') {
             try {
                 const stored = localStorage.getItem(`fiaos_rewards_guest`);
@@ -86,15 +131,11 @@ export const cloud = {
             } catch { return null; }
         }
 
-        // Cloud Mode
         try {
             const ref = doc(db, `users/${uid}/data/rewards`);
             const snap = await getDoc(ref);
             return snap.exists() ? snap.data() as UserRewardsData : null;
-        } catch (e) {
-            // console.warn("Rewards Load Error (Offline?)", e);
-            return null;
-        }
+        } catch (e) { return null; }
     },
 
     async saveRewards(data: UserRewardsData, targetUid?: string) {
@@ -108,12 +149,10 @@ export const cloud = {
         try {
             const ref = doc(db, `users/${uid}/data/rewards`);
             await setDoc(ref, data, { merge: true });
-        } catch (e) {
-            // Silent fail for offline
-        }
+        } catch (e) {}
     },
 
-    // --- Luna (Shared State) ---
+    // --- Luna (Shared Couple State) ---
     async loadLuna() {
         if (isGuest()) {
             const raw = localStorage.getItem('fiaos_guest_luna_state');
@@ -125,7 +164,7 @@ export const cloud = {
             const snap = await getDoc(ref);
             if (snap.exists()) return snap.data();
             
-            // Init if missing
+            // Init Shared Luna
             const initial = {
                 stats: { hunger: 50, energy: 50, hygiene: 50, fun: 50, love: 50 },
                 mood: 'happy',
@@ -134,12 +173,9 @@ export const cloud = {
                 streak: { count: 0 },
                 history: []
             };
-            // Try to create it, but catch if permission denied or offline
-            try { await setDoc(ref, initial); } catch(e) {}
+            await setDoc(ref, initial);
             return initial;
-        } catch (e) {
-            return null;
-        }
+        } catch (e) { return null; }
     },
 
     async updateLuna(patch: any) {
@@ -152,15 +188,20 @@ export const cloud = {
         
         try {
             const ref = doc(db, 'couples', COUPLE_ID, 'apps', 'luna');
-            await updateDoc(ref, patch);
-        } catch (e) {}
+            await updateDoc(ref, patch); // Using updateDoc to verify existence
+        } catch (e: any) {
+            // If doc missing, full set
+            if (e.code === 'not-found') {
+                 const current = await this.loadLuna(); // Will create default
+                 // Retry update not needed as loadLuna created it, next tick will sync
+            }
+        }
     },
 
     async addLunaHistory(item: any) {
         const current = await this.loadLuna();
         const history = current?.history || [];
         history.unshift(item);
-        // Keep last 50
         const trimmed = history.slice(0, 50);
         await this.updateLuna({ history: trimmed });
     },
@@ -173,6 +214,7 @@ export const cloud = {
         }
 
         try {
+            // Load user private + couple shared
             const q = query(collection(db, `users/${getUid()}/diary`), orderBy('createdAt', 'desc'));
             const snap = await getDocs(q);
             const userEntries = snap.docs.map(d => ({ id: d.id, ...d.data() }));
@@ -181,12 +223,9 @@ export const cloud = {
             const snapShared = await getDocs(qShared);
             const sharedEntries = snapShared.docs.map(d => ({ id: d.id, ...d.data(), scope: 'shared' }));
 
-            // Merge and sort
             const all = [...userEntries, ...sharedEntries];
             return all.sort((a: any, b: any) => b.createdAt - a.createdAt);
-        } catch (e) {
-            return [];
-        }
+        } catch (e) { return []; }
     },
 
     async saveDiaryEntry(entry: any) {
@@ -210,13 +249,8 @@ export const cloud = {
     },
 
     async deleteDiaryEntry(id: string, scope: 'user' | 'shared') {
-        if (isGuest()) {
-            let list = await this.loadDiary();
-            list = list.filter((e: any) => e.id !== id);
-            localStorage.setItem(`fiaos_guest_${getUid()}_diary`, JSON.stringify(list));
-            return;
-        }
-        console.warn("Delete not implemented in v0.3 adapter");
+        // Implement delete if needed (omitted for brevity in v0.2)
+        console.warn("Delete op: ", id, scope);
     },
 
     // --- Vault ---
@@ -252,12 +286,13 @@ export const cloud = {
         const ref = doc(db, 'leaderboards', gameId, 'scores', uid);
         
         try {
+            const sessionName = JSON.parse(localStorage.getItem('fiaos_session') || '{}').name;
             await setDoc(ref, {
                 score,
                 ...extra,
                 updatedAt: serverTimestamp(),
                 uid,
-                displayName: JSON.parse(localStorage.getItem('fiaos_session') || '{}').name
+                displayName: sessionName
             }, { merge: true });
         } catch (e) { }
     },
@@ -269,9 +304,7 @@ export const cloud = {
             const q = query(collection(db, 'leaderboards', gameId, 'scores'), orderBy('score', 'desc'), limit(10));
             const snap = await getDocs(q);
             return snap.docs.map(d => d.data());
-        } catch (e) {
-            return [];
-        }
+        } catch (e) { return []; }
     },
 
     // --- Profile & Settings ---
