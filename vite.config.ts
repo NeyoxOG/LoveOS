@@ -7,6 +7,10 @@ export default defineConfig({
   // Root directory is current directory
   root: '.',
   base: '/',
+  define: {
+    // Prevent "process is not defined" errors in browser
+    'process.env': {} 
+  },
   build: {
     outDir: 'dist',
     emptyOutDir: true,
