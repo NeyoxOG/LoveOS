@@ -4,17 +4,25 @@ import react from '@vitejs/plugin-react';
 
 export default defineConfig({
   plugins: [react()],
-  // Root directory is current directory
   root: '.',
   base: '/',
   define: {
-    // Prevent "process is not defined" errors in browser
+    // Prevent "process is not defined" crashes in certain older libraries
     'process.env': {} 
   },
   build: {
     outDir: 'dist',
+    assetsDir: 'assets',
     emptyOutDir: true,
-    sourcemap: false
+    sourcemap: false,
+    rollupOptions: {
+      output: {
+        manualChunks: {
+          vendor: ['react', 'react-dom', 'framer-motion'],
+          firebase: ['firebase/app', 'firebase/auth', 'firebase/firestore']
+        }
+      }
+    }
   },
   server: {
     host: true
