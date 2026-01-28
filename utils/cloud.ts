@@ -151,15 +151,13 @@ export const cloud = {
     },
 
     async adminForceLogout(targetUid: string) {
+        // Since we monitor AdminConfig in App.tsx, simply saving the config
+        // (which usually happens alongside a ban toggle) is enough.
+        // We can force a timestamp update to trigger listeners.
         try {
-            // We flag the user document directly or update global config
-            // For V2, let's update the UserStatus in global config which is monitored
             const config = await this.loadAdminConfig() || DEFAULT_ADMIN_CONFIG;
-            if (!config.userStatus[targetUid]) config.userStatus[targetUid] = { role: 'user', banned: false };
-            
-            // We don't have a 'forceLogout' field in config, but we can toggle ban briefly or rely on app logic
-            // Ideally we'd have a session invalidator. For now, let's just re-save config to trigger listeners
-            await this.saveAdminConfig(config); 
+            config.updatedAt = Date.now();
+            await this.saveAdminConfig(config);
             return true;
         } catch(e) { return false; }
     },
@@ -167,7 +165,9 @@ export const cloud = {
     // --- Config (Real-time) ---
     listenToAdminConfig(callback: (config: AdminConfig) => void) {
         if (isGuest()) {
-            callback(JSON.parse(localStorage.getItem('fiaos_global_admin_config') || JSON.stringify(DEFAULT_ADMIN_CONFIG)));
+            // Guest uses local storage config simulation
+            const local = localStorage.getItem('fiaos_global_admin_config');
+            callback(local ? JSON.parse(local) : DEFAULT_ADMIN_CONFIG);
             return () => {};
         }
         try {
@@ -175,11 +175,15 @@ export const cloud = {
                 if (snap.exists) {
                     callback(snap.data() as AdminConfig);
                 } else {
+                    // Initialize if missing
+                    db.collection('globals').doc('system_config').set(sanitize(DEFAULT_ADMIN_CONFIG));
                     callback(DEFAULT_ADMIN_CONFIG);
                 }
+            }, (error) => {
+                console.error("Admin Config Listener Error:", error);
             });
         } catch (e) { 
-            console.error("Config Listen Error", e);
+            console.error("Config Listen Setup Error", e);
             return () => {}; 
         }
     },
@@ -190,9 +194,6 @@ export const cloud = {
             const ref = db.collection('globals').doc('system_config');
             const snap = await ref.get();
             if (snap.exists) return snap.data() as AdminConfig;
-            
-            // Create if missing
-            await ref.set(sanitize(DEFAULT_ADMIN_CONFIG));
             return DEFAULT_ADMIN_CONFIG;
         } catch (e) { return null; }
     },

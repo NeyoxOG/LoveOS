@@ -1,6 +1,6 @@
 
 /**
- * AdminOS v2.0 Logic (Fixes for Ban & Rewards)
+ * AdminOS v2.0 Logic (Fixes for Ban & Maintenance)
  */
 
 const KEYS = { SESSION: 'fiaos_session' };
@@ -215,8 +215,13 @@ window.switchView = (viewId, btn) => {
 // --- Actions: System ---
 
 window.toggleMaintenance = async () => {
+    // 1. Flip State
     adminConfig.maintenanceMode = !adminConfig.maintenanceMode;
+    
+    // 2. Optimistic UI
     renderDashboard(); 
+    
+    // 3. Save to Cloud (Critical)
     await syncConfig();
 };
 
@@ -234,8 +239,9 @@ async function syncConfig() {
     // Optimistic local save
     localStorage.setItem('fiaos_global_admin_config', JSON.stringify(adminConfig));
     // Cloud save
-    if (cloud) await cloud.saveAdminConfig(adminConfig);
-    // Notifying parent not needed as Parent listens to Cloud
+    if (cloud) {
+        await cloud.saveAdminConfig(adminConfig);
+    }
 }
 
 // --- Actions: Luna ---
@@ -265,8 +271,13 @@ window.openUserModal = async (uid, name) => {
     document.getElementById('modalUserName').innerText = name;
     document.getElementById('userModal').classList.add('open');
     
+    // Ensure User Object Exists
+    if (!adminConfig.userStatus[uid]) {
+        adminConfig.userStatus[uid] = { role: 'user', banned: false };
+    }
+
     // Check Ban Status
-    const status = adminConfig.userStatus[uid] || { banned: false };
+    const status = adminConfig.userStatus[uid];
     const banTog = document.getElementById('banToggle');
     if (status.banned) banTog.classList.add('active'); else banTog.classList.remove('active');
 
@@ -291,6 +302,7 @@ window.toggleBan = async () => {
     if (selectedUserId === 'guest') return alert("Gast kann nicht gebannt werden.");
     if (selectedUserId === 'collin') return alert("Admin kann nicht gebannt werden.");
     
+    // Ensure entry exists
     if (!adminConfig.userStatus[selectedUserId]) {
         adminConfig.userStatus[selectedUserId] = { role: 'user', banned: false };
     }
@@ -298,14 +310,16 @@ window.toggleBan = async () => {
     // Toggle
     adminConfig.userStatus[selectedUserId].banned = !adminConfig.userStatus[selectedUserId].banned;
     
-    // Update UI
+    // Update UI Modal
     const banTog = document.getElementById('banToggle');
     if (adminConfig.userStatus[selectedUserId].banned) banTog.classList.add('active'); 
     else banTog.classList.remove('active');
     
-    // Sync
+    // Sync Immediately
     await syncConfig();
-    renderUsersList(); // Update list indicators
+    
+    // Update List
+    renderUsersList(); 
 };
 
 window.saveUserDaily = async () => {
@@ -319,7 +333,6 @@ window.saveUserDaily = async () => {
 
 window.forceLogoutUser = async () => {
     if (!selectedUserId || !cloud) return;
-    // We reuse the ban logic slightly or trigger the logout timestamp
     await cloud.adminForceLogout(selectedUserId);
     alert("Logout Signal gesendet.");
 };
@@ -373,6 +386,7 @@ function renderRewardsList() {
         if (term && !r.title.toLowerCase().includes(term) && !r.id.toLowerCase().includes(term)) return;
 
         let unlocked = false;
+        // Optional Chaining for robustness
         if (r.id.startsWith('valentine.')) {
             unlocked = userRewardsData.valentine?.unlocked?.[r.id] || false;
         } else {
@@ -407,7 +421,7 @@ window.toggleReward = async (rId) => {
     
     // Ensure structure exists
     if (rId.startsWith('valentine.')) {
-        if (!userRewardsData.valentine) userRewardsData.valentine = { unlocked: {} };
+        if (!userRewardsData.valentine) userRewardsData.valentine = { total: 6, unlocked: {}, completedAt: null };
         if (!userRewardsData.valentine.unlocked) userRewardsData.valentine.unlocked = {};
         
         newVal = !userRewardsData.valentine.unlocked[rId];
@@ -423,7 +437,7 @@ window.toggleReward = async (rId) => {
         if (newVal) userRewardsData.rewards[rId].unlockedAt = Date.now();
     }
 
-    // Save
+    // Save to Specific User Path
     if (cloud) await cloud.saveRewards(userRewardsData, uid);
     else localStorage.setItem(uid === 'guest' ? 'fiaos_rewards_guest' : `fiaos_rewards_${uid}`, JSON.stringify(userRewardsData));
     

@@ -63,7 +63,7 @@ const App: React.FC = () => {
   const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
   const [userPrefs, setUserPrefs] = useState<UserPrefs | null>(null);
   
-  // Admin Config State - Driven by Cloud Listener
+  // Admin Config State - Source of Truth
   const [adminConfig, setAdminConfig] = useState<AdminConfig | null>(null);
 
   const [showOnboarding, setShowOnboarding] = useState(false);
@@ -72,13 +72,11 @@ const App: React.FC = () => {
 
   // --- Effects ---
 
-  // 1. Global Cloud Config Listener (The Source of Truth)
+  // 1. Global Cloud Config Listener (Priority 1)
   useEffect(() => {
     const unsubscribe = cloud.listenToAdminConfig((conf) => {
         // console.log("Received Admin Config Update:", conf);
         setAdminConfig(conf);
-        
-        // Save to local for fallback
         localStorage.setItem('fiaos_global_admin_config', JSON.stringify(conf));
     });
     return () => unsubscribe();
@@ -89,13 +87,12 @@ const App: React.FC = () => {
     const existing = loadSession();
     if (existing) {
         setSession(existing);
-        // Attempt cloud restore
         cloud.restoreConnection();
     }
     setIsVerifying(false);
   }, []);
 
-  // 3. User Data & Ban/Maintenance Enforcement
+  // 3. User Data & SECURITY ENFORCEMENT
   useEffect(() => {
     if (!session) {
         setRewardsData(null);
@@ -104,15 +101,17 @@ const App: React.FC = () => {
         return;
     }
 
-    // -- Security Check --
+    // --- REAL-TIME BAN CHECK ---
+    // If admin config loads and user is marked banned, kick them out immediately.
     if (adminConfig && adminConfig.userStatus) {
-        const userStatus = adminConfig.userStatus[session.userId];
-        if (userStatus && userStatus.banned) {
+        const myStatus = adminConfig.userStatus[session.userId];
+        if (myStatus && myStatus.banned) {
+            console.warn("User is banned. Forcing logout.");
             handleLogout();
             setOverlay({
                 isOpen: true,
-                title: "Account Gesperrt",
-                content: "Dein Zugang wurde vom Administrator deaktiviert. ⛔"
+                title: "Account Gesperrt ⛔",
+                content: "Dein Zugang wurde deaktiviert. Wende dich an den Administrator."
             });
             return;
         }
@@ -165,7 +164,7 @@ const App: React.FC = () => {
 
     initUserData();
 
-  }, [session, adminConfig]); // Re-run if admin config changes (live ban)
+  }, [session, adminConfig]); // Re-run if session OR admin config changes
 
   // 4. Global Bridge
   useEffect(() => {
@@ -197,8 +196,6 @@ const App: React.FC = () => {
 
     window.FIAOS_PROFILE_UPDATED = (p) => setUserProfile(p);
     
-    // NOTE: FIAOS_ADMIN_CONFIG_UPDATED removed here because we use the global useEffect listener now
-    
     window.FIAOS_EVENTS = {
         emit: (event, data) => {
              if (event === 'games.unlock') handleUnlockReward(data.id);
@@ -217,13 +214,14 @@ const App: React.FC = () => {
   // --- Handlers ---
 
   const handleUserSelect = (u: User) => {
-    // Immediate Ban Check before even asking for password
+    // Immediate Ban Check (Pre-Login)
     if (adminConfig?.userStatus?.[u.id]?.banned) {
         setOverlay({
             isOpen: true,
             title: "Zugriff Verweigert",
             content: "Dieser Benutzer ist gesperrt. ⛔"
         });
+        playSound('error');
         return;
     }
 
@@ -314,11 +312,8 @@ const App: React.FC = () => {
   };
 
   const handleAppClick = (app: AppItem) => {
-      // Check Admin Config for App Visibility
       if (adminConfig && adminConfig.appVisibility) {
           if (adminConfig.appVisibility[app.id] === false && app.id !== 'settings') {
-             // Admins can see but maybe warn? Or strictly follow list?
-             // Assuming HomeScreen handles visibility, but this is a double check
              if (session?.role !== 'admin' && session?.role !== 'developer') {
                  setToast({ id: Date.now(), message: 'App ist deaktiviert 🔒' });
                  return;
@@ -346,7 +341,7 @@ const App: React.FC = () => {
 
   if (isVerifying) return <div className="bg-black w-full h-full" />;
 
-  // Maintenance Check
+  // --- GATEKEEPER: MAINTENANCE MODE ---
   const isAdminUser = session?.role === 'admin' || session?.role === 'developer';
   const maintenanceActive = adminConfig?.maintenanceMode;
   
@@ -354,7 +349,7 @@ const App: React.FC = () => {
       return <MaintenanceScreen onBypass={() => setBypassMaintenance(true)} />;
   }
 
-  // Theme
+  // Theme Calculation
   const activeThemeId = userPrefs?.theme || 'roseGlass';
   const activeThemeDef = THEMES[activeThemeId] || THEMES['roseGlass'];
   
