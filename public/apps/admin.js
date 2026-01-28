@@ -120,13 +120,17 @@ function renderUserTab(uid) {
 
 async function loadDailyStats(uid) {
     if (!cloud) return;
-    const daily = await cloud.adminGetData(uid, 'daily_state');
-    if (daily) {
-        document.getElementById('inpStreak').value = daily.streak || 0;
-        document.getElementById('inpPoints').value = daily.points || 0;
-    } else {
-        document.getElementById('inpStreak').value = 0;
-        document.getElementById('inpPoints').value = 0;
+    try {
+        const daily = await cloud.adminGetData(uid, 'daily_state');
+        if (daily) {
+            document.getElementById('inpStreak').value = daily.streak || 0;
+            document.getElementById('inpPoints').value = daily.points || 0;
+        } else {
+            document.getElementById('inpStreak').value = 0;
+            document.getElementById('inpPoints').value = 0;
+        }
+    } catch (e) {
+        console.error("Failed to load daily stats", e);
     }
 }
 
@@ -232,6 +236,8 @@ window.actionResetUser = async () => {
         if (cloud) {
             await cloud.adminResetUser(selectedUserId);
             alert("User wurde zurückgesetzt.");
+            // Refresh view to show zeroed stats
+            renderUserTab(selectedUserId);
         } else {
             alert("Offline Reset nicht implementiert.");
         }
@@ -241,10 +247,16 @@ window.actionResetUser = async () => {
 
 window.actionSaveDaily = async () => {
     if (!selectedUserId || !cloud) return;
-    const streak = parseInt(document.getElementById('inpStreak').value) || 0;
-    const points = parseInt(document.getElementById('inpPoints').value) || 0;
+    const streak = parseInt(document.getElementById('inpStreak').value, 10);
+    const points = parseInt(document.getElementById('inpPoints').value, 10);
     
+    if (isNaN(streak) || isNaN(points)) {
+        alert("Bitte gültige Zahlen eingeben.");
+        return;
+    }
+
     toggleLoading(true);
+    // Merge true allows partial updates if structure changes, but for stats we set specific fields
     await cloud.adminSetData(selectedUserId, 'daily_state', { streak, points });
     toggleLoading(false);
     alert("Daily Stats gespeichert.");

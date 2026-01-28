@@ -93,6 +93,21 @@ const App: React.FC = () => {
       }
   }, []);
 
+  const handleLogout = useCallback(() => {
+    playSound('close');
+    clearSession();
+    setSession(null);
+    setRewardsData(null);
+    setOpenedApp(null);
+    setUserProfile(null);
+    setUserPrefs(null);
+    setShowOnboarding(false);
+    setIsAccountSheetOpen(false);
+    setCustomBg(null);
+    document.documentElement.style.cssText = ''; 
+    document.documentElement.removeAttribute('data-theme');
+  }, []);
+
   // --- INITIALIZATION ---
   useEffect(() => {
     const initApp = async () => {
@@ -211,7 +226,18 @@ const App: React.FC = () => {
 
     const interval = setInterval(checkStatus, 3000); 
     return () => clearInterval(interval);
-  }, [session, showToast, adminConfig, maintenanceBypass]);
+  }, [session, showToast, adminConfig, maintenanceBypass, handleLogout]);
+
+  // --- FORCE LOGOUT ON MAINTENANCE ---
+  useEffect(() => {
+    if (adminConfig?.maintenanceMode && session && !maintenanceBypass) {
+        const isPrivileged = session.role === 'admin' || session.role === 'developer';
+        if (!isPrivileged) {
+            handleLogout();
+            showToast("Wartungsmodus aktiviert: Du wurdest ausgeloggt.");
+        }
+    }
+  }, [adminConfig?.maintenanceMode, session, maintenanceBypass, handleLogout, showToast]);
 
   // Event Bus Setup
   useEffect(() => {
@@ -357,21 +383,6 @@ const App: React.FC = () => {
           showToast("Viel Spaß mit FiaOS! 🚀");
           handleUnlockReward('custom_theme_unlock'); 
       }
-  };
-
-  const handleLogout = () => {
-    playSound('close');
-    clearSession();
-    setSession(null);
-    setRewardsData(null);
-    setOpenedApp(null);
-    setUserProfile(null);
-    setUserPrefs(null);
-    setShowOnboarding(false);
-    setIsAccountSheetOpen(false);
-    setCustomBg(null);
-    document.documentElement.style.cssText = ''; 
-    document.documentElement.removeAttribute('data-theme');
   };
 
   const closeAuthSheet = () => { setIsAuthSheetOpen(false); setTimeout(() => setSelectedUser(null), 300); };

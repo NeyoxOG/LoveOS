@@ -118,6 +118,7 @@ export const cloud = {
             if (type === 'daily_state') path = `users/${targetUid}/data/daily_state`;
             
             if (path) {
+                // If data is null/empty, we might want to delete, but typically this is update
                 await db.doc(path).set(sanitize(data), { merge: true });
                 return true;
             }
@@ -238,6 +239,7 @@ export const cloud = {
         try {
             const ref = db.doc(`users/${uid}/data/daily_state`);
             const snap = await ref.get();
+            // Critical change: if document doesn't exist, return null so client knows to init/reset
             return snap.exists ? snap.data() : null;
         } catch { return null; }
     },

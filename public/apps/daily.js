@@ -37,7 +37,7 @@ function init() {
     }
 
     initDevTools();
-    loadData(); // This now triggers renderUI after data is ready
+    loadData();
 }
 
 function isAdmin() {
@@ -54,61 +54,98 @@ function initDevTools() {
 }
 
 async function loadData() {
-    // 1. Get Local State (User Specific)
-    const stateKey = `${KEYS.DAILY_STATE}${user.id}_daily_state`;
-    const rawState = localStorage.getItem(stateKey);
     const todayISO = new Date().toISOString().split('T')[0];
+    const localKey = `${KEYS.DAILY_STATE}${user.id}_daily_state`;
     
-    if (rawState) {
-        state = JSON.parse(rawState);
-    } else {
-        state = {
+    let loadedState = null;
+
+    // 1. Try Loading from Cloud (Authority)
+    if (cloud && user.role !== 'guest') {
+        try {
+            // console.log("Loading Daily from Cloud...");
+            const cloudData = await cloud.loadDailyState(user.id);
+            if (cloudData) {
+                loadedState = cloudData;
+                // Update local cache to match cloud (sync down)
+                localStorage.setItem(localKey, JSON.stringify(loadedState));
+            }
+        } catch (e) {
+            console.error("Cloud load failed, falling back to local", e);
+        }
+    }
+
+    // 2. Fallback to Local (Only if cloud failed or guest)
+    // IMPORTANT: If cloud returned null (success but empty), we do NOT load local.
+    // This allows Admin Reset to actually wipe the data.
+    if (!loadedState && (!cloud || user.role === 'guest')) {
+        const rawState = localStorage.getItem(localKey);
+        if (rawState) loadedState = JSON.parse(rawState);
+    }
+
+    // 3. Initialize Default if nothing found (New User or Reset)
+    if (!loadedState) {
+        loadedState = {
             lastClaimDateISO: null,
             streak: 0,
             totalClaims: 0,
-            points: 0, // Added points
+            points: 0,
             todaySeed: `${user.id}_${todayISO}`,
             openedToday: false,
             lastOpenAt: 0
         };
-        localStorage.setItem(stateKey, JSON.stringify(state));
-    }
-    
-    // Migration: ensure points exist
-    if (state.points === undefined) {
-        state.points = state.totalClaims * 10;
+        // Save initial state immediately if not guest
+        if (cloud && user.role !== 'guest') {
+            await cloud.saveDailyState(loadedState);
+        }
     }
 
-    // Refresh Seed if new day
+    state = loadedState;
+
+    // Migration Check: Ensure points exist
+    if (state.points === undefined) state.points = (state.totalClaims || 0) * 10;
+
+    // 4. Refresh Day/Seed Logic
     const expectedSeed = `${user.id}_${todayISO}`;
     if (state.todaySeed !== expectedSeed) {
         state.todaySeed = expectedSeed;
         state.openedToday = false;
         
-        // Streak Logic
+        // Streak Logic: Check if broken
         if (state.lastClaimDateISO) {
             const lastDate = new Date(state.lastClaimDateISO);
             const today = new Date(todayISO);
             const diffTime = Math.abs(today.getTime() - lastDate.getTime());
             const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
             
+            // If more than 1 day passed, streak resets
+            // (diffDays 0 = same day, 1 = yesterday, >1 = missed a day)
             if (diffDays > 1) {
                 state.streak = 0;
             }
         } else {
             state.streak = 0;
         }
-        localStorage.setItem(stateKey, JSON.stringify(state));
+        
+        // Save updates (Seed change / Streak reset)
+        saveState();
     }
 
     offer = getLocalDailyOffer(state.todaySeed);
     
-    // Render basic UI immediately
     renderUI();
     
     // Async check for couple bonus via Cloud
     if (cloud && user.role !== 'guest') {
         checkCoupleBonus(todayISO);
+    }
+}
+
+async function saveState() {
+    const localKey = `${KEYS.DAILY_STATE}${user.id}_daily_state`;
+    localStorage.setItem(localKey, JSON.stringify(state));
+    
+    if (cloud && user.role !== 'guest') {
+        await cloud.saveDailyState(state);
     }
 }
 
@@ -306,8 +343,10 @@ async function processClaim() {
     const earned = pointsMap[offer.rarity] || 10;
     state.points = (state.points || 0) + earned;
     
-    localStorage.setItem(`${KEYS.DAILY_STATE}${user.id}_daily_state`, JSON.stringify(state));
+    // Save state (Cloud + Local)
+    await saveState();
 
+    // Update History (Local only mostly, fine for now)
     const histKey = `${KEYS.DAILY_HISTORY}${user.id}_daily_history`;
     let history = JSON.parse(localStorage.getItem(histKey) || '[]');
     history.unshift({
@@ -429,28 +468,28 @@ function getLocalDailyOffer(seed) {
 }
 
 // --- Dev Actions (Secure) ---
-window.devReset = () => { 
+// Note: These now affect cloud via re-init logic if page reloaded
+window.devReset = async () => { 
     if (!isAdmin()) return alert("Access Denied");
+    // Clear Local
     localStorage.removeItem(`${KEYS.DAILY_STATE}${user.id}_daily_state`); 
+    // Clear Cloud (Mock reset via save empty)
+    if(cloud) await cloud.saveDailyState(null);
     location.reload(); 
 };
 
-window.devStreakReset = () => { 
+window.devStreakReset = async () => { 
     if (!isAdmin()) return alert("Access Denied");
-    const k = `${KEYS.DAILY_STATE}${user.id}_daily_state`; 
-    const s = JSON.parse(localStorage.getItem(k)); 
-    s.streak = 0; 
-    localStorage.setItem(k, JSON.stringify(s)); 
+    state.streak = 0;
+    await saveState();
     location.reload(); 
 };
 
-window.devReroll = () => { 
+window.devReroll = async () => { 
     if (!isAdmin()) return alert("Access Denied");
-    const k = `${KEYS.DAILY_STATE}${user.id}_daily_state`; 
-    const s = JSON.parse(localStorage.getItem(k)); 
-    s.todaySeed = Math.random().toString(); 
-    s.openedToday = false; 
-    localStorage.setItem(k, JSON.stringify(s)); 
+    state.todaySeed = Math.random().toString();
+    state.openedToday = false;
+    await saveState();
     location.reload(); 
 };
 
