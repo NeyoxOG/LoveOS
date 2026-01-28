@@ -233,6 +233,9 @@ export const loadAdminConfig = (): AdminConfig => {
             // Ensure newly added apps (like bucket) are visible if undefined in old config
             if (config.appVisibility) {
                 if (config.appVisibility.bucket === undefined) config.appVisibility.bucket = true;
+                // FORCE LUNA & BUCKET VISIBILITY TO FIX STALE STATE
+                config.appVisibility.luna = true;
+                config.appVisibility.bucket = true;
             }
             return config;
         }
