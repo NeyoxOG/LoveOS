@@ -1,0 +1,149 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Story of Love</title>
+    <style>
+        body {
+            margin: 0; padding: 0;
+            background: #000;
+            color: #fff;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            height: 100vh;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            user-select: none;
+        }
+
+        .screen {
+            position: absolute; inset: 0;
+            display: flex; flex-direction: column;
+            align-items: center; justify-content: center;
+            opacity: 0; pointer-events: none;
+            transition: opacity 0.5s ease;
+        }
+        .screen.active { opacity: 1; pointer-events: auto; }
+
+        /* Intro */
+        .intro-btn {
+            background: linear-gradient(135deg, #ec4899, #f43f5e);
+            border: none; color: white; padding: 20px 40px;
+            border-radius: 50px; font-size: 20px; font-weight: 700;
+            cursor: pointer;
+            box-shadow: 0 0 30px rgba(244, 63, 94, 0.4);
+            display: flex; align-items: center; gap: 10px;
+            transition: transform 0.2s;
+        }
+        .intro-btn:active { transform: scale(0.95); }
+
+        /* Video */
+        video {
+            width: 100%; height: 100%;
+            object-fit: contain;
+            background: #000;
+        }
+        .skip-btn {
+            position: absolute; top: 20px; right: 20px;
+            background: rgba(255,255,255,0.1); backdrop-filter: blur(10px);
+            border: 1px solid rgba(255,255,255,0.2);
+            color: white; padding: 8px 16px; border-radius: 20px;
+            font-size: 14px; cursor: pointer; z-index: 50;
+        }
+
+        /* Countdown */
+        .cd-container {
+            text-align: center;
+            background: radial-gradient(circle, #2e1065 0%, #000 100%);
+            width: 100%; height: 100%;
+            display: flex; flex-direction: column; align-items: center; justify-content: center;
+        }
+        .cd-title {
+            font-size: 14px; color: rgba(255,255,255,0.6);
+            text-transform: uppercase; letter-spacing: 2px;
+            margin-bottom: 30px;
+        }
+        .cd-timer {
+            display: grid; grid-template-columns: repeat(4, 1fr); gap: 20px;
+            width: 90%; max-width: 400px;
+        }
+        .cd-item {
+            display: flex; flex-direction: column; align-items: center;
+        }
+        .cd-val {
+            font-size: 36px; font-weight: 800;
+            background: linear-gradient(to bottom, #fff, #f472b6);
+            -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+            line-height: 1;
+        }
+        .cd-label {
+            font-size: 12px; color: rgba(255,255,255,0.4); margin-top: 5px;
+        }
+        .target-date {
+            margin-top: 40px; font-size: 18px; color: #ec4899; font-weight: 500;
+        }
+
+        .back-btn {
+            position: absolute; top: 20px; left: 20px;
+            background: transparent; border: none; color: rgba(255,255,255,0.5);
+            font-size: 24px; cursor: pointer;
+        }
+
+    </style>
+</head>
+<body>
+
+    <!-- Intro Screen -->
+    <div class="screen active" id="introScreen">
+        <button class="intro-btn" onclick="playVideo()">
+            <span>▶</span> Start Story
+        </button>
+        <div style="margin-top:20px; font-size:12px; color:#666;">Für Fia & Collin</div>
+    </div>
+
+    <!-- Video Screen -->
+    <div class="screen" id="videoScreen">
+        <button class="skip-btn" onclick="endVideo()">Überspringen</button>
+        <video id="storyVideo" playsinline>
+            <source src="/storyoflove.mp4" type="video/mp4">
+            Dein Browser unterstützt dieses Video nicht.
+        </video>
+    </div>
+
+    <!-- Countdown Screen -->
+    <div class="screen" id="countdownScreen">
+        <button class="back-btn" onclick="window.history.back()">✕</button>
+        <div class="cd-container">
+            <div class="cd-title">Wir sehen uns am</div>
+            
+            <div class="cd-timer">
+                <div class="cd-item">
+                    <span class="cd-val" id="d">00</span>
+                    <span class="cd-label">Tage</span>
+                </div>
+                <div class="cd-item">
+                    <span class="cd-val" id="h">00</span>
+                    <span class="cd-label">Std</span>
+                </div>
+                <div class="cd-item">
+                    <span class="cd-val" id="m">00</span>
+                    <span class="cd-label">Min</span>
+                </div>
+                <div class="cd-item">
+                    <span class="cd-val" id="s">00</span>
+                    <span class="cd-label">Sek</span>
+                </div>
+            </div>
+
+            <div class="target-date">18. Mai 2026</div>
+        </div>
+    </div>
+
+    <script src="story.js"></script>
+</body>
+</html>
+    

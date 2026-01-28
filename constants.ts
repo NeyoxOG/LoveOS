@@ -27,6 +27,7 @@ export const USERS: User[] = [
 
 export const APPS: AppItem[] = [
   { id:"love", name:"Love", icon:"💞", status:"available" },
+  { id:"story", name: "Story of Love", icon: "🎞️", status: "available" },
   { id:"daily", name:"Daily", icon:"✨", status:"available" },
   { id:"rewards_app", name:"Belohnungen", icon:"🎁", status:"available" },
   { id:"messages", name:"Nachrichten", icon:"💬", status:"available" },
@@ -139,15 +140,6 @@ export const REWARD_CATALOG: Reward[] = [
     category: 'love',
     payload: { themeId: 'eternal' } 
   },
-  {
-    id: 'custom_theme_unlock',
-    title: 'Designer',
-    description: 'Custom Theme freigeschaltet 🎨',
-    icon: '🎨',
-    type: 'theme_unlock',
-    category: 'general',
-    payload: { themeId: 'custom' }
-  }
 ];
 
 export const VALENTINE_REWARDS: Reward[] = [
@@ -159,74 +151,20 @@ export const VALENTINE_REWARDS: Reward[] = [
   { id: 'valentine.reward.secret', title: 'Geheime Nachricht', description: 'Nur für dich. 💌', icon: '💌', category: 'valentine' },
 ];
 
-// Enhanced Themes
 export const THEMES: Record<string, ThemeDef> = {
   roseGlass: {
     id: 'roseGlass',
-    name: 'FiaOS Rose (Standard)',
+    name: 'Default',
     colors: {
-      bgGradient: 'linear-gradient(135deg, #1f0213 0%, #4a0423 50%, #000 100%)',
+      bgGradient: 'linear-gradient(to bottom right, #2e1065, #000)',
       cardBg: 'rgba(255, 255, 255, 0.08)',
-      text: '#fff0f5',
-      textDim: 'rgba(255, 240, 245, 0.6)'
-    }
-  },
-  lavender: {
-    id: 'lavender',
-    name: 'Lavender Mist',
-    colors: {
-      bgGradient: 'linear-gradient(135deg, #2e1065 0%, #4c1d95 60%, #1e1b4b 100%)',
-      cardBg: 'rgba(255, 255, 255, 0.1)',
-      text: '#e9d5ff',
-      textDim: '#a78bfa'
-    }
-  },
-  mint: {
-    id: 'mint',
-    name: 'Fresh Mint',
-    colors: {
-      bgGradient: 'linear-gradient(135deg, #064e3b 0%, #065f46 50%, #022c22 100%)',
-      cardBg: 'rgba(255, 255, 255, 0.08)',
-      text: '#d1fae5',
-      textDim: '#6ee7b7'
-    }
-  },
-  ocean: {
-    id: 'ocean',
-    name: 'Deep Ocean',
-    colors: {
-      bgGradient: 'linear-gradient(135deg, #0c4a6e 0%, #0369a1 50%, #0f172a 100%)',
-      cardBg: 'rgba(255, 255, 255, 0.1)',
-      text: '#e0f2fe',
-      textDim: '#7dd3fc'
-    }
-  },
-  sunset: {
-    id: 'sunset',
-    name: 'Golden Hour',
-    colors: {
-      bgGradient: 'linear-gradient(135deg, #7c2d12 0%, #ea580c 60%, #9a3412 100%)',
-      cardBg: 'rgba(255, 255, 255, 0.1)',
-      text: '#ffedd5',
-      textDim: '#fdba74'
-    }
-  },
-  
-  // Unlockables
-  aurora: {
-    id: 'aurora',
-    name: 'Aurora Dreams (Unlock)',
-    unlockRewardId: 'reward.welcomeTheme',
-    colors: {
-      bgGradient: 'linear-gradient(135deg, #2b5876 0%, #4e4376 100%)',
-      cardBg: 'rgba(255, 255, 255, 0.12)',
-      text: '#ffffff',
-      textDim: 'rgba(224, 231, 255, 0.6)'
+      text: '#fff',
+      textDim: 'rgba(255, 255, 255, 0.5)'
     }
   },
   softRose: {
     id: 'softRose',
-    name: 'Soft Rose (Unlock)',
+    name: 'Soft Rose',
     unlockRewardId: 'love_1_month',
     colors: {
       bgGradient: 'linear-gradient(to bottom right, #be185d, #4c0519)',
@@ -237,7 +175,7 @@ export const THEMES: Record<string, ThemeDef> = {
   },
   midnightLove: {
     id: 'midnightLove',
-    name: 'Midnight Love (Unlock)',
+    name: 'Midnight Love',
     unlockRewardId: 'love_3_month',
     colors: {
       bgGradient: 'linear-gradient(to bottom, #1e1b4b, #312e81)',
@@ -248,7 +186,7 @@ export const THEMES: Record<string, ThemeDef> = {
   },
   pastelSky: {
     id: 'pastelSky',
-    name: 'Pastel Sky (Unlock)',
+    name: 'Pastel Sky',
     unlockRewardId: 'love_6_month',
     colors: {
       bgGradient: 'linear-gradient(to top, #7dd3fc 0%, #e0f2fe 100%)',
@@ -259,7 +197,7 @@ export const THEMES: Record<string, ThemeDef> = {
   },
   eternal: {
     id: 'eternal',
-    name: 'Eternal Gold (Unlock)',
+    name: 'Eternal Gold',
     unlockRewardId: 'love_1_year',
     colors: {
       bgGradient: 'linear-gradient(to bottom right, #713f12, #451a03)',
@@ -284,7 +222,7 @@ export const THEMES: Record<string, ThemeDef> = {
     name: 'Eigene Bilder',
     unlockRewardId: 'custom_theme_unlock',
     colors: {
-      bgGradient: '#000', // Overridden by image
+      bgGradient: '#000', 
       cardBg: 'rgba(255, 255, 255, 0.1)',
       text: '#fff',
       textDim: 'rgba(255, 255, 255, 0.6)'
