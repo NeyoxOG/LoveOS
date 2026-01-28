@@ -1,18 +1,45 @@
 
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Play, Pause, SkipForward, Music } from 'lucide-react';
 
 const MusicPlayer: React.FC = () => {
   const [isPlaying, setIsPlaying] = useState(false);
   const [isExpanded, setIsExpanded] = useState(false);
+  const audioRef = useRef<HTMLAudioElement>(null);
   
-  // Simulated track list
-  const track = { title: "Our Love Song", artist: "Fia & Collin", duration: "3:45" };
+  // Track Info & Source
+  const track = { title: "Walzer", artist: "Provinz", duration: "0:30" };
+  const audioSrc = "https://audio-ssl.itunes.apple.com/itunes-assets/AudioPreview221/v4/02/00/f0/0200f0e0-61fb-9ff6-9dc1-cbff5d9b83cb/mzaf_9238239730011130235.plus.aac.ep.m4a";
+
+  useEffect(() => {
+    const audio = audioRef.current;
+    if (!audio) return;
+
+    const handleEnded = () => setIsPlaying(false);
+    const handlePause = () => setIsPlaying(false);
+    const handlePlay = () => setIsPlaying(true);
+
+    audio.addEventListener('ended', handleEnded);
+    audio.addEventListener('pause', handlePause);
+    audio.addEventListener('play', handlePlay);
+
+    return () => {
+        audio.removeEventListener('ended', handleEnded);
+        audio.removeEventListener('pause', handlePause);
+        audio.removeEventListener('play', handlePlay);
+    };
+  }, []);
 
   const togglePlay = (e: React.MouseEvent) => {
     e.stopPropagation();
-    setIsPlaying(!isPlaying);
+    if (audioRef.current) {
+        if (isPlaying) {
+            audioRef.current.pause();
+        } else {
+            audioRef.current.play().catch(e => console.error("Audio play failed:", e));
+        }
+    }
   };
 
   return (
@@ -28,6 +55,8 @@ const MusicPlayer: React.FC = () => {
       transition={{ type: "spring", stiffness: 300, damping: 25 }}
       className={`fixed top-14 left-1/2 -translate-x-1/2 z-50 bg-black/60 backdrop-blur-xl border border-white/10 shadow-2xl overflow-hidden cursor-pointer ${isExpanded ? 'p-4' : 'p-0'}`}
     >
+      <audio ref={audioRef} src={audioSrc} preload="auto" />
+
       <AnimatePresence mode='wait'>
         {!isExpanded ? (
           <motion.div 
@@ -58,8 +87,17 @@ const MusicPlayer: React.FC = () => {
             className="flex items-center gap-4 h-full"
           >
             {/* Album Art */}
-            <div className="w-20 h-20 bg-gradient-to-br from-indigo-500 to-pink-500 rounded-xl flex items-center justify-center shadow-lg shrink-0">
-                <Music className="w-10 h-10 text-white" />
+            <div className="w-20 h-20 bg-gradient-to-br from-red-500 to-orange-600 rounded-xl flex items-center justify-center shadow-lg shrink-0 overflow-hidden relative">
+                {/* Using a gradient or visual for now, but could be album art */}
+                <div className="absolute inset-0 bg-black/20 z-10" />
+                <Music className="w-10 h-10 text-white relative z-20" />
+                {isPlaying && (
+                    <div className="absolute inset-0 flex items-center justify-center gap-1 z-0 opacity-30">
+                         <motion.div animate={{ height: ['20%', '80%', '20%'] }} transition={{ repeat: Infinity, duration: 1.2 }} className="w-2 bg-white/50" />
+                         <motion.div animate={{ height: ['40%', '100%', '40%'] }} transition={{ repeat: Infinity, duration: 0.9 }} className="w-2 bg-white/50" />
+                         <motion.div animate={{ height: ['30%', '60%', '30%'] }} transition={{ repeat: Infinity, duration: 1.5 }} className="w-2 bg-white/50" />
+                    </div>
+                )}
             </div>
 
             {/* Controls */}
