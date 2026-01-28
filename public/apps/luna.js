@@ -32,7 +32,8 @@ async function loadState() {
     if (!Array.isArray(state.history)) state.history = [];
     
     const today = new Date().toISOString().split('T')[0];
-    if (state.daily && state.daily.dayKey !== today) {
+    if (!state.daily) state.daily = {};
+    if (state.daily.dayKey !== today) {
         if (!state.daily.fedToday) state.stats.love = Math.max(0, state.stats.love - 20);
         state.daily.fedToday = false;
         state.daily.dayKey = today;

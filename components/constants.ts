@@ -167,7 +167,6 @@ export const THEMES: Record<string, ThemeDef> = {
       textDim: 'rgba(255, 255, 255, 0.5)'
     }
   },
-  // --- New Themes added to match Settings ---
   lavender: {
     id: 'lavender',
     name: 'Lavender',
@@ -219,7 +218,6 @@ export const THEMES: Record<string, ThemeDef> = {
       textDim: 'rgba(224, 231, 255, 0.6)'
     }
   },
-  // --- Unlockables ---
   softRose: {
     id: 'softRose',
     name: 'Soft Rose',

@@ -217,7 +217,7 @@ const App: React.FC = () => {
     };
 
     window.FIAOS_APPLY_PREFS = (newPrefs: UserPrefs) => {
-        // Create new object to force React re-render
+        // Force state update
         const updatedPrefs = { ...newPrefs };
         setUserPrefs(updatedPrefs);
         
@@ -227,6 +227,9 @@ const App: React.FC = () => {
         if (session && session.role !== 'guest') {
             cloud.savePrefs(updatedPrefs);
         }
+        
+        // Use timeout to ensure DOM update
+        setTimeout(() => showToast(`Theme "${updatedPrefs.theme}" angewendet!`), 100);
     };
 
     window.FIAOS_PROFILE_UPDATED = (profile: UserProfile) => {
@@ -452,15 +455,13 @@ const App: React.FC = () => {
       );
   }
 
-  const activeThemeId = userPrefs?.theme || 'roseGlass';
-  const activeThemeDef = THEMES[activeThemeId] || THEMES['roseGlass'];
-  
+  // Use CSS variable fallback to ensure robust theme switching
   const bgStyle = customBg 
     ? { backgroundImage: `url(${customBg})`, backgroundSize: 'cover', backgroundPosition: 'center' }
-    : { background: activeThemeDef.colors.bgGradient };
+    : { background: 'var(--bg-gradient, linear-gradient(to bottom right, #2e1065, #000))' };
 
   return (
-    <div className="relative h-full w-full bg-slate-950 overflow-hidden font-sans text-slate-50 selection:bg-indigo-500/30">
+    <div className="relative h-full w-full bg-slate-950 overflow-hidden font-sans text-[var(--text-primary,#fff)] selection:bg-indigo-500/30">
       <div className="absolute inset-0 z-0 transition-colors duration-500" style={bgStyle} />
       {!customBg && <div className="absolute top-[-20%] left-[-20%] w-[80%] h-[80%] bg-indigo-500/20 rounded-full blur-[100px] pointer-events-none opacity-40 mix-blend-screen animate-pulse duration-[10000ms]" style={{ backgroundColor: 'var(--accent)' }} />}
       {!customBg && <div className="absolute inset-0 z-0 pointer-events-none opacity-40 mix-blend-overlay" style={{ backgroundImage: `url("${NOISE_BG}")` }} />}
