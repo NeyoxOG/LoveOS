@@ -15,7 +15,7 @@ const initAudio = () => {
     return ctx;
 };
 
-const playTone = (freq: number, type: OscillatorType, duration: number, vol = 0.1) => {
+const playTone = (freq: number, type: OscillatorType, duration: number, vol = 0.1, delay = 0) => {
     const audioCtx = initAudio();
     if (!audioCtx) return;
 
@@ -25,63 +25,76 @@ const playTone = (freq: number, type: OscillatorType, duration: number, vol = 0.
     }
 
     try {
+        const t = audioCtx.currentTime + delay;
         const osc = audioCtx.createOscillator();
         const gain = audioCtx.createGain();
         
         osc.type = type;
-        osc.frequency.setValueAtTime(freq, audioCtx.currentTime);
+        osc.frequency.setValueAtTime(freq, t);
         
-        gain.gain.setValueAtTime(vol, audioCtx.currentTime);
-        gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + duration);
+        gain.gain.setValueAtTime(0, t);
+        gain.gain.linearRampToValueAtTime(vol, t + 0.05);
+        gain.gain.exponentialRampToValueAtTime(0.001, t + duration);
         
         osc.connect(gain);
         gain.connect(audioCtx.destination);
         
-        osc.start();
-        osc.stop(audioCtx.currentTime + duration);
+        osc.start(t);
+        osc.stop(t + duration);
     } catch (e) {
-        // Ignore sound errors to prevent app crash
+        // Ignore sound errors
     }
 };
 
-export const playSound = (type: 'click' | 'open' | 'close' | 'success' | 'error' | 'hover') => {
+export const playRewardSound = (rarity: 'common' | 'rare' | 'epic') => {
+    switch (rarity) {
+        case 'common':
+            playTone(523.25, 'sine', 0.5, 0.1, 0); // C5
+            playTone(659.25, 'sine', 0.5, 0.1, 0.1); // E5
+            break;
+        case 'rare':
+            playTone(523.25, 'triangle', 0.4, 0.1, 0); // C5
+            playTone(659.25, 'triangle', 0.4, 0.1, 0.1); // E5
+            playTone(783.99, 'triangle', 0.6, 0.1, 0.2); // G5
+            playTone(1046.50, 'sine', 0.8, 0.1, 0.3); // C6
+            break;
+        case 'epic':
+            // Arpeggio
+            [523.25, 659.25, 783.99, 1046.50, 1318.51, 1567.98, 2093.00].forEach((freq, i) => {
+                playTone(freq, 'square', 0.6, 0.05, i * 0.08);
+            });
+            // Bass impact
+            playTone(130.81, 'sawtooth', 1.0, 0.2, 0); 
+            break;
+    }
+};
+
+export const playSound = (type: 'click' | 'open' | 'close' | 'success' | 'error' | 'hover' | 'tap') => {
     try {
         switch (type) {
             case 'click':
                 playTone(600, 'sine', 0.1, 0.05);
                 break;
+            case 'tap':
+                playTone(800, 'triangle', 0.05, 0.03);
+                break;
             case 'hover':
                 playTone(400, 'sine', 0.05, 0.02);
                 break;
             case 'open':
-                // Swoosh up
-                const ac1 = initAudio();
-                if (ac1) {
-                    const osc = ac1.createOscillator();
-                    const gain = ac1.createGain();
-                    osc.frequency.setValueAtTime(200, ac1.currentTime);
-                    osc.frequency.exponentialRampToValueAtTime(600, ac1.currentTime + 0.3);
-                    gain.gain.setValueAtTime(0.1, ac1.currentTime);
-                    gain.gain.linearRampToValueAtTime(0, ac1.currentTime + 0.3);
-                    osc.connect(gain);
-                    gain.connect(ac1.destination);
-                    osc.start();
-                    osc.stop(ac1.currentTime + 0.3);
-                }
+                playTone(400, 'sine', 0.3, 0.1, 0);
+                playTone(600, 'sine', 0.3, 0.1, 0.1);
                 break;
             case 'close':
                 playTone(300, 'sine', 0.15, 0.05);
                 break;
             case 'success':
-                // High chiming
-                setTimeout(() => playTone(800, 'sine', 0.4, 0.1), 0);
-                setTimeout(() => playTone(1200, 'sine', 0.6, 0.1), 100);
+                playRewardSound('common');
                 break;
             case 'error':
                 playTone(150, 'sawtooth', 0.3, 0.1);
+                playTone(140, 'sawtooth', 0.3, 0.1, 0.1);
                 break;
         }
-    } catch(e) {
-        // Fail silently
-    }
+    } catch(e) {}
 };

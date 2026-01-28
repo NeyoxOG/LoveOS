@@ -14,7 +14,7 @@ const DEFAULT_ADMIN_CONFIG: AdminConfig = {
   appVisibility: {
     luna: true, rewards: true, settings: true, valentine: true, 
     vault: true, admin: true, messages: true, achievements: true, 
-    games: true, diary: true, daily: true, love: true, rewards_app: true, story: true
+    games: true, diary: true, daily: true, love: true, rewards_app: true, story: true, bucket: true
   },
   userStatus: {
     "fia": { role: "user", banned: false },
@@ -348,7 +348,7 @@ export const cloud = {
         } catch(e) { console.error("Send Msg Error", e); }
     },
 
-    // --- Vault & Diary ---
+    // --- Vault, Diary & Bucket ---
     async loadVault() {
         if (isGuest()) return JSON.parse(localStorage.getItem('fiaos_guest_vault') || '{"messages":[]}');
         try {
@@ -364,7 +364,6 @@ export const cloud = {
             return;
         }
         try {
-            // Vault saves the whole array, so set() is fine for updating
             await db.collection('couples').doc(COUPLE_ID).collection('apps').doc('vault').set(sanitize(state));
         } catch {}
     },
@@ -387,8 +386,27 @@ export const cloud = {
             return;
         }
         try {
-            // Upsert based on ID
             await db.collection('users').doc(getUid()).collection('diary').doc(entry.id).set(sanitize(entry), { merge: true });
+        } catch {}
+    },
+
+    // Bucket List (Shared)
+    async loadBucket() {
+        if (isGuest()) return JSON.parse(localStorage.getItem('fiaos_guest_bucket') || '{"items":[]}');
+        try {
+            const ref = db.collection('couples').doc(COUPLE_ID).collection('apps').doc('bucket');
+            const snap = await ref.get();
+            return snap.exists ? snap.data() : { items: [] };
+        } catch { return { items: [] }; }
+    },
+
+    async saveBucket(data: any) {
+        if (isGuest()) {
+            localStorage.setItem('fiaos_guest_bucket', JSON.stringify(data));
+            return;
+        }
+        try {
+            await db.collection('couples').doc(COUPLE_ID).collection('apps').doc('bucket').set(sanitize(data));
         } catch {}
     },
 

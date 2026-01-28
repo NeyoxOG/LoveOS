@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect, useCallback } from 'react';
-import { User, Session, AppItem, ToastState, OverlayState, UserRewardsData, UserProfile, UserPrefs, AdminConfig } from './types';
+import { User, Session, AppItem, ToastState, OverlayState, UserRewardsData, UserProfile, UserPrefs, AdminConfig, Reward } from './types';
 import { NOISE_BG, REWARD_CATALOG, THEMES } from './constants';
 import { loadSession, saveSession, clearSession } from './utils/session';
 import { cloud } from './utils/cloud'; 
@@ -22,6 +22,7 @@ import AppWindow from './components/AppWindow';
 import Onboarding from './components/Onboarding';
 import MaintenanceScreen from './components/MaintenanceScreen';
 import MusicPlayer from './components/MusicPlayer';
+import RewardUnlockOverlay from './components/RewardUnlockOverlay';
 
 declare global {
   interface Window {
@@ -53,6 +54,9 @@ const App: React.FC = () => {
   const [isRewardsOpen, setIsRewardsOpen] = useState(false);
   const [rewardsTab, setRewardsTab] = useState('general');
   const [rewardsData, setRewardsData] = useState<UserRewardsData | null>(null);
+  
+  // New State for Reward Overlay
+  const [newlyUnlockedReward, setNewlyUnlockedReward] = useState<Reward | null>(null);
 
   const [openedApp, setOpenedApp] = useState<{id: string, name: string} | null>(null);
 
@@ -78,10 +82,10 @@ const App: React.FC = () => {
       setRewardsData(updatedData);
       await cloud.saveRewards(updatedData);
       
-      const rewardInfo = REWARD_CATALOG.find(r => r.id === rewardId);
-      const rewardTitle = rewardInfo ? rewardInfo.title : "Unbekannter Erfolg";
-      showToast(`Erfolg freigeschaltet: ${rewardTitle} ✨`);
-      playSound('success');
+      const rewardInfo = REWARD_CATALOG.find(r => r.id === rewardId) || { id: rewardId, title: "Geheimer Erfolg", icon: "🏆", description: "Du hast etwas Neues entdeckt!" };
+      
+      // Trigger the fancy overlay instead of just toast
+      setNewlyUnlockedReward(rewardInfo);
     }
   }, [showToast, rewardsData, session]);
 
@@ -404,7 +408,7 @@ const App: React.FC = () => {
     
     if (app.id === 'valentine') { setRewardsTab('valentine'); setIsRewardsOpen(true); }
     else if (app.id === 'achievements') { setIsRewardsOpen(true); } 
-    else if (['luna', 'vault', 'settings', 'admin', 'games', 'diary', 'daily', 'love', 'rewards_app', 'messages', 'story'].includes(app.id)) { 
+    else if (['luna', 'vault', 'settings', 'admin', 'games', 'diary', 'daily', 'love', 'rewards_app', 'messages', 'story', 'bucket'].includes(app.id)) { 
         setOpenedApp({ id: app.id, name: app.name }); 
     } 
     else { showToast("Bald verfügbar ✨"); }
@@ -481,6 +485,7 @@ const App: React.FC = () => {
       <AuthSheet isOpen={isAuthSheetOpen} onClose={closeAuthSheet} user={selectedUser} onLogin={attemptLogin} />
       <AccountSheet isOpen={isAccountSheetOpen} onClose={() => { playSound('close'); setIsAccountSheetOpen(false); }} profile={userProfile} onLogout={handleLogout} onOpenSettings={(sub) => setOpenedApp({ id: 'settings', name: 'Einstellungen' })} />
       <RewardsSheet isOpen={isRewardsOpen} onClose={handleCloseRewards} rewardsData={rewardsData} initialTab={rewardsTab} />
+      <RewardUnlockOverlay reward={newlyUnlockedReward} onClose={() => setNewlyUnlockedReward(null)} />
       <Overlay state={overlay} onClose={() => setOverlay(prev => ({ ...prev, isOpen: false }))} />
       <Toast message={toast.message} onClear={() => setToast({ id: 0, message: '' })} />
     </div>

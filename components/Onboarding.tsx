@@ -1,164 +1,260 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { ChevronRight, Check, Heart, BookOpen, Lock, Sparkles, Star } from 'lucide-react';
+import { ChevronRight, Check, Heart, Power, Sparkles, Fingerprint } from 'lucide-react';
+import { playSound } from '../utils/sound';
 
 interface OnboardingProps {
   onComplete: () => void;
 }
 
-const SLIDES = [
-  {
-    id: 1,
-    title: "Willkommen",
-    subtitle: "bei FiaOS v0.2",
-    description: "Ein Betriebssystem, gebaut für die Liebe. Ein digitaler Raum nur für uns.",
-    icon: <Sparkles className="w-16 h-16 text-yellow-300 drop-shadow-[0_0_20px_rgba(253,224,71,0.6)]" />,
-    gradient: "from-indigo-900 via-purple-900 to-slate-900",
-    particleColor: "bg-indigo-400"
-  },
-  {
-    id: 2,
-    title: "LoveOS",
-    subtitle: "Verbindung spüren",
-    description: "Cloud-Synchronisiert. Was wir hier tun, erleben wir gemeinsam. Egal wo wir sind.",
-    icon: <Heart className="w-16 h-16 text-pink-500 drop-shadow-[0_0_25px_rgba(236,72,153,0.6)] animate-[pulse_2s_infinite]" />,
-    gradient: "from-pink-900 via-rose-900 to-rose-950",
-    particleColor: "bg-pink-400"
-  },
-  {
-    id: 3,
-    title: "Features",
-    subtitle: "Alles an einem Ort",
-    description: "Luna pflegen, Tagebuch schreiben und Erinnerungen im Tresor sichern.",
-    icon: (
-      <div className="flex gap-4">
-        <motion.div animate={{ y: [0, -5, 0] }} transition={{ repeat: Infinity, duration: 2 }} className="bg-white/10 p-3 rounded-2xl border border-white/10"><span className="text-3xl">🐑</span></motion.div>
-        <motion.div animate={{ y: [0, -5, 0] }} transition={{ repeat: Infinity, duration: 2, delay: 0.3 }} className="bg-white/10 p-3 rounded-2xl border border-white/10"><BookOpen className="w-8 h-8 text-amber-300" /></motion.div>
-        <motion.div animate={{ y: [0, -5, 0] }} transition={{ repeat: Infinity, duration: 2, delay: 0.6 }} className="bg-white/10 p-3 rounded-2xl border border-white/10"><Lock className="w-8 h-8 text-emerald-300" /></motion.div>
-      </div>
-    ),
-    gradient: "from-slate-900 via-blue-900 to-indigo-950",
-    particleColor: "bg-blue-400"
-  },
-  {
-    id: 4,
-    title: "Bereit?",
-    subtitle: "Deine Reise beginnt",
-    description: "Sammle Erfolge, entdecke Secrets und gestalte dein FiaOS.",
-    icon: <motion.div animate={{ rotate: [0, 10, -10, 0] }} transition={{ repeat: Infinity, duration: 3 }} className="text-6xl drop-shadow-[0_0_20px_rgba(255,255,255,0.4)]">🚀</motion.div>,
-    gradient: "from-blue-900 via-cyan-900 to-cyan-950",
-    particleColor: "bg-cyan-400"
-  }
-];
-
 const Onboarding: React.FC<OnboardingProps> = ({ onComplete }) => {
-  const [currentSlide, setCurrentSlide] = useState(0);
+  const [step, setStep] = useState(0);
+  const [interactState, setInteractState] = useState(0); // For sub-steps within slides
 
-  const nextSlide = () => {
-    if (currentSlide < SLIDES.length - 1) {
-      setCurrentSlide(curr => curr + 1);
-    } else {
-      onComplete();
+  // Step 0: Welcome - Tap to start
+  const handleStart = () => {
+    playSound('success');
+    setStep(1);
+    setInteractState(0);
+  };
+
+  // Step 1: Connect - Tap 2 dots
+  const handleConnect = (dotId: number) => {
+    if (dotId === 1 && interactState === 0) {
+        setInteractState(1);
+        playSound('tap');
+    }
+    if (dotId === 2 && interactState === 1) {
+        setInteractState(2);
+        playSound('success');
+        setTimeout(() => {
+            setStep(2);
+            setInteractState(0);
+        }, 1000);
     }
   };
 
-  const current = SLIDES[currentSlide];
+  // Step 2: Activate Features - Tap 3 icons
+  const handleFeatureTap = (id: number) => {
+      // Bitmask or simple counter. Let's use simple counter visual
+      if (interactState < 3) {
+          setInteractState(prev => prev + 1);
+          playSound('tap');
+          if (interactState + 1 === 3) {
+              playSound('success');
+              setTimeout(() => {
+                  setStep(3);
+                  setInteractState(0);
+              }, 1000);
+          }
+      }
+  };
+
+  // Step 3: Launch - Hold button
+  const [holdProgress, setHoldProgress] = useState(0);
+  const startHold = () => {
+      const interval = setInterval(() => {
+          setHoldProgress(p => {
+              if (p >= 100) {
+                  clearInterval(interval);
+                  onComplete();
+                  playSound('success');
+                  return 100;
+              }
+              return p + 2; // Speed
+          });
+      }, 16);
+      // @ts-ignore
+      window.holdInterval = interval;
+  };
+  const stopHold = () => {
+      // @ts-ignore
+      clearInterval(window.holdInterval);
+      setHoldProgress(0);
+  };
 
   return (
     <motion.div 
       initial={{ opacity: 0 }} 
       animate={{ opacity: 1 }} 
       exit={{ opacity: 0 }}
-      className="fixed inset-0 z-[200] flex flex-col overflow-hidden bg-black font-sans text-white"
+      className="fixed inset-0 z-[200] flex flex-col overflow-hidden bg-black font-sans text-white select-none"
     >
-      {/* Dynamic Background */}
-      <motion.div
-        key={current.id}
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-        transition={{ duration: 1.5 }}
-        className={`absolute inset-0 bg-gradient-to-br ${current.gradient} opacity-80`}
-      />
-      
-      {/* Animated Particles */}
-      <div className="absolute inset-0 overflow-hidden pointer-events-none">
-         {[...Array(8)].map((_, i) => (
-             <motion.div
-                key={i}
-                initial={{ y: "110vh", x: Math.random() * 100 + "vw", opacity: 0 }}
-                animate={{ y: "-10vh", opacity: [0, 0.5, 0] }}
-                transition={{ duration: 5 + Math.random() * 5, repeat: Infinity, delay: Math.random() * 5 }}
-                className={`absolute w-1 h-1 rounded-full ${current.particleColor}`}
-             />
-         ))}
-      </div>
+      <div className="absolute inset-0 bg-[url('https://grainy-gradients.vercel.app/noise.svg')] opacity-20 brightness-150 pointer-events-none"></div>
 
-      {/* Noise Texture */}
-      <div className="absolute inset-0 opacity-20 pointer-events-none mix-blend-overlay" style={{ backgroundImage: `url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.65' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)' opacity='1'/%3E%3C/svg%3E")` }} />
-
-      {/* Content Area */}
-      <div className="relative flex-1 flex flex-col items-center justify-center p-8 text-center z-10">
-        <AnimatePresence mode='wait'>
-          <motion.div
-            key={current.id}
-            initial={{ opacity: 0, y: 30, scale: 0.9 }}
-            animate={{ opacity: 1, y: 0, scale: 1 }}
-            exit={{ opacity: 0, y: -30, scale: 0.9 }}
-            transition={{ duration: 0.5, ease: "easeOut" }}
-            className="flex flex-col items-center max-w-sm"
-          >
-            {/* Icon Glow */}
-            <div className="mb-12 relative">
-                <div className="absolute inset-0 bg-white/10 blur-[50px] rounded-full scale-150 animate-pulse" />
-                <div className="relative z-10">{current.icon}</div>
-            </div>
-
-            {/* Texts */}
-            <h1 className="text-5xl font-extrabold bg-clip-text text-transparent bg-gradient-to-b from-white to-white/60 mb-3 tracking-tight drop-shadow-sm">
-              {current.title}
-            </h1>
-            <h2 className="text-sm text-indigo-200 font-bold tracking-[0.2em] uppercase mb-8 border-b border-white/20 pb-2">
-              {current.subtitle}
-            </h2>
-            <p className="text-lg text-white/80 leading-relaxed font-normal">
-              {current.description}
-            </p>
-          </motion.div>
-        </AnimatePresence>
-      </div>
-
-      {/* Bottom Navigation */}
-      <div className="relative z-20 px-8 pb-16 pt-4 flex flex-col items-center gap-8">
+      <AnimatePresence mode='wait'>
         
-        {/* Indicators */}
-        <div className="flex gap-3">
-          {SLIDES.map((slide, idx) => (
+        {/* SLIDE 1: WELCOME */}
+        {step === 0 && (
             <motion.div 
-              key={slide.id}
-              animate={{ 
-                  width: idx === currentSlide ? 32 : 8,
-                  backgroundColor: idx === currentSlide ? "#ffffff" : "rgba(255,255,255,0.2)" 
-              }}
-              className="h-1.5 rounded-full" 
-            />
-          ))}
-        </div>
+                key="step0"
+                initial={{ opacity: 0, scale: 0.9 }}
+                animate={{ opacity: 1, scale: 1 }}
+                exit={{ opacity: 0, scale: 1.1, filter: 'blur(10px)' }}
+                className="flex-1 flex flex-col items-center justify-center p-8 text-center relative"
+            >
+                <div className="absolute inset-0 bg-gradient-to-br from-indigo-900 via-black to-black opacity-50 -z-10" />
+                
+                <motion.div 
+                    animate={{ rotate: [0, 5, -5, 0] }} 
+                    transition={{ repeat: Infinity, duration: 6 }}
+                    className="mb-8 relative"
+                >
+                    <div className="absolute inset-0 bg-indigo-500 blur-3xl opacity-30 animate-pulse" />
+                    <Sparkles className="w-20 h-20 text-indigo-300 relative z-10" />
+                </motion.div>
 
-        {/* Action Button */}
-        <motion.button
-          whileTap={{ scale: 0.95 }}
-          whileHover={{ scale: 1.05 }}
-          onClick={nextSlide}
-          className="w-full max-w-xs h-14 bg-white text-black rounded-full font-bold text-lg flex items-center justify-center gap-2 shadow-[0_0_30px_rgba(255,255,255,0.2)] hover:shadow-[0_0_50px_rgba(255,255,255,0.4)] transition-shadow"
-        >
-          {currentSlide === SLIDES.length - 1 ? (
-            <>Loslegen <Check className="w-5 h-5" /></>
-          ) : (
-            <>Weiter <ChevronRight className="w-5 h-5" /></>
-          )}
-        </motion.button>
-      </div>
+                <h1 className="text-5xl font-black mb-4 tracking-tighter">FiaOS</h1>
+                <p className="text-white/60 mb-12 max-w-xs">Dein persönliches Love-System.<br/>Bereit für den Start?</p>
+
+                <motion.button
+                    whileTap={{ scale: 0.9 }}
+                    onClick={handleStart}
+                    className="w-20 h-20 rounded-full bg-white text-black flex items-center justify-center shadow-[0_0_30px_rgba(255,255,255,0.3)] animate-pulse"
+                >
+                    <Power className="w-8 h-8" />
+                </motion.button>
+                <div className="mt-4 text-xs text-white/30 uppercase tracking-widest">Tippen zum Starten</div>
+            </motion.div>
+        )}
+
+        {/* SLIDE 2: CONNECTION */}
+        {step === 1 && (
+            <motion.div 
+                key="step1"
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0, x: -50 }}
+                className="flex-1 flex flex-col items-center justify-center p-8 text-center relative"
+            >
+                <div className="absolute inset-0 bg-gradient-to-br from-pink-900 via-black to-black opacity-50 -z-10" />
+                
+                <h2 className="text-3xl font-bold mb-2">Verbindung</h2>
+                <p className="text-white/50 mb-12 text-sm">Synchronisiere unsere Herzen.</p>
+
+                <div className="relative h-40 w-full flex items-center justify-center">
+                    {/* Line */}
+                    <div className="absolute h-1 bg-white/10 w-40 rounded-full" />
+                    <motion.div 
+                        className="absolute h-1 bg-pink-500 rounded-full"
+                        initial={{ width: 0 }}
+                        animate={{ width: interactState === 2 ? 160 : interactState === 1 ? 80 : 0 }}
+                        style={{ left: '50%', translateX: '-50%' }}
+                    />
+
+                    {/* Dot 1 */}
+                    <motion.button
+                        onClick={() => handleConnect(1)}
+                        className={`absolute left-[calc(50%-80px-20px)] w-10 h-10 rounded-full border-2 flex items-center justify-center transition-all duration-500
+                            ${interactState >= 1 ? 'bg-pink-500 border-pink-500 shadow-[0_0_20px_#ec4899]' : 'bg-black border-white/30'}
+                        `}
+                    >
+                        <Heart className={`w-4 h-4 ${interactState >= 1 ? 'fill-white text-white' : 'text-white/30'}`} />
+                    </motion.button>
+
+                    {/* Dot 2 */}
+                    <motion.button
+                        onClick={() => handleConnect(2)}
+                        disabled={interactState < 1}
+                        className={`absolute right-[calc(50%-80px-20px)] w-10 h-10 rounded-full border-2 flex items-center justify-center transition-all duration-500
+                            ${interactState >= 2 ? 'bg-pink-500 border-pink-500 shadow-[0_0_20px_#ec4899]' : 'bg-black border-white/30'}
+                            ${interactState === 1 ? 'animate-bounce' : ''}
+                        `}
+                    >
+                        <Heart className={`w-4 h-4 ${interactState >= 2 ? 'fill-white text-white' : 'text-white/30'}`} />
+                    </motion.button>
+                </div>
+                
+                <div className="mt-8 text-xs text-white/30 uppercase tracking-widest">
+                    {interactState === 0 ? "Tippe das linke Herz" : interactState === 1 ? "Verbinde mit dem rechten" : "Verbunden!"}
+                </div>
+            </motion.div>
+        )}
+
+        {/* SLIDE 3: FEATURES */}
+        {step === 2 && (
+            <motion.div 
+                key="step2"
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0, x: -50 }}
+                className="flex-1 flex flex-col items-center justify-center p-8 text-center relative"
+            >
+                <div className="absolute inset-0 bg-gradient-to-br from-blue-900 via-black to-black opacity-50 -z-10" />
+                
+                <h2 className="text-3xl font-bold mb-2">Module</h2>
+                <p className="text-white/50 mb-12 text-sm">Aktiviere deine Apps.</p>
+
+                <div className="flex gap-6">
+                    {[0, 1, 2].map((i) => (
+                        <motion.button
+                            key={i}
+                            whileTap={{ scale: 0.9 }}
+                            onClick={() => handleFeatureTap(i)}
+                            className={`w-20 h-24 rounded-2xl border flex flex-col items-center justify-center gap-2 transition-all duration-300
+                                ${interactState > i 
+                                    ? 'bg-blue-500/20 border-blue-400 shadow-[0_0_20px_rgba(59,130,246,0.3)]' 
+                                    : 'bg-white/5 border-white/10 opacity-50'}
+                            `}
+                        >
+                            <div className="text-2xl">{['🐑', '📔', '💌'][i]}</div>
+                            <div className={`w-2 h-2 rounded-full ${interactState > i ? 'bg-blue-400' : 'bg-white/20'}`} />
+                        </motion.button>
+                    ))}
+                </div>
+
+                <div className="mt-12 text-xs text-white/30 uppercase tracking-widest">
+                    {3 - interactState} Module aktivieren
+                </div>
+            </motion.div>
+        )}
+
+        {/* SLIDE 4: LAUNCH */}
+        {step === 3 && (
+            <motion.div 
+                key="step3"
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0, scale: 1.5 }}
+                className="flex-1 flex flex-col items-center justify-center p-8 text-center relative"
+            >
+                <div className="absolute inset-0 bg-gradient-to-br from-emerald-900 via-black to-black opacity-50 -z-10" />
+                
+                <h2 className="text-4xl font-black mb-8 tracking-tighter">Bereit.</h2>
+                
+                <div className="relative">
+                    {/* Ring Background */}
+                    <svg width="120" height="120" className="rotate-[-90deg]">
+                        <circle cx="60" cy="60" r="54" stroke="rgba(255,255,255,0.1)" strokeWidth="4" fill="none" />
+                        <motion.circle 
+                            cx="60" cy="60" r="54" 
+                            stroke="#10b981" strokeWidth="4" fill="none"
+                            strokeDasharray="339.292"
+                            strokeDashoffset={339.292 - (339.292 * holdProgress) / 100}
+                            strokeLinecap="round"
+                        />
+                    </svg>
+                    
+                    {/* Fingerprint Button */}
+                    <button
+                        onMouseDown={startHold}
+                        onMouseUp={stopHold}
+                        onTouchStart={startHold}
+                        onTouchEnd={stopHold}
+                        className="absolute inset-2 rounded-full bg-white/10 flex items-center justify-center active:bg-white/20 transition-colors"
+                    >
+                        <Fingerprint className={`w-10 h-10 ${holdProgress > 0 ? 'text-emerald-400' : 'text-white/50'}`} />
+                    </button>
+                </div>
+
+                <div className="mt-8 text-xs text-white/30 uppercase tracking-widest font-bold">
+                    Halten zum Öffnen
+                </div>
+            </motion.div>
+        )}
+
+      </AnimatePresence>
     </motion.div>
   );
 };
