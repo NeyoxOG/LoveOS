@@ -1,14 +1,15 @@
 
-import { db, auth, firebase } from './firebase';
+import { 
+    client, account, databases, 
+    DB_ID, COL_STATES, COL_DIARY, COL_MESSAGES, COL_GAMES, COL_VAULT,
+    ID, Query 
+} from './appwriteClient';
 import { UserRewardsData, AdminConfig, UserPrefs } from '../types';
 import { USERS } from '../constants';
 
-const AUTH_MAP: Record<string, string> = {
-    'fia': 'fia@fiaos.app', 
-    'collin': 'collin@fiaos.app'
-};
+// --- Types & Constants ---
 
-const COUPLE_ID = 'fia-collin';
+const COUPLE_ID = 'couple';
 
 const DEFAULT_ADMIN_CONFIG: AdminConfig = {
   appVisibility: {
@@ -26,29 +27,7 @@ const DEFAULT_ADMIN_CONFIG: AdminConfig = {
   updatedAt: Date.now()
 };
 
-// --- Helper: Deep Sanitize ---
-const sanitize = (obj: any): any => {
-    if (obj === undefined) return null;
-    if (obj === null) return null;
-    if (typeof obj !== 'object') return obj;
-    if (Array.isArray(obj)) return obj.map(sanitize);
-    
-    const newObj: any = {};
-    for (const key in obj) {
-        const val = obj[key];
-        newObj[key] = (val === undefined) ? null : sanitize(val);
-    }
-    return newObj;
-};
-
-const isGuest = () => {
-    try {
-        const sessionStr = localStorage.getItem('fiaos_session');
-        if (!sessionStr) return true;
-        const session = JSON.parse(sessionStr);
-        return session.role === 'guest';
-    } catch { return true; }
-};
+// --- Helpers ---
 
 const getUid = () => {
     try {
@@ -58,266 +37,304 @@ const getUid = () => {
     } catch { return 'guest'; }
 };
 
+const isGuest = () => {
+    return getUid() === 'guest';
+};
+
+const getCacheKey = (type: string, uid: string) => {
+    return uid === 'guest' ? `fiaos_guest_${type}` : `fiaos_${type}_${uid}`;
+};
+
+// --- Cloud State Management ---
+
+let cloudStatus: 'online' | 'offline' | 'syncing' = 'offline';
+let statusListeners: ((s: string) => void)[] = [];
+
+const setStatus = (s: 'online' | 'offline' | 'syncing') => {
+    cloudStatus = s;
+    statusListeners.forEach(cb => cb(s));
+};
+
+const isNetworkError = (e: any) => {
+    const msg = e?.message || '';
+    return msg === 'Load failed' || msg === 'Network request failed' || msg.includes('offline');
+};
+
+// Helper to wrap DB calls with JSON stringify/parse for payload field
+const docHelper = {
+    async get(collectionId: string, docId: string) {
+        if (isGuest()) return null;
+        try {
+            const doc = await databases.getDocument(DB_ID, collectionId, docId);
+            setStatus('online');
+            return doc;
+        } catch (e) {
+            if (!isNetworkError(e)) console.error(`[Cloud] Get Error ${collectionId}:`, e);
+            setStatus('offline');
+            return null;
+        }
+    },
+    
+    // Specifically for the 'states' collection which uses module + profileKey logic
+    async getState(module: string, profileKey: string) {
+        if (isGuest()) return null;
+        try {
+            const q = [
+                Query.equal('module', module),
+                Query.equal('profileKey', profileKey)
+            ];
+            const res = await databases.listDocuments(DB_ID, COL_STATES, q);
+            if (res.documents.length > 0) {
+                const doc = res.documents[0];
+                setStatus('online');
+                return JSON.parse(doc.payload);
+            }
+            return null;
+        } catch (e) {
+            if (!isNetworkError(e)) console.warn(`[Cloud] GetState Error ${module}:`, e);
+            setStatus('offline');
+            return null;
+        }
+    },
+
+    async setState(module: string, profileKey: string, data: any) {
+        if (isGuest()) return;
+        setStatus('syncing');
+        try {
+            const payload = JSON.stringify(data);
+            const updatedAt = new Date().toISOString();
+
+            // Check if exists (Optimized: we could cache ID to avoid read-before-write, but safety first)
+            const q = [
+                Query.equal('module', module),
+                Query.equal('profileKey', profileKey)
+            ];
+            const res = await databases.listDocuments(DB_ID, COL_STATES, q);
+
+            if (res.documents.length > 0) {
+                // Update
+                await databases.updateDocument(DB_ID, COL_STATES, res.documents[0].$id, {
+                    payload,
+                    updatedAt
+                });
+            } else {
+                // Create
+                await databases.createDocument(DB_ID, COL_STATES, ID.unique(), {
+                    module,
+                    profileKey,
+                    payload,
+                    updatedAt
+                });
+            }
+            setStatus('online');
+        } catch (e) {
+            if (!isNetworkError(e)) console.warn(`[Cloud] SetState Error ${module}:`, e);
+            setStatus('offline');
+        }
+    }
+};
+
 // --- Cloud Adapter API ---
 
 export const cloud = {
     
-    // --- Auth ---
+    getMode() {
+        return isGuest() ? 'local' : 'cloud';
+    },
+
+    onStatusChange(cb: (s: string) => void) {
+        statusListeners.push(cb);
+        cb(cloudStatus);
+        return () => {
+            statusListeners = statusListeners.filter(l => l !== cb);
+        };
+    },
+
+    // --- Auth Strategy ---
     async silentLogin(userId: string, password: string): Promise<boolean> {
         if (userId === 'guest') return true; 
-        const email = AUTH_MAP[userId];
-        if (!email) return false;
+        
+        const userConfig = USERS.find(u => u.id === userId);
+        if (!userConfig || userConfig.password !== password) return false;
 
         try {
-            await auth.signInWithEmailAndPassword(email, password);
-            return true;
-        } catch (e: any) {
-            if (e.code === 'auth/invalid-credential' || e.code === 'auth/user-not-found') {
-                try {
-                    await auth.createUserWithEmailAndPassword(email, password);
-                    await db.collection('users').doc(userId).set(sanitize({
-                        userId: userId,
-                        role: userId === 'collin' ? 'admin' : 'user',
-                        displayName: userId.charAt(0).toUpperCase() + userId.slice(1),
-                        createdAt: firebase.firestore.FieldValue.serverTimestamp()
-                    }));
-                    return true;
-                } catch (createErr: any) {
-                    console.error(`[Cloud] Auto-create failed:`, createErr.code);
-                }
+            try {
+                await account.get();
+                setStatus('online');
+            } catch {
+                await account.createAnonymousSession();
+                setStatus('online');
             }
-            return false;
+            return true;
+        } catch (e) {
+            // Suppress network errors during login to allow offline access
+            if (!isNetworkError(e)) console.error("[Cloud] Auth failed", e);
+            setStatus('offline');
+            return true; 
         }
     },
 
     async restoreConnection() {
-        if (auth.currentUser) return; 
         if (isGuest()) return;
-        const uid = getUid();
-        const userConfig = USERS.find(u => u.id === uid);
-        if (userConfig && userConfig.password) {
-            await this.silentLogin(uid, userConfig.password);
+        try {
+            await account.get();
+            setStatus('online');
+        } catch {
+            try {
+                await account.createAnonymousSession();
+                setStatus('online');
+            } catch {
+                setStatus('offline');
+            }
         }
     },
 
-    // --- Admin Inspector ---
-    async adminGetData(targetUid: string, type: string): Promise<any> {
-        try {
-            let path = '';
-            if (type === 'daily_state') path = `users/${targetUid}/data/daily_state`;
-            if (!path) return null;
-
-            const snap = await db.doc(path).get();
-            return snap.exists ? snap.data() : null;
-        } catch(e) { return null; }
-    },
-
-    async adminSetData(targetUid: string, type: string, data: any) {
-        try {
-            let path = '';
-            if (type === 'daily_state') path = `users/${targetUid}/data/daily_state`;
-            
-            if (path) {
-                await db.doc(path).set(sanitize(data), { merge: true });
-                return true;
-            }
-            return false;
-        } catch(e) { return false; }
-    },
-
-    // --- Admin Actions ---
+    // --- Admin / Config ---
     
-    async adminResetUser(targetUid: string) {
-        try {
-            await db.doc(`users/${targetUid}/data/rewards`).delete();
-            await db.doc(`users/${targetUid}/data/prefs`).delete();
-            await db.doc(`users/${targetUid}/data/daily_state`).delete();
-            
-            const diarySnap = await db.collection('users').doc(targetUid).collection('diary').get();
-            const batch = db.batch();
-            diarySnap.docs.forEach(doc => batch.delete(doc.ref));
-            await batch.commit();
+    async loadAdminConfig(): Promise<AdminConfig | null> {
+        const cacheKey = 'fiaos_global_admin_config';
+        // Always try to return cache first if offline, or fall back to it
+        let config: AdminConfig | null = null;
 
-            await db.collection('users').doc(targetUid).update({ 
-                onboardingCompleted: false,
-                avatar: { type: 'emoji', value: targetUid.charAt(0).toUpperCase() } 
+        if (!isGuest()) {
+            config = await docHelper.getState('admin_config', 'system');
+        }
+
+        if (config) {
+            localStorage.setItem(cacheKey, JSON.stringify(config));
+            return config;
+        }
+
+        // Fallback
+        return JSON.parse(localStorage.getItem(cacheKey) || JSON.stringify(DEFAULT_ADMIN_CONFIG));
+    },
+
+    async saveAdminConfig(config: AdminConfig) {
+        localStorage.setItem('fiaos_global_admin_config', JSON.stringify(config));
+        await docHelper.setState('admin_config', 'system', config);
+    },
+
+    listenToAdminConfig(callback: (config: AdminConfig) => void) {
+        // Initial Local Load
+        const local = localStorage.getItem('fiaos_global_admin_config');
+        callback(local ? JSON.parse(local) : DEFAULT_ADMIN_CONFIG);
+
+        if (isGuest()) return () => {};
+
+        // Fetch Fresh
+        this.loadAdminConfig().then(cfg => {
+            if (cfg) callback(cfg);
+        });
+
+        try {
+            const unsub = client.subscribe(`databases.${DB_ID}.collections.${COL_STATES}.documents`, response => {
+                if (response.events.includes('databases.*.collections.*.documents.*.update') || 
+                    response.events.includes('databases.*.collections.*.documents.*.create')) {
+                    
+                    const payload = (response.payload as any);
+                    if (payload.module === 'admin_config' && payload.profileKey === 'system') {
+                        const data = JSON.parse(payload.payload);
+                        callback(data);
+                        localStorage.setItem('fiaos_global_admin_config', JSON.stringify(data));
+                    }
+                }
             });
-            
-            return true;
-        } catch (e) { 
-            console.error("Reset failed", e);
-            return false; 
+            return unsub;
+        } catch (e) {
+            return () => {};
         }
     },
 
     async adminForceLogout(targetUid: string) {
-        // Since we monitor AdminConfig in App.tsx, simply saving the config
-        // (which usually happens alongside a ban toggle) is enough.
-        // We can force a timestamp update to trigger listeners.
+        const config = await this.loadAdminConfig() || DEFAULT_ADMIN_CONFIG;
+        config.updatedAt = Date.now();
+        await this.saveAdminConfig(config);
+        return true;
+    },
+
+    async adminResetUser(targetUid: string) {
         try {
-            const config = await this.loadAdminConfig() || DEFAULT_ADMIN_CONFIG;
-            config.updatedAt = Date.now();
-            await this.saveAdminConfig(config);
+            await docHelper.setState('rewards', targetUid, null);
+            await docHelper.setState('prefs', targetUid, null);
+            await docHelper.setState('daily', targetUid, null);
             return true;
-        } catch(e) { return false; }
+        } catch { return false; }
     },
 
-    // --- Config (Real-time) ---
-    listenToAdminConfig(callback: (config: AdminConfig) => void) {
-        if (isGuest()) {
-            // Guest uses local storage config simulation
-            const local = localStorage.getItem('fiaos_global_admin_config');
-            callback(local ? JSON.parse(local) : DEFAULT_ADMIN_CONFIG);
-            return () => {};
-        }
-        try {
-            return db.collection('globals').doc('system_config').onSnapshot(snap => {
-                if (snap.exists) {
-                    callback(snap.data() as AdminConfig);
-                } else {
-                    // Initialize if missing
-                    db.collection('globals').doc('system_config').set(sanitize(DEFAULT_ADMIN_CONFIG));
-                    callback(DEFAULT_ADMIN_CONFIG);
-                }
-            }, (error) => {
-                console.error("Admin Config Listener Error:", error);
-            });
-        } catch (e) { 
-            console.error("Config Listen Setup Error", e);
-            return () => {}; 
-        }
+    async adminGetData(targetUid: string, type: string) {
+        let module = type;
+        if (type === 'daily_state') module = 'daily';
+        return await docHelper.getState(module, targetUid);
     },
 
-    async loadAdminConfig(): Promise<AdminConfig | null> {
-        if (isGuest()) return JSON.parse(localStorage.getItem('fiaos_global_admin_config') || JSON.stringify(DEFAULT_ADMIN_CONFIG));
-        try {
-            const ref = db.collection('globals').doc('system_config');
-            const snap = await ref.get();
-            if (snap.exists) return snap.data() as AdminConfig;
-            return DEFAULT_ADMIN_CONFIG;
-        } catch (e) { return null; }
+    async adminSetData(targetUid: string, type: string, data: any) {
+        let module = type;
+        if (type === 'daily_state') module = 'daily';
+        await docHelper.setState(module, targetUid, data);
     },
 
-    async saveAdminConfig(config: AdminConfig) {
-        if (isGuest()) {
-            localStorage.setItem('fiaos_global_admin_config', JSON.stringify(config));
-            return;
-        }
-        try {
-            const ref = db.collection('globals').doc('system_config');
-            await ref.set(sanitize(config), { merge: true });
-        } catch (e) {
-            console.error("Save Admin Config Error", e);
-        }
-    },
-
-    // --- Rewards ---
+    // --- Rewards (Offline First) ---
+    
     async loadRewards(targetUid?: string): Promise<UserRewardsData | null> {
         const uid = targetUid || getUid();
+        const cacheKey = uid === 'guest' ? 'fiaos_rewards_guest' : `fiaos_rewards_${uid}`; // Legacy key match for seamless transition
         
-        if (uid === 'guest') {
-            const stored = localStorage.getItem(`fiaos_rewards_guest`);
-            return stored ? JSON.parse(stored) : null;
+        let data = null;
+        if (!isGuest()) {
+            data = await docHelper.getState('rewards', uid);
         }
-        
-        try {
-            const ref = db.doc(`users/${uid}/data/rewards`);
-            const snap = await ref.get();
-            return snap.exists ? snap.data() as UserRewardsData : null;
-        } catch (e) { 
-            console.error("Load Rewards Error", e);
-            return null; 
+
+        if (data) {
+            localStorage.setItem(cacheKey, JSON.stringify(data));
+            return data;
         }
+
+        return JSON.parse(localStorage.getItem(cacheKey) || 'null');
     },
 
     async saveRewards(data: UserRewardsData, targetUid?: string) {
         const uid = targetUid || getUid();
+        const cacheKey = uid === 'guest' ? 'fiaos_rewards_guest' : `fiaos_rewards_${uid}`;
         
-        if (uid === 'guest') {
-            localStorage.setItem(`fiaos_rewards_guest`, JSON.stringify(data));
-            return;
-        }
-        
-        try {
-            const ref = db.doc(`users/${uid}/data/rewards`);
-            await ref.set(sanitize(data), { merge: true });
-        } catch (e) {
-            console.error("Save Rewards Error", e);
-        }
+        localStorage.setItem(cacheKey, JSON.stringify(data));
+        await docHelper.setState('rewards', uid, data);
     },
 
-    // --- Prefs ---
+    // --- Prefs (Offline First) ---
+
     async loadPrefs(): Promise<UserPrefs | null> {
-        if (isGuest()) return null; 
-        try {
-            const ref = db.doc(`users/${getUid()}/data/prefs`);
-            const snap = await ref.get();
-            return snap.exists ? snap.data() as UserPrefs : null;
-        } catch { return null; }
+        const uid = getUid();
+        const cacheKey = getCacheKey('prefs', uid); // fiaos_prefs_fia
+        // NOTE: data.ts uses specific legacy keys like `fiaos_user_${uid}_prefs`
+        // We will stick to the pattern used in data.ts for compatibility if we want seamless.
+        // Actually data.ts uses: `fiaos_user_${userId}_prefs`
+        
+        const legacyKey = `fiaos_user_${uid}_prefs`;
+
+        let data = null;
+        if (!isGuest()) {
+            data = await docHelper.getState('prefs', uid);
+        }
+
+        if (data) {
+            localStorage.setItem(legacyKey, JSON.stringify(data));
+            return data;
+        }
+        return JSON.parse(localStorage.getItem(legacyKey) || 'null');
     },
 
     async savePrefs(data: UserPrefs) {
-        if (isGuest()) return;
-        try {
-            const ref = db.doc(`users/${getUid()}/data/prefs`);
-            await ref.set(sanitize(data), { merge: true });
-        } catch (e) {}
-    },
-
-    // --- Daily ---
-    async loadDailyState(targetUid?: string) {
-        const uid = targetUid || getUid();
-        if (uid === 'guest') return JSON.parse(localStorage.getItem('fiaos_guest_daily_state') || 'null');
-        try {
-            const ref = db.doc(`users/${uid}/data/daily_state`);
-            const snap = await ref.get();
-            return snap.exists ? snap.data() : null;
-        } catch { return null; }
-    },
-
-    async saveDailyState(data: any, targetUid?: string) {
-        const uid = targetUid || getUid();
-        if (uid === 'guest') {
-            localStorage.setItem('fiaos_guest_daily_state', JSON.stringify(data));
-            return;
-        }
-        try {
-            const ref = db.doc(`users/${uid}/data/daily_state`);
-            await ref.set(sanitize(data), { merge: true });
-        } catch (e) {}
-    },
-
-    async getDailyShared(dateIso: string): Promise<string[]> {
-        if (isGuest()) return [];
-        try {
-            const ref = db.collection('couples').doc(COUPLE_ID).collection('daily').doc(dateIso);
-            const snap = await ref.get();
-            return snap.exists ? (snap.data().claims || []) : [];
-        } catch { return []; }
-    },
-
-    async addDailyClaim(dateIso: string, userId: string) {
-        if (isGuest()) return;
-        try {
-            const ref = db.collection('couples').doc(COUPLE_ID).collection('daily').doc(dateIso);
-            const snap = await ref.get();
-            let claims: string[] = snap.exists ? (snap.data().claims || []) : [];
-            if (!claims.includes(userId)) {
-                claims.push(userId);
-                await ref.set({ claims }, { merge: true });
-            }
-        } catch {}
+        const uid = getUid();
+        const legacyKey = `fiaos_user_${uid}_prefs`;
+        localStorage.setItem(legacyKey, JSON.stringify(data));
+        await docHelper.setState('prefs', uid, data);
     },
 
     // --- Luna ---
+
     async loadLuna() {
         if (isGuest()) return JSON.parse(localStorage.getItem('fiaos_guest_luna_state') || 'null');
-        try {
-            const ref = db.collection('couples').doc(COUPLE_ID).collection('apps').doc('luna');
-            const snap = await ref.get();
-            if (snap.exists) return snap.data();
-            return null; 
-        } catch { return null; }
+        return await docHelper.getState('luna', COUPLE_ID);
     },
 
     async updateLuna(patch: any) {
@@ -326,100 +343,212 @@ export const cloud = {
             localStorage.setItem('fiaos_guest_luna_state', JSON.stringify({ ...cur, ...patch }));
             return;
         }
+        const current = await this.loadLuna() || {};
+        const updated = { ...current, ...patch };
+        await docHelper.setState('luna', COUPLE_ID, updated);
+    },
+
+    // --- Diary ---
+
+    async loadDiary() {
+        const localKey = isGuest() ? 'fiaos_guest_diary' : 'fiaos_cached_diary';
+        let items = [];
+
+        if (!isGuest()) {
+            try {
+                const res = await databases.listDocuments(DB_ID, COL_DIARY, [
+                    Query.orderDesc('createdAt'),
+                    Query.limit(100)
+                ]);
+                items = res.documents.map(d => ({
+                    id: d.$id,
+                    userId: d.userId,
+                    title: d.title,
+                    text: d.text,
+                    mood: d.mood,
+                    createdAt: d.createdAt,
+                    ...JSON.parse(d.payload || '{}')
+                }));
+                // Update Cache
+                localStorage.setItem(localKey, JSON.stringify(items));
+                setStatus('online');
+                return items;
+            } catch (e) {
+                if (!isNetworkError(e)) console.error("Diary Load Error", e);
+                setStatus('offline');
+            }
+        }
+
+        return JSON.parse(localStorage.getItem(localKey) || '[]');
+    },
+
+    async saveDiaryEntry(entry: any) {
+        const localKey = isGuest() ? 'fiaos_guest_diary' : 'fiaos_cached_diary';
+        
+        // Update Local Cache Immediately
+        const local = JSON.parse(localStorage.getItem(localKey) || '[]');
+        const idx = local.findIndex((e:any) => e.id === entry.id);
+        if (idx >= 0) local[idx] = entry; else local.unshift(entry);
+        localStorage.setItem(localKey, JSON.stringify(local));
+
+        if (isGuest()) return;
+
         try {
-            const ref = db.collection('couples').doc(COUPLE_ID).collection('apps').doc('luna');
-            await ref.set(sanitize(patch), { merge: true });
-        } catch {}
+            const payload = JSON.stringify({
+                authorName: entry.authorName,
+                scope: entry.scope
+            });
+
+            try {
+                await databases.getDocument(DB_ID, COL_DIARY, entry.id);
+                await databases.updateDocument(DB_ID, COL_DIARY, entry.id, {
+                    title: entry.title,
+                    text: entry.text,
+                    mood: entry.mood,
+                    payload
+                });
+            } catch {
+                await databases.createDocument(DB_ID, COL_DIARY, entry.id, {
+                    userId: getUid(),
+                    title: entry.title,
+                    text: entry.text,
+                    mood: entry.mood,
+                    createdAt: entry.createdAt,
+                    payload
+                });
+            }
+            setStatus('online');
+        } catch (e) {
+            if (!isNetworkError(e)) console.error("Diary Save Error", e);
+            setStatus('offline');
+        }
     },
 
     // --- Messages ---
-    listenToMessages(callback: (msgs: any[]) => void) {
-        if (isGuest()) {
-            const local = JSON.parse(localStorage.getItem('fiaos_guest_messages') || '[]');
-            callback(local);
-            return () => {}; 
-        }
-        try {
-            const q = db.collection('couples').doc(COUPLE_ID).collection('messages')
-                        .orderBy('createdAt', 'desc')
-                        .limit(50);
 
-            return q.onSnapshot((snapshot) => {
-                const msgs = snapshot.docs.map(d => ({ id: d.id, ...d.data() }));
-                callback(msgs.reverse());
+    listenToMessages(callback: (msgs: any[]) => void) {
+        const localKey = isGuest() ? 'fiaos_guest_messages' : 'fiaos_cached_messages';
+        
+        // Initial Local
+        const cached = localStorage.getItem(localKey);
+        if (cached) callback(JSON.parse(cached));
+
+        if (isGuest()) return () => {};
+
+        // Fetch
+        databases.listDocuments(DB_ID, COL_MESSAGES, [
+            Query.orderDesc('createdAt'),
+            Query.limit(50)
+        ]).then(res => {
+            const msgs = res.documents.map(d => ({
+                id: d.$id,
+                text: d.text,
+                senderId: d.senderId,
+                createdAt: d.createdAt
+            })).reverse();
+            localStorage.setItem(localKey, JSON.stringify(msgs));
+            callback(msgs);
+        }).catch(() => {
+            // ignore network error, rely on cache
+        });
+
+        try {
+            const unsub = client.subscribe(`databases.${DB_ID}.collections.${COL_MESSAGES}.documents`, res => {
+                if (res.events.includes('databases.*.collections.*.documents.*.create')) {
+                    // Refetch to sync
+                    databases.listDocuments(DB_ID, COL_MESSAGES, [
+                        Query.orderDesc('createdAt'),
+                        Query.limit(50)
+                    ]).then(r => {
+                        const msgs = r.documents.map(d => ({
+                            id: d.$id,
+                            text: d.text,
+                            senderId: d.senderId,
+                            createdAt: d.createdAt
+                        })).reverse();
+                        localStorage.setItem(localKey, JSON.stringify(msgs));
+                        callback(msgs);
+                    });
+                }
             });
-        } catch (e) { console.error("Msg Listen Error", e); return () => {}; }
+            return unsub;
+        } catch (e) {
+            return () => {};
+        }
     },
 
     async sendMessage(text: string) {
-        const msg = {
-            text,
-            senderId: getUid(),
-            senderName: JSON.parse(localStorage.getItem('fiaos_session') || '{}').name || 'Unknown',
-            createdAt: firebase.firestore.FieldValue.serverTimestamp()
-        };
-
+        // Optimistic local update not easily possible without breaking callback flow, 
+        // relying on fetch/subscribe cycle for now.
         if (isGuest()) {
             const local = JSON.parse(localStorage.getItem('fiaos_guest_messages') || '[]');
-            local.push({ ...msg, createdAt: Date.now() });
+            local.push({ text, senderId: 'guest', createdAt: Date.now() });
             localStorage.setItem('fiaos_guest_messages', JSON.stringify(local));
             return;
         }
 
         try {
-            await db.collection('couples').doc(COUPLE_ID).collection('messages').add(sanitize(msg));
-        } catch(e) { console.error("Send Msg Error", e); }
+            await databases.createDocument(DB_ID, COL_MESSAGES, ID.unique(), {
+                senderId: getUid(),
+                text,
+                createdAt: Date.now()
+            });
+        } catch(e) { console.error("Send Error", e); }
     },
 
-    // --- Vault, Diary & Bucket ---
+    // --- Vault ---
+
     async loadVault() {
         if (isGuest()) return JSON.parse(localStorage.getItem('fiaos_guest_vault') || '{"messages":[]}');
         try {
-            const ref = db.collection('couples').doc(COUPLE_ID).collection('apps').doc('vault');
-            const snap = await ref.get();
-            return snap.exists ? snap.data() : { messages: [] };
+            const res = await databases.listDocuments(DB_ID, COL_VAULT, [Query.limit(100)]);
+            const messages = res.documents.map(d => ({
+                id: d.$id,
+                title: d.title,
+                body: d.body,
+                lock: { type: d.lockType, unlockAt: d.unlockAt },
+                openedAt: d.openedAt,
+                createdAt: d.createdAt
+            }));
+            return { messages };
         } catch { return { messages: [] }; }
     },
-    
+
     async saveVault(state: any) {
         if (isGuest()) {
             localStorage.setItem('fiaos_guest_vault', JSON.stringify(state));
             return;
         }
-        try {
-            await db.collection('couples').doc(COUPLE_ID).collection('apps').doc('vault').set(sanitize(state));
-        } catch {}
-    },
-    
-    async loadDiary() {
-        if (isGuest()) return JSON.parse(localStorage.getItem('fiaos_guest_diary') || '[]');
-        try {
-            const q = db.collection('users').doc(getUid()).collection('diary').orderBy('createdAt', 'desc');
-            const snap = await q.get();
-            return snap.docs.map(d => ({ id: d.id, ...d.data() }));
-        } catch { return []; }
-    },
-    
-    async saveDiaryEntry(entry: any) {
-        if (isGuest()) {
-            const local = JSON.parse(localStorage.getItem('fiaos_guest_diary') || '[]');
-            const idx = local.findIndex((e:any) => e.id === entry.id);
-            if (idx >= 0) local[idx] = entry; else local.push(entry);
-            localStorage.setItem('fiaos_guest_diary', JSON.stringify(local));
-            return;
+        if (!state.messages) return;
+        for (const msg of state.messages) {
+            try {
+                await databases.updateDocument(DB_ID, COL_VAULT, msg.id, {
+                    title: msg.title,
+                    body: msg.body,
+                    lockType: msg.lock.type,
+                    unlockAt: msg.lock.unlockAt || 0,
+                    openedAt: msg.openedAt || 0
+                });
+            } catch {
+                try {
+                    await databases.createDocument(DB_ID, COL_VAULT, msg.id, {
+                        title: msg.title,
+                        body: msg.body,
+                        lockType: msg.lock.type,
+                        unlockAt: msg.lock.unlockAt || 0,
+                        openedAt: msg.openedAt || 0,
+                        createdAt: msg.createdAt || Date.now()
+                    });
+                } catch (e) {}
+            }
         }
-        try {
-            await db.collection('users').doc(getUid()).collection('diary').doc(entry.id).set(sanitize(entry), { merge: true });
-        } catch {}
     },
 
+    // --- Bucket / Goals ---
+    
     async loadBucket() {
         if (isGuest()) return JSON.parse(localStorage.getItem('fiaos_guest_bucket') || '{"items":[]}');
-        try {
-            const ref = db.collection('couples').doc(COUPLE_ID).collection('apps').doc('bucket');
-            const snap = await ref.get();
-            return snap.exists ? snap.data() : { items: [] };
-        } catch { return { items: [] }; }
+        return await docHelper.getState('bucket', COUPLE_ID);
     },
 
     async saveBucket(data: any) {
@@ -427,46 +556,123 @@ export const cloud = {
             localStorage.setItem('fiaos_guest_bucket', JSON.stringify(data));
             return;
         }
-        try {
-            await db.collection('couples').doc(COUPLE_ID).collection('apps').doc('bucket').set(sanitize(data));
-        } catch {}
+        await docHelper.setState('bucket', COUPLE_ID, data);
     },
 
-    // --- Games & Profile ---
-    async saveHighscore(gameId: string, score: number, extra: any = {}) {
-        if (isGuest()) return;
-        try {
-            const sessionName = JSON.parse(localStorage.getItem('fiaos_session') || '{}').name;
-            await db.collection('leaderboards').doc(gameId).collection('scores').doc(getUid()).set(sanitize({
-                score, ...extra, updatedAt: firebase.firestore.FieldValue.serverTimestamp(), uid: getUid(), displayName: sessionName
-            }), { merge: true });
-        } catch {}
+    // --- Daily (Offline First) ---
+
+    async loadDailyState(targetUid?: string) {
+        const uid = targetUid || getUid();
+        const legacyKey = `fiaos_user_${uid}_daily_state`; // as in daily.js
+
+        let data = null;
+        if (!isGuest()) {
+            data = await docHelper.getState('daily', uid);
+        }
+
+        if (data) {
+            localStorage.setItem(legacyKey, JSON.stringify(data));
+            return data;
+        }
+        return JSON.parse(localStorage.getItem(legacyKey) || 'null');
     },
-    
+
+    async saveDailyState(data: any, targetUid?: string) {
+        const uid = targetUid || getUid();
+        const legacyKey = `fiaos_user_${uid}_daily_state`;
+        
+        localStorage.setItem(legacyKey, JSON.stringify(data));
+        await docHelper.setState('daily', uid, data);
+    },
+
+    async getDailyShared(dateIso: string): Promise<string[]> {
+        if (isGuest()) return [];
+        const data: any = await docHelper.getState('daily_shared', dateIso);
+        return data ? data.claims : [];
+    },
+
+    async addDailyClaim(dateIso: string, userId: string) {
+        if (isGuest()) return;
+        const data: any = await docHelper.getState('daily_shared', dateIso) || { claims: [] };
+        if (!data.claims.includes(userId)) {
+            data.claims.push(userId);
+            await docHelper.setState('daily_shared', dateIso, data);
+        }
+    },
+
+    // --- Games ---
+
+    async saveHighscore(gameId: string, score: number) {
+        if (isGuest()) return;
+        const uid = getUid();
+        const session = JSON.parse(localStorage.getItem('fiaos_session') || '{}');
+        
+        try {
+            const q = [
+                Query.equal('gameId', gameId),
+                Query.equal('userId', uid)
+            ];
+            const res = await databases.listDocuments(DB_ID, COL_GAMES, q);
+            
+            if (res.documents.length > 0) {
+                const doc = res.documents[0];
+                if (doc.score < score) {
+                    await databases.updateDocument(DB_ID, COL_GAMES, doc.$id, {
+                        score,
+                        updatedAt: Date.now()
+                    });
+                }
+            } else {
+                await databases.createDocument(DB_ID, COL_GAMES, ID.unique(), {
+                    gameId,
+                    userId: uid,
+                    score,
+                    displayName: session.name || 'User',
+                    updatedAt: Date.now()
+                });
+            }
+        } catch (e) { console.error("Score Save Error", e); }
+    },
+
     async getLeaderboard(gameId: string) {
         if (isGuest()) return [];
         try {
-            const q = db.collection('leaderboards').doc(gameId).collection('scores').orderBy('score', 'desc').limit(10);
-            const snap = await q.get();
-            return snap.docs.map(d => d.data());
+            const res = await databases.listDocuments(DB_ID, COL_GAMES, [
+                Query.equal('gameId', gameId),
+                Query.orderDesc('score'),
+                Query.limit(10)
+            ]);
+            return res.documents.map(d => ({
+                userId: d.userId,
+                name: d.displayName,
+                score: d.score,
+                date: d.updatedAt
+            }));
         } catch { return []; }
     },
     
+    // --- Profile ---
     async loadProfile() {
-        if (isGuest()) return null;
-        try {
-            const snap = await db.collection('users').doc(getUid()).get();
-            return snap.exists ? snap.data() : null;
-        } catch { return null; }
+        const uid = getUid();
+        const legacyKey = `fiaos_user_${uid}_profile`;
+        
+        let data = null;
+        if (!isGuest()) {
+            data = await docHelper.getState('profile', uid);
+        }
+        
+        if (data) {
+            localStorage.setItem(legacyKey, JSON.stringify(data));
+            return data;
+        }
+        return JSON.parse(localStorage.getItem(legacyKey) || 'null');
     },
     
     async saveProfile(data: any) {
-        if (isGuest()) {
-            const uid = getUid(); 
-            const key = uid === 'guest' ? 'fiaos_guest_guest_profile' : `fiaos_user_${uid}_profile`;
-            localStorage.setItem(key, JSON.stringify(data));
-            return;
-        }
-        try { await db.collection('users').doc(getUid()).set(sanitize(data), { merge: true }); } catch {}
+        const uid = getUid();
+        const legacyKey = `fiaos_user_${uid}_profile`;
+        
+        localStorage.setItem(legacyKey, JSON.stringify(data));
+        await docHelper.setState('profile', uid, data);
     }
 };
