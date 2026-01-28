@@ -230,6 +230,9 @@ const RewardsSheet: React.FC<RewardsSheetProps> = ({ isOpen, onClose, rewardsDat
                   
                   const isTheme = reward.type === 'theme_unlock';
                   const themeDef = isTheme && reward.payload?.themeId ? THEMES[reward.payload.themeId] : null;
+                  
+                  // Valentine redeemed style override: If unlocked, treat as redeemed/completed visual
+                  const isRedeemedStyle = activeTab === 'valentine' && isUnlocked;
 
                   return (
                     <motion.div
@@ -241,10 +244,10 @@ const RewardsSheet: React.FC<RewardsSheetProps> = ({ isOpen, onClose, rewardsDat
                         relative flex items-center gap-4 p-4 rounded-2xl border transition-all duration-300 overflow-hidden
                         ${isUnlocked 
                           ? activeTab === 'valentine'
-                            ? 'bg-gradient-to-br from-pink-500/10 to-purple-500/10 border-pink-500/30'
+                            ? 'bg-gradient-to-br from-pink-950/50 to-purple-950/50 border-pink-500/30'
                             : activeTab === 'love'
-                                ? 'bg-gradient-to-br from-rose-500/10 to-pink-500/10 border-rose-500/30'
-                                : 'bg-gradient-to-br from-indigo-500/10 to-purple-500/10 border-indigo-500/30' 
+                                ? 'bg-gradient-to-br from-rose-950/50 to-pink-950/50 border-rose-500/30'
+                                : 'bg-gradient-to-br from-indigo-950/50 to-purple-950/50 border-indigo-500/30' 
                           : 'bg-white/5 border-white/5 grayscale opacity-60'}
                       `}
                     >
@@ -261,7 +264,7 @@ const RewardsSheet: React.FC<RewardsSheetProps> = ({ isOpen, onClose, rewardsDat
                         w-12 h-12 rounded-xl flex items-center justify-center text-2xl shadow-inner shrink-0 relative z-10
                         ${isUnlocked 
                           ? activeTab === 'valentine'
-                            ? 'bg-gradient-to-tr from-pink-500 to-purple-600' 
+                            ? 'bg-gradient-to-tr from-pink-500 to-purple-600 shadow-[0_0_15px_rgba(236,72,153,0.3)]' 
                             : activeTab === 'love'
                                 ? 'bg-gradient-to-tr from-rose-500 to-pink-600'
                                 : 'bg-gradient-to-tr from-indigo-500 to-purple-600'
@@ -277,7 +280,7 @@ const RewardsSheet: React.FC<RewardsSheetProps> = ({ isOpen, onClose, rewardsDat
                           {isTheme && isUnlocked && <Palette className="w-3 h-3 text-white/50" />}
                         </h3>
                         <p className="text-xs text-white/40 leading-relaxed truncate">
-                          {reward.description}
+                          {isRedeemedStyle ? "Eingelöst ✔" : reward.description}
                         </p>
                       </div>
 

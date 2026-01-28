@@ -14,6 +14,8 @@ let user = null;
 let vaultState = null;
 let cloud = null;
 let activeFilter = 'all';
+let currentReadingMsg = null;
+let editingMsgId = null;
 
 function init() {
     const sessionStr = localStorage.getItem(KEYS.SESSION);
@@ -160,15 +162,10 @@ function handleCardClick(msg) {
         }
     } else if (msg.lock && msg.lock.type === 'reward') {
         // Simple bridge check would be better, but local storage fallback for now
-        const rKey = user.role === 'guest' ? 'fiaos_rewards_guest' : `fiaos_rewards_${user.id}`; // Note: rewards are usually user bound, but we check current user
-        // Actually for vault, unlocking depends on the viewer.
+        const rKey = user.role === 'guest' ? 'fiaos_rewards_guest' : `fiaos_rewards_${user.id}`; 
+        
         let unlocked = false;
         try {
-            // Try to get rewards via parent frame bridge if possible, otherwise crude local check
-            // In a real scenario, we'd use cloud.loadRewards()
-            // Let's optimistic check via cloud for correct behavior
-            // But sync might be slow for click handler.
-            // Simplified:
             const rData = JSON.parse(localStorage.getItem(rKey) || '{}');
             unlocked = rData.rewards?.[msg.lock.rewardId]?.unlocked || rData.valentine?.unlocked?.[msg.lock.rewardId];
         } catch(e){}
@@ -194,6 +191,34 @@ function saveMessage() {
     
     if (!title || !body) return;
 
+    if (editingMsgId) {
+        // Update existing
+        const msg = vaultState.messages.find(m => m.id === editingMsgId);
+        if (msg) {
+            msg.title = title;
+            msg.body = body;
+            msg.lock.type = lockType;
+            // Update lock details if type changed or same
+            if (lockType === 'time') {
+                const val = document.getElementById('inpTime').value;
+                if (val) msg.lock.unlockAt = new Date(val).getTime();
+            } else if (lockType === 'reward') {
+                msg.lock.rewardId = document.getElementById('inpRewardId').value;
+            }
+            saveState();
+            renderList();
+            
+            // If currently reading, update reader
+            if (currentReadingMsg && currentReadingMsg.id === editingMsgId) {
+                openReader(msg);
+            }
+        }
+        document.getElementById('composer').classList.remove('active');
+        editingMsgId = null;
+        return;
+    }
+
+    // New Message
     const newMsg = {
         id: 'msg_' + Date.now(),
         title, body,
@@ -229,17 +254,61 @@ function saveMessage() {
 }
 
 function openReader(msg) {
+    currentReadingMsg = msg;
     document.getElementById('readerTitle').innerText = msg.title;
     document.getElementById('readerBody').innerText = msg.body;
     document.getElementById('readerDate').innerText = new Date(msg.createdAt).toLocaleString();
+    
+    // Show Edit button if I am author
+    const editBtn = document.getElementById('readerEdit');
+    if (msg.author.id === user.id) {
+        editBtn.classList.remove('hidden');
+    } else {
+        editBtn.classList.add('hidden');
+    }
+
     document.getElementById('reader').classList.add('active');
 }
 
+window.editCurrent = () => {
+    if (!currentReadingMsg) return;
+    
+    document.getElementById('reader').classList.remove('active');
+    
+    // Open Composer in Edit Mode
+    editingMsgId = currentReadingMsg.id;
+    document.getElementById('inpTitle').value = currentReadingMsg.title;
+    document.getElementById('inpBody').value = currentReadingMsg.body;
+    document.getElementById('inpLockType').value = currentReadingMsg.lock.type;
+    
+    // Trigger change event to show correct inputs
+    const evt = new Event('change');
+    document.getElementById('inpLockType').dispatchEvent(evt);
+    
+    if (currentReadingMsg.lock.type === 'time' && currentReadingMsg.lock.unlockAt) {
+        // Convert ts to datetime-local string (roughly)
+        const date = new Date(currentReadingMsg.lock.unlockAt);
+        // ISO string is UTC, adjust for local? Simply using slice for now, might be off by TZ
+        // Better:
+        const offset = date.getTimezoneOffset() * 60000;
+        const localISOTime = (new Date(date - offset)).toISOString().slice(0, 16);
+        document.getElementById('inpTime').value = localISOTime;
+    } else if (currentReadingMsg.lock.type === 'reward') {
+        document.getElementById('inpRewardId').value = currentReadingMsg.lock.rewardId;
+    }
+    
+    document.getElementById('composer').classList.add('active');
+};
+
 function bindEvents() {
     document.getElementById('btnAdd').onclick = () => {
+        editingMsgId = null;
         document.getElementById('composer').classList.add('active');
         document.getElementById('inpTitle').value = '';
         document.getElementById('inpBody').value = '';
+        document.getElementById('inpLockType').value = 'none';
+        document.getElementById('groupTime').classList.add('hidden');
+        document.getElementById('groupReward').classList.add('hidden');
         
         const sel = document.getElementById('inpRewardId');
         sel.innerHTML = REWARDS_LIST.map(r => `<option value="${r.id}">${r.name}</option>`).join('');

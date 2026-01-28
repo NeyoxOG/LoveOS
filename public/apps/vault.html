@@ -154,6 +154,14 @@
         }
         .paper-close:active { background: rgba(0,0,0,0.1); }
 
+        .paper-edit {
+            position: absolute; top: 15px; right: 55px; width: 32px; height: 32px;
+            background: rgba(0,0,0,0.05); border-radius: 50%; color: #881337;
+            display: flex; justify-content: center; align-items: center; cursor: pointer;
+            z-index: 20; font-size: 16px; transition: background 0.2s;
+        }
+        .paper-edit:active { background: rgba(0,0,0,0.1); }
+
         .paper-title { font-family: 'Georgia', serif; font-size: 28px; color: #831843; margin-bottom: 20px; font-weight: 700; z-index: 10; }
         .paper-body { font-family: 'Georgia', serif; font-size: 18px; line-height: 1.8; color: #374151; flex: 1; overflow-y: auto; white-space: pre-wrap; z-index: 10; }
         .paper-date { text-align: right; font-size: 13px; color: #9ca3af; font-style: italic; margin-top: 20px; z-index: 10; }
@@ -190,7 +198,7 @@
         }
         .status-dot { width: 6px; height: 6px; border-radius: 50%; background: #32d74b; }
         .status-dot.offline { background: #ff453a; }
-        .status-dot.loading { background: #ff9f0a; }
+        .status-dot.loading { background: #ff9f0a; animation: pulse 1s infinite; }
 
         .empty-state { text-align: center; margin-top: 80px; color: var(--text-dim); font-size: 15px; }
         .hidden { display: none; }
@@ -230,6 +238,7 @@
         <div class="paper-sheet" id="paperSheet">
             <div class="paper-texture"></div>
             <div class="paper-close" id="readerClose">✕</div>
+            <div class="paper-edit hidden" id="readerEdit" onclick="editCurrent()">✎</div>
             <div class="paper-title" id="readerTitle">Titel</div>
             <div class="paper-body" id="readerBody">...</div>
             <div class="paper-date" id="readerDate">--</div>

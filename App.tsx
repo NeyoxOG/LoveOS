@@ -80,14 +80,16 @@ const App: React.FC = () => {
       if (event instanceof ErrorEvent) msg = event.message;
       else if (event instanceof PromiseRejectionEvent) msg = String(event.reason);
 
+      // Ignore common resize observer loops
+      if (msg.includes('ResizeObserver') || msg.includes('Script error')) return;
+
       console.group('%c[FiaOS Auto-Detect] Critical Error', 'color: red; font-weight: bold; background: #ffe4e6; padding: 4px;');
       console.error(msg);
       console.log('Session:', session);
       console.groupEnd();
 
-      if (!msg.includes('ResizeObserver') && !msg.includes('Script error')) {
-          showToast(`System Fehler: Check Console ⚠️`);
-      }
+      // Only show toast for relevant errors
+      // showToast(`System Fehler: Check Console ⚠️`);
     };
 
     window.addEventListener('error', handleError);
@@ -119,6 +121,11 @@ const App: React.FC = () => {
         const storedSession = loadSession();
         
         if (!storedSession) {
+            // Need to verify maintenance mode from cloud even if no session
+            try {
+                const remoteConfig = await cloud.loadAdminConfig();
+                if (remoteConfig) setAdminConfig(remoteConfig);
+            } catch(e) {}
             setIsVerifying(false);
             return;
         }
@@ -167,9 +174,6 @@ const App: React.FC = () => {
 
                 // Profile check for Forced Logout
                 if (profile) {
-                    // Check force logout timestamp vs login time (simplified)
-                    // In real app, check timestamps. For now, we trust the session is valid unless flag set.
-                    // If onboarding was reset remotely:
                     setUserProfile(profile as UserProfile);
                     if (!profile.onboardingCompleted) setShowOnboarding(true);
                 } else {
@@ -229,27 +233,23 @@ const App: React.FC = () => {
       }
   };
 
-  // --- PERIODIC CHECKS (Ban & Logout) ---
+  // --- PERIODIC CHECKS (Ban & Logout & Maintenance) ---
   useEffect(() => {
-    if (!session || session.role === 'guest') return;
-
     const checkStatus = async () => {
         const remoteConfig = await cloud.loadAdminConfig();
         if (remoteConfig) {
             setAdminConfig(remoteConfig);
-            if (remoteConfig.userStatus[session.userId]?.banned) {
+            
+            if (session && remoteConfig.userStatus[session.userId]?.banned) {
                 handleLogout();
                 showToast("Zugriff entzogen: Account gesperrt. 🔒");
                 return;
             }
         }
         
-        // Check user profile for forced logout
-        const profile = await cloud.loadProfile() as any;
-        if (profile && profile.forceLogoutAt) {
-            // If forced logout time is newer than login time... 
-            // Simplified: If session.lastLoginAt < forceLogoutAt
-            if (session.lastLoginAt < profile.forceLogoutAt) {
+        if (session && session.role !== 'guest') {
+            const profile = await cloud.loadProfile() as any;
+            if (profile && profile.forceLogoutAt && session.lastLoginAt < profile.forceLogoutAt) {
                 handleLogout();
                 showToast("Sitzung wurde fern-beendet. 🔌");
             }
@@ -488,21 +488,24 @@ const App: React.FC = () => {
       );
   }
 
-  // Check Maintenance Mode
-  const isMaintenance = adminConfig?.maintenanceMode && !maintenanceBypass && session?.role !== 'admin' && session?.role !== 'developer';
+  // --- MAINTENANCE CHECK ---
+  // Ensure Maintenance Screen blocks access unless Admin or Bypassed
+  const isMaintenance = adminConfig?.maintenanceMode;
+  const isAdmin = session?.role === 'admin' || session?.role === 'developer';
   
-  if (isMaintenance) {
+  if (isMaintenance && !isAdmin && !maintenanceBypass) {
       return <MaintenanceScreen onBypass={() => setMaintenanceBypass(true)} />;
   }
 
   // Calculate Background Style
+  // Fix: Use CSS Variable for Theme Background if no custom image
   const bgStyle = customBg 
     ? { backgroundImage: `url(${customBg})`, backgroundSize: 'cover', backgroundPosition: 'center' }
-    : { background: 'var(--bg-primary, linear-gradient(to bottom right, #0f1016, #08080a))' };
+    : { background: 'var(--bg-gradient, linear-gradient(to bottom right, #0f1016, #08080a))' };
 
   return (
     <div className="relative h-full w-full bg-slate-950 overflow-hidden font-sans text-slate-50 selection:bg-indigo-500/30">
-      <div className="absolute inset-0 bg-gradient-to-br from-[#0f1016] via-[#161622] to-[#08080a] z-0 transition-colors duration-500" style={bgStyle} />
+      <div className="absolute inset-0 z-0 transition-colors duration-500" style={bgStyle} />
       {!customBg && <div className="absolute top-[-20%] left-[-20%] w-[80%] h-[80%] bg-indigo-500/20 rounded-full blur-[100px] pointer-events-none opacity-40 mix-blend-screen animate-pulse duration-[10000ms]" style={{ backgroundColor: 'var(--accent)' }} />}
       {!customBg && <div className="absolute inset-0 z-0 pointer-events-none opacity-40 mix-blend-overlay" style={{ backgroundImage: `url("${NOISE_BG}")` }} />}
 
