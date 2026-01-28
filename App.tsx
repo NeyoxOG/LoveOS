@@ -21,6 +21,7 @@ import RewardsSheet from './components/RewardsSheet';
 import AppWindow from './components/AppWindow';
 import Onboarding from './components/Onboarding';
 import MaintenanceScreen from './components/MaintenanceScreen';
+import MusicPlayer from './components/MusicPlayer';
 
 declare global {
   interface Window {
@@ -452,6 +453,9 @@ const App: React.FC = () => {
           <>
             {showOnboarding && <Onboarding onComplete={handleOnboardingComplete} />}
             
+            {/* Global Music Player Widget */}
+            <MusicPlayer />
+
             <HomeScreen 
                 session={session} 
                 onLogout={handleLogout}
