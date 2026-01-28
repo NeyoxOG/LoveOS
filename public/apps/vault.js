@@ -21,6 +21,10 @@ function init() {
 
     if (window.parent.FIAOS && window.parent.FIAOS.cloud) {
         cloud = window.parent.FIAOS.cloud;
+    } else {
+        console.error("Cloud unavailable in Vault");
+        document.querySelector('.empty-state').innerText = "Verbindungsfehler ⚠️";
+        return;
     }
 
     loadState();
@@ -29,12 +33,19 @@ function init() {
 }
 
 async function loadState() {
-    const data = await cloud.loadVault();
-    vaultState = data || { messages: [] };
-    renderList();
+    try {
+        const data = await cloud.loadVault();
+        vaultState = data && data.messages ? data : { messages: [] };
+        renderList();
+    } catch (e) {
+        console.error("Vault Load Error", e);
+        vaultState = { messages: [] };
+        renderList();
+    }
 }
 
 async function saveState() {
+    if (!vaultState) return;
     await cloud.saveVault(vaultState);
 }
 
@@ -42,7 +53,12 @@ function renderList() {
     const container = document.getElementById('msgList');
     container.innerHTML = '';
 
-    const list = (vaultState.messages || []).filter(m => {
+    if (!vaultState || !vaultState.messages) {
+        container.innerHTML = '<div class="empty-state">Ladefehler...</div>';
+        return;
+    }
+
+    const list = vaultState.messages.filter(m => {
         if (activeFilter === 'all') return true;
         if (activeFilter === 'locked') return !m.openedAt;
         if (activeFilter === 'opened') return !!m.openedAt;
@@ -63,20 +79,37 @@ function renderList() {
 
         let lockBadge = '';
         if (!isOpened) {
-            if (msg.lock.type === 'time') {
+            if (msg.lock && msg.lock.type === 'time') {
                 const diff = msg.lock.unlockAt - Date.now();
                 if (diff > 0) lockBadge = `<div class="lock-badge time-lock" data-ts="${msg.lock.unlockAt}">⏳ ...</div>`;
                 else lockBadge = `<div class="lock-badge" style="color:#4ade80">🔓 Jetzt bereit</div>`;
-            } else if (msg.lock.type === 'reward') {
+            } else if (msg.lock && msg.lock.type === 'reward') {
                 lockBadge = `<div class="lock-badge">🏆 Reward Lock</div>`;
             }
         }
 
+        const authorName = msg.author?.name || 'Unbekannt';
+        const authorAvatar = msg.author?.avatar?.value || authorName.charAt(0);
+        const sealColor = msg.style?.sealColor || '#ec4899';
+        const lockIcon = (msg.lock && msg.lock.type !== 'none') ? '🔐' : '💌';
+
         el.innerHTML = `
-            ${!isOpened ? `<div class="envelope-flap"></div><div class="envelope-bg"><div class="seal" style="background:${msg.style?.sealColor || '#ec4899'}">${msg.lock.type === 'none' ? '💌' : '🔐'}</div></div>` : ''}
+            ${!isOpened ? `<div class="envelope-flap"></div><div class="envelope-bg"><div class="seal" style="background:${sealColor}">${lockIcon}</div></div>` : ''}
             <div class="msg-content">
-                <div><div class="msg-header"><div class="msg-title">${msg.title}</div>${msg.isPinned ? '📌' : ''}</div><div class="msg-preview">${isOpened ? msg.body.substring(0, 60) + '...' : 'Inhalt verschlossen'}</div></div>
-                <div class="msg-meta"><div class="author-badge"><div class="author-avatar">${msg.author.avatar || msg.author.name.charAt(0)}</div><span>${msg.author.name}</span></div>${lockBadge || `<span>${new Date(msg.createdAt).toLocaleDateString()}</span>`}</div>
+                <div>
+                    <div class="msg-header">
+                        <div class="msg-title">${msg.title || 'Nachricht'}</div>
+                        ${msg.isPinned ? '📌' : ''}
+                    </div>
+                    <div class="msg-preview">${isOpened ? (msg.body || '').substring(0, 60) + '...' : 'Inhalt verschlossen'}</div>
+                </div>
+                <div class="msg-meta">
+                    <div class="author-badge">
+                        <div class="author-avatar">${authorAvatar}</div>
+                        <span>${authorName}</span>
+                    </div>
+                    ${lockBadge || `<span>${new Date(msg.createdAt).toLocaleDateString()}</span>`}
+                </div>
             </div>
         `;
         container.appendChild(el);
@@ -87,13 +120,18 @@ function renderList() {
 function handleCardClick(msg) {
     if (msg.openedAt) { openReader(msg); return; }
     
-    if (msg.lock.type === 'time') {
+    if (msg.lock && msg.lock.type === 'time') {
         if (Date.now() < msg.lock.unlockAt) { alert("Noch verschlossen! Geduld. ⏳"); return; }
-    } else if (msg.lock.type === 'reward') {
-        // Simple check against local for now, strictly should check cloud rewards
+    } else if (msg.lock && msg.lock.type === 'reward') {
+        // Fallback: Check local rewards. In prod, better to check cloud rewards via bridge or direct.
         const rKey = `fiaos_rewards_${user.id}`;
-        const rData = JSON.parse(localStorage.getItem(rKey) || '{}');
-        if (!rData.rewards?.[msg.lock.rewardId]?.unlocked) { alert("Erfolg fehlt noch!"); return; }
+        let unlocked = false;
+        try {
+            const rData = JSON.parse(localStorage.getItem(rKey) || '{}');
+            unlocked = rData.rewards?.[msg.lock.rewardId]?.unlocked;
+        } catch(e){}
+        
+        if (!unlocked) { alert("Erfolg fehlt noch!"); return; }
     }
 
     msg.openedAt = Date.now();
@@ -109,20 +147,29 @@ function saveMessage() {
     
     if (!title || !body) return;
 
+    // Construct Clean Object (Null instead of undefined)
     const newMsg = {
         id: 'msg_' + Date.now(),
         title, body,
-        author: { id: user.id, name: user.name, avatar: user.avatar },
+        author: { 
+            id: user.id, 
+            name: user.name, 
+            avatar: user.avatar || { type: 'emoji', value: user.name.charAt(0) } 
+        },
         createdAt: Date.now(),
-        lock: { type: lockType },
+        lock: { type: lockType, unlockAt: null, rewardId: null },
         openedAt: null,
         isPinned: false,
         style: { sealColor: '#ec4899', paper: 'classic' }
     };
 
     if (lockType === 'time') {
-        const ts = new Date(document.getElementById('inpTime').value).getTime();
-        newMsg.lock.unlockAt = ts;
+        const val = document.getElementById('inpTime').value;
+        if (val) {
+            newMsg.lock.unlockAt = new Date(val).getTime();
+        } else {
+            newMsg.lock.type = 'none'; // Fallback
+        }
     } else if (lockType === 'reward') {
         newMsg.lock.rewardId = document.getElementById('inpRewardId').value;
     }
@@ -160,7 +207,9 @@ function bindEvents() {
 window.filterList = (type, idx) => { activeFilter = type; document.getElementById('segIndicator').style.transform = `translateX(${idx * 100}%)`; renderList(); };
 function updateTimers() {
     document.querySelectorAll('.time-lock').forEach(el => {
-        const diff = parseInt(el.getAttribute('data-ts')) - Date.now();
+        const ts = parseInt(el.getAttribute('data-ts'));
+        if (!ts) return;
+        const diff = ts - Date.now();
         if (diff <= 0) { el.innerText = "🔓 Jetzt bereit"; el.style.color = "#4ade80"; }
     });
 }

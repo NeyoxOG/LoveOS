@@ -1,6 +1,6 @@
 
 /**
- * Daily App Logic
+ * Daily App Logic (Cloud Enhanced)
  */
 
 const KEYS = {
@@ -12,7 +12,8 @@ const KEYS = {
 
 let user = null;
 let state = null;
-let offer = null; // Today's pending offer
+let offer = null;
+let cloud = null;
 
 // Simple Seeded Random
 const seededRandom = (seed) => {
@@ -31,23 +32,24 @@ function init() {
     if (!sessionStr) return;
     user = JSON.parse(sessionStr);
 
+    if (window.parent.FIAOS && window.parent.FIAOS.cloud) {
+        cloud = window.parent.FIAOS.cloud;
+    }
+
     initDevTools();
-    loadData();
-    renderUI();
+    loadData(); // This now triggers renderUI after data is ready
 }
 
 function initDevTools() {
     const devTools = document.getElementById('devTools');
     const isAdmin = user.role === 'admin' || user.role === 'developer';
-    
-    // Always visible, but buttons disabled if not admin
     devTools.querySelectorAll('button').forEach(btn => {
         btn.disabled = !isAdmin;
     });
 }
 
-function loadData() {
-    // 1. Get State
+async function loadData() {
+    // 1. Get Local State (User Specific)
     const stateKey = `${KEYS.DAILY_STATE}${user.id}_daily_state`;
     const rawState = localStorage.getItem(stateKey);
     const todayISO = new Date().toISOString().split('T')[0];
@@ -72,30 +74,34 @@ function loadData() {
         state.todaySeed = expectedSeed;
         state.openedToday = false;
         
-        // Streak Check Logic on new day open (before claim)
+        // Streak Logic
         if (state.lastClaimDateISO) {
             const lastDate = new Date(state.lastClaimDateISO);
             const today = new Date(todayISO);
             const diffTime = Math.abs(today.getTime() - lastDate.getTime());
             const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
             
-            // If missed yesterday (diff > 1), reset streak
             if (diffDays > 1) {
                 state.streak = 0;
             }
         } else {
             state.streak = 0;
         }
-        
         localStorage.setItem(stateKey, JSON.stringify(state));
     }
 
     offer = getLocalDailyOffer(state.todaySeed);
+    
+    // Render basic UI immediately
+    renderUI();
+    
+    // Async check for couple bonus via Cloud
+    if (cloud && user.role !== 'guest') {
+        checkCoupleBonus(todayISO);
+    }
 }
 
 function renderUI() {
-    const todayISO = new Date().toISOString().split('T')[0];
-
     // 1. Today Card
     if (state.openedToday) {
         setCardState('claimed');
@@ -105,19 +111,17 @@ function renderUI() {
 
     // 2. Streak
     const row = document.getElementById('streakRow');
-    // Keep the fire icon
     const fire = row.querySelector('.streak-fire');
     row.innerHTML = '';
     row.appendChild(fire);
     
-    const displayStreak = state.streak % 7; // Cycle of 7
+    const displayStreak = state.streak % 7; 
     for (let i = 0; i < 7; i++) {
         const d = document.createElement('div');
         d.className = `streak-dot ${i < displayStreak ? 'active' : ''}`;
         row.appendChild(d);
     }
     
-    // Add number if high streak
     if (state.streak > 0) {
         const num = document.createElement('span');
         num.style.fontSize = '12px';
@@ -127,13 +131,7 @@ function renderUI() {
         row.appendChild(num);
     }
 
-    // 3. Couple Bonus Check
-    checkCoupleBonus(todayISO);
-
-    // 4. Inbox
     renderInbox();
-
-    // 5. History
     renderHistory();
 }
 
@@ -147,7 +145,7 @@ function setCardState(status) {
     if (status === 'claimed') {
         title.innerText = "Abgeholt ✅";
         sub.innerText = "Komm morgen wieder!";
-        icon.innerText = offer.icon; // Show what was claimed
+        icon.innerText = offer.icon;
         btn.innerText = "Erledigt";
         btn.classList.add('disabled');
         card.style.boxShadow = "none";
@@ -158,7 +156,6 @@ function setCardState(status) {
         btn.innerText = "Heute abholen";
         btn.classList.remove('disabled');
         
-        // Rarity hint
         const rarity = offer.rarity;
         if (rarity === 'epic') card.style.boxShadow = "0 0 30px rgba(168, 85, 247, 0.4)";
         else if (rarity === 'rare') card.style.boxShadow = "0 0 20px rgba(59, 130, 246, 0.3)";
@@ -166,21 +163,19 @@ function setCardState(status) {
     }
 }
 
-function checkCoupleBonus(todayISO) {
-    if (user.role === 'guest') return;
-
-    const sharedKey = `fiaos_shared_daily_couple_${todayISO}`;
-    const claims = JSON.parse(localStorage.getItem(sharedKey) || '[]');
+async function checkCoupleBonus(todayISO) {
+    if (!cloud) return;
     
-    // If both 'fia' and 'collin' are in claims
+    const claims = await cloud.getDailyShared(todayISO);
+    
     const bonusActive = claims.includes('fia') && claims.includes('collin');
     const badge = document.getElementById('coupleBonus');
     
     if (bonusActive) {
         badge.classList.add('active');
+        badge.style.background = 'linear-gradient(90deg, #ec4899, #8b5cf6)';
         badge.innerText = "Couple Bonus aktiv 💗";
     } else if (claims.length > 0 && !claims.includes(user.id)) {
-        // Partner has claimed, waiting for you
         badge.classList.add('active');
         badge.style.background = 'rgba(255,255,255,0.1)';
         badge.innerText = "Partner wartet auf dich... ⏳";
@@ -248,29 +243,26 @@ window.doClaim = () => {
 
     // Start Animation
     card.classList.add('claiming');
-    icon.innerText = offer.icon; // Reveal icon early for animation
+    icon.innerText = offer.icon;
     btn.classList.add('disabled');
     btn.innerText = "Öffnen...";
 
-    // Delay for effect
-    setTimeout(() => {
-        processClaim();
+    setTimeout(async () => {
+        await processClaim();
         
-        // Cleanup Animation classes after modal shows
         setTimeout(() => {
             card.classList.remove('claiming');
             fireConfetti();
             showModal(offer);
-            renderUI(); // Update UI to claimed state
+            renderUI();
         }, 600);
         
     }, 800);
 };
 
-function processClaim() {
+async function processClaim() {
     const todayISO = new Date().toISOString().split('T')[0];
     
-    // Update Streak Logic
     if (state.lastClaimDateISO) {
         const lastDate = new Date(state.lastClaimDateISO);
         const today = new Date(todayISO);
@@ -278,7 +270,7 @@ function processClaim() {
         const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
         
         if (diffDays === 1) state.streak++;
-        else if (diffDays > 1) state.streak = 1; // Reset if missed
+        else if (diffDays > 1) state.streak = 1;
     } else {
         state.streak = 1;
     }
@@ -289,7 +281,6 @@ function processClaim() {
     
     localStorage.setItem(`${KEYS.DAILY_STATE}${user.id}_daily_state`, JSON.stringify(state));
 
-    // Add History
     const histKey = `${KEYS.DAILY_HISTORY}${user.id}_daily_history`;
     let history = JSON.parse(localStorage.getItem(histKey) || '[]');
     history.unshift({
@@ -303,26 +294,19 @@ function processClaim() {
     });
     localStorage.setItem(histKey, JSON.stringify(history));
 
-    // Bridge Calls
     executePayload(offer);
 
     // Couple Bonus Update
-    if (user.role !== 'guest') {
-        const sharedKey = `fiaos_shared_daily_couple_${todayISO}`;
-        let claims = JSON.parse(localStorage.getItem(sharedKey) || '[]');
-        if (!claims.includes(user.id)) {
-            claims.push(user.id);
-            localStorage.setItem(sharedKey, JSON.stringify(claims));
-        }
+    if (cloud && user.role !== 'guest') {
+        await cloud.addDailyClaim(todayISO, user.id);
+        const claims = await cloud.getDailyShared(todayISO);
         
         if (claims.includes('fia') && claims.includes('collin')) {
-             // Bonus Triggered!
              addInboxItem({
                 type: 'reward', title: 'Couple Bonus 💞', body: 'Ihr habt beide gesammelt!', icon: '💞'
              });
-             // Also unlock streak bonus if not already
              if (window.parent.FIAOS) {
-                 window.parent.FIAOS.bridgeUnlockReward({ rewardId: 'reward.streak3' }); // Small extra
+                 window.parent.FIAOS.bridgeUnlockReward({ rewardId: 'reward.streak3' });
              }
         }
     }
@@ -342,7 +326,6 @@ function executePayload(offer) {
         bridge.bridgeUnlockApp({ appId: offer.payload.appId });
     }
     
-    // Milestones
     if (state.totalClaims === 1) bridge.bridgeUnlockReward({ rewardId: 'daily.first' });
     if (state.totalClaims === 10) bridge.bridgeUnlockReward({ rewardId: 'daily.total10' });
     if (state.streak === 3) bridge.bridgeUnlockReward({ rewardId: 'daily.streak3' });
@@ -394,7 +377,7 @@ function fireConfetti() {
     setTimeout(() => { container.innerHTML = ''; }, 4000);
 }
 
-// --- Local Offer Pool (Copy of constants) ---
+// --- Local Offer Pool ---
 function getLocalDailyOffer(seed) {
     const rand = seededRandom(seed);
     const offers = [
@@ -416,26 +399,8 @@ function getLocalDailyOffer(seed) {
 }
 
 // --- Dev ---
-window.devReset = () => {
-    localStorage.removeItem(`${KEYS.DAILY_STATE}${user.id}_daily_state`);
-    location.reload();
-};
-
-window.devStreakReset = () => {
-    const k = `${KEYS.DAILY_STATE}${user.id}_daily_state`;
-    const s = JSON.parse(localStorage.getItem(k));
-    s.streak = 0;
-    localStorage.setItem(k, JSON.stringify(s));
-    location.reload();
-};
-
-window.devReroll = () => {
-    const k = `${KEYS.DAILY_STATE}${user.id}_daily_state`;
-    const s = JSON.parse(localStorage.getItem(k));
-    s.todaySeed = Math.random().toString();
-    s.openedToday = false;
-    localStorage.setItem(k, JSON.stringify(s));
-    location.reload();
-};
+window.devReset = () => { localStorage.removeItem(`${KEYS.DAILY_STATE}${user.id}_daily_state`); location.reload(); };
+window.devStreakReset = () => { const k = `${KEYS.DAILY_STATE}${user.id}_daily_state`; const s = JSON.parse(localStorage.getItem(k)); s.streak = 0; localStorage.setItem(k, JSON.stringify(s)); location.reload(); };
+window.devReroll = () => { const k = `${KEYS.DAILY_STATE}${user.id}_daily_state`; const s = JSON.parse(localStorage.getItem(k)); s.todaySeed = Math.random().toString(); s.openedToday = false; localStorage.setItem(k, JSON.stringify(s)); location.reload(); };
 
 init();

@@ -1,6 +1,6 @@
 
 import { db, auth } from './firebase';
-import { doc, getDoc, setDoc, updateDoc, collection, getDocs, query, orderBy, limit, serverTimestamp } from 'firebase/firestore';
+import { doc, getDoc, setDoc, updateDoc, collection, getDocs, query, orderBy, limit, serverTimestamp, onSnapshot } from 'firebase/firestore';
 import { signInWithEmailAndPassword, createUserWithEmailAndPassword } from 'firebase/auth';
 import { UserRewardsData, AdminConfig } from '../types';
 import { USERS } from '../constants';
@@ -30,10 +30,28 @@ const DEFAULT_ADMIN_CONFIG: AdminConfig = {
   updatedAt: Date.now()
 };
 
-// Helper: Remove undefined values which Firestore hates
+// Helper: Deep Sanitize to remove undefined (Firestore rejects undefined)
 const sanitize = (obj: any): any => {
     if (obj === undefined) return null;
-    return JSON.parse(JSON.stringify(obj, (k, v) => v === undefined ? null : v));
+    if (obj === null) return null;
+    if (typeof obj !== 'object') return obj;
+    
+    // Handle Arrays
+    if (Array.isArray(obj)) {
+        return obj.map(sanitize);
+    }
+    
+    // Handle Objects
+    const newObj: any = {};
+    for (const key in obj) {
+        const val = obj[key];
+        if (val === undefined) {
+            newObj[key] = null;
+        } else {
+            newObj[key] = sanitize(val);
+        }
+    }
+    return newObj;
 };
 
 // Helper to determine mode
@@ -70,14 +88,13 @@ export const cloud = {
             console.log(`[Cloud] Connected as ${userId}`);
             return true;
         } catch (e: any) {
-            // Fix: 'auth/invalid-credential' can mean User Not Found in newer Firebase SDKs.
-            // We attempt to create the user if login fails for credential reasons.
+            // Attempt Auto-Creation if user missing
             if (e.code === 'auth/invalid-credential' || e.code === 'auth/user-not-found' || e.code === 'auth/wrong-password') {
                 try {
-                    console.log(`[Cloud] User ${userId} login failed (${e.code}). Attempting auto-creation...`);
+                    console.log(`[Cloud] User ${userId} missing. Creating account...`);
                     await createUserWithEmailAndPassword(auth, email, password);
                     
-                    // Initialize User Profile Document
+                    // Init Profile
                     await setDoc(doc(db, 'users', userId), sanitize({
                         userId: userId,
                         role: userId === 'collin' ? 'admin' : 'user',
@@ -85,18 +102,13 @@ export const cloud = {
                         createdAt: serverTimestamp()
                     }));
                     
-                    console.log(`[Cloud] Account created successfully for ${userId}`);
+                    console.log(`[Cloud] Account created for ${userId}`);
                     return true;
                 } catch (createErr: any) {
-                    if (createErr.code === 'auth/email-already-in-use') {
-                        console.warn(`[Cloud] Password mismatch for ${userId}. Please check constants.ts vs Firebase Console.`);
-                    } else {
-                        console.error(`[Cloud] Creation failed:`, createErr.code);
-                    }
+                    console.error(`[Cloud] Creation failed:`, createErr.code);
                 }
-            } else {
-                console.warn(`[Cloud] Login skipped: ${e.code}`);
             }
+            console.warn(`[Cloud] Login skipped: ${e.code}`);
             return false;
         }
     },
@@ -109,7 +121,6 @@ export const cloud = {
         const userConfig = USERS.find(u => u.id === uid);
         
         if (userConfig && userConfig.password) {
-            console.log(`[Cloud] Restoring session for ${uid}...`);
             await this.silentLogin(uid, userConfig.password);
         }
     },
@@ -122,13 +133,9 @@ export const cloud = {
             const snap = await getDoc(ref);
             if (snap.exists()) return snap.data() as AdminConfig;
             
-            // Init default if missing
             await setDoc(ref, sanitize(DEFAULT_ADMIN_CONFIG));
             return DEFAULT_ADMIN_CONFIG;
-        } catch (e) { 
-            console.error("[Cloud] Load Config Error", e);
-            return null; 
-        }
+        } catch (e) { return null; }
     },
 
     async saveAdminConfig(config: AdminConfig) {
@@ -136,7 +143,7 @@ export const cloud = {
         try {
             const ref = doc(db, 'globals', 'system_config');
             await setDoc(ref, sanitize(config), { merge: true });
-        } catch (e) { console.error("[Cloud] Save Config Error", e); }
+        } catch (e) { console.error("Config Save Error", e); }
     },
 
     // --- Rewards ---
@@ -165,6 +172,37 @@ export const cloud = {
         } catch (e) {}
     },
 
+    // --- Daily (Shared State for Couple Bonus) ---
+    async getDailyShared(dateIso: string): Promise<string[]> {
+        if (isGuest()) return [];
+        try {
+            const ref = doc(db, 'couples', COUPLE_ID, 'daily', dateIso);
+            const snap = await getDoc(ref);
+            if (snap.exists()) {
+                return snap.data().claims || [];
+            }
+            return [];
+        } catch (e) { return []; }
+    },
+
+    async addDailyClaim(dateIso: string, userId: string) {
+        if (isGuest()) return;
+        try {
+            const ref = doc(db, 'couples', COUPLE_ID, 'daily', dateIso);
+            const snap = await getDoc(ref);
+            let claims: string[] = [];
+            
+            if (snap.exists()) {
+                claims = snap.data().claims || [];
+            }
+            
+            if (!claims.includes(userId)) {
+                claims.push(userId);
+                await setDoc(ref, { claims }, { merge: true });
+            }
+        } catch (e) { console.error("Daily sync failed", e); }
+    },
+
     // --- Luna (Shared) ---
     async loadLuna() {
         if (isGuest()) return JSON.parse(localStorage.getItem('fiaos_guest_luna_state') || 'null');
@@ -174,7 +212,6 @@ export const cloud = {
             const snap = await getDoc(ref);
             if (snap.exists()) return snap.data();
             
-            // Init
             const initial = {
                 stats: { hunger: 50, energy: 50, hygiene: 50, fun: 50, love: 50 },
                 mood: 'happy',
@@ -246,7 +283,7 @@ export const cloud = {
     },
 
     async deleteDiaryEntry(id: string, scope: 'user' | 'shared') {
-        // Deletion logic placeholder
+        // Implement if needed
     },
 
     // --- Vault ---
@@ -255,9 +292,16 @@ export const cloud = {
         try {
             const ref = doc(db, 'couples', COUPLE_ID, 'apps', 'vault');
             const snap = await getDoc(ref);
-            if (snap.exists()) return snap.data();
+            if (snap.exists()) {
+                const data = snap.data();
+                if (!data.messages) data.messages = [];
+                return data;
+            }
             return { messages: [] };
-        } catch(e) { return { messages: [] }; }
+        } catch(e) { 
+            console.warn("Vault load error", e);
+            return { messages: [] }; 
+        }
     },
 
     async saveVault(state: any) {
