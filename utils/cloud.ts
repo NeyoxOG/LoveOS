@@ -1,8 +1,8 @@
 
 import { db, auth } from './firebase';
-import { doc, getDoc, setDoc, updateDoc, collection, addDoc, getDocs, query, orderBy, limit, serverTimestamp, arrayUnion } from 'firebase/firestore';
+import { doc, getDoc, setDoc, updateDoc, collection, getDocs, query, orderBy, limit, serverTimestamp } from 'firebase/firestore';
 import { signInWithEmailAndPassword } from 'firebase/auth';
-import { Session, User, UserRewardsData } from '../types';
+import { UserRewardsData } from '../types';
 
 // Placeholder Emails for Silent Auth
 const AUTH_MAP: Record<string, string> = {
@@ -14,16 +14,20 @@ const COUPLE_ID = 'fia-collin';
 
 // Helper to determine mode
 const isGuest = () => {
-    const sessionStr = localStorage.getItem('fiaos_session');
-    if (!sessionStr) return true;
-    const session = JSON.parse(sessionStr);
-    return session.role === 'guest';
+    try {
+        const sessionStr = localStorage.getItem('fiaos_session');
+        if (!sessionStr) return true;
+        const session = JSON.parse(sessionStr);
+        return session.role === 'guest';
+    } catch { return true; }
 };
 
 const getUid = () => {
-    const sessionStr = localStorage.getItem('fiaos_session');
-    if (!sessionStr) return 'guest';
-    return JSON.parse(sessionStr).userId;
+    try {
+        const sessionStr = localStorage.getItem('fiaos_session');
+        if (!sessionStr) return 'guest';
+        return JSON.parse(sessionStr).userId;
+    } catch { return 'guest'; }
 };
 
 // --- Cloud Adapter API ---
@@ -50,12 +54,15 @@ export const cloud = {
     async loadRewards(targetUid?: string): Promise<UserRewardsData | null> {
         const uid = targetUid || getUid();
         
-        // Check if guest (either by targetUid 'guest' or current session if no target provided)
+        // Guest / Local Mode
         if (uid === 'guest') {
-            const stored = localStorage.getItem(`fiaos_rewards_guest`);
-            return stored ? JSON.parse(stored) : null;
+            try {
+                const stored = localStorage.getItem(`fiaos_rewards_guest`);
+                return stored ? JSON.parse(stored) : null;
+            } catch { return null; }
         }
 
+        // Cloud Mode
         try {
             const ref = doc(db, `users/${uid}/data/rewards`);
             const snap = await getDoc(ref);
@@ -74,8 +81,12 @@ export const cloud = {
             return;
         }
         
-        const ref = doc(db, `users/${uid}/data/rewards`);
-        await setDoc(ref, data, { merge: true });
+        try {
+            const ref = doc(db, `users/${uid}/data/rewards`);
+            await setDoc(ref, data, { merge: true });
+        } catch (e) {
+            console.error("Rewards Save Error", e);
+        }
     },
 
     // --- Luna (Shared State) ---
@@ -121,10 +132,11 @@ export const cloud = {
 
     async addLunaHistory(item: any) {
         const current = await this.loadLuna();
-        let history = current.history || [];
+        const history = current?.history || [];
         history.unshift(item);
-        if (history.length > 50) history = history.slice(0, 50);
-        await this.updateLuna({ history });
+        // Keep last 50
+        const trimmed = history.slice(0, 50);
+        await this.updateLuna({ history: trimmed });
     },
 
     // --- Diary ---
@@ -143,7 +155,9 @@ export const cloud = {
             const snapShared = await getDocs(qShared);
             const sharedEntries = snapShared.docs.map(d => ({ id: d.id, ...d.data(), scope: 'shared' }));
 
-            return [...userEntries, ...sharedEntries].sort((a: any, b: any) => b.createdAt - a.createdAt);
+            // Merge and sort
+            const all = [...userEntries, ...sharedEntries];
+            return all.sort((a: any, b: any) => b.createdAt - a.createdAt);
         } catch (e) {
             console.error("Diary Load Error", e);
             return [];
@@ -175,7 +189,7 @@ export const cloud = {
             localStorage.setItem(`fiaos_guest_${getUid()}_diary`, JSON.stringify(list));
             return;
         }
-        console.warn("Delete not fully implemented in v0.3 adapter");
+        console.warn("Delete not implemented in v0.3 adapter - requires explicit deleteDoc import");
     },
 
     // --- Vault ---
@@ -206,34 +220,48 @@ export const cloud = {
         const uid = getUid();
         const ref = doc(db, 'leaderboards', gameId, 'scores', uid);
         
-        await setDoc(ref, {
-            score,
-            ...extra,
-            updatedAt: serverTimestamp(),
-            uid,
-            displayName: JSON.parse(localStorage.getItem('fiaos_session') || '{}').name
-        }, { merge: true });
+        // We use setDoc with merge to update score
+        // Ideally we check if new score is higher, but here we trust client logic to only call if highscore
+        try {
+            await setDoc(ref, {
+                score,
+                ...extra,
+                updatedAt: serverTimestamp(),
+                uid,
+                // We grab display name from session for leaderboard display
+                displayName: JSON.parse(localStorage.getItem('fiaos_session') || '{}').name
+            }, { merge: true });
+        } catch (e) { console.error(e); }
     },
 
     async getLeaderboard(gameId: string) {
         if (isGuest()) return [];
 
-        const q = query(collection(db, 'leaderboards', gameId, 'scores'), orderBy('score', 'desc'), limit(10));
-        const snap = await getDocs(q);
-        return snap.docs.map(d => d.data());
+        try {
+            const q = query(collection(db, 'leaderboards', gameId, 'scores'), orderBy('score', 'desc'), limit(10));
+            const snap = await getDocs(q);
+            return snap.docs.map(d => d.data());
+        } catch (e) {
+            console.error("Leaderboard Error", e);
+            return [];
+        }
     },
 
     // --- Profile & Settings ---
     async loadProfile() {
         if (isGuest()) return null;
-        const ref = doc(db, 'users', getUid());
-        const snap = await getDoc(ref);
-        return snap.exists() ? snap.data() : null;
+        try {
+            const ref = doc(db, 'users', getUid());
+            const snap = await getDoc(ref);
+            return snap.exists() ? snap.data() : null;
+        } catch { return null; }
     },
 
     async saveProfile(data: any) {
         if (isGuest()) return;
-        const ref = doc(db, 'users', getUid());
-        await setDoc(ref, data, { merge: true });
+        try {
+            const ref = doc(db, 'users', getUid());
+            await setDoc(ref, data, { merge: true });
+        } catch (e) { console.error(e); }
     }
 };

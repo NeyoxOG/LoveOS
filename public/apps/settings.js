@@ -79,6 +79,8 @@ function loadData() {
     }
 
     // Rewards (to check unlocks)
+    // Note: Settings app reads local rewards cache for UI speed.
+    // Sync happens in OS (App.tsx).
     const rStr = localStorage.getItem(rewardsKey);
     if (rStr) userRewards = JSON.parse(rStr);
     else userRewards = { rewards: {} };
@@ -197,24 +199,35 @@ window.resetData = () => {
 window.devUnlockRewards = () => {
     if (window.parent.FIAOS_DEBUG) {
         window.parent.FIAOS_DEBUG.unlockAll();
-        // Reload local data to reflect changes
         setTimeout(() => {
             loadData();
             renderUI();
-            alert("Rewards Unlocked");
+            alert("Rewards Unlocked (Local)");
         }, 500);
     }
 };
 
-window.devResetLuna = () => {
-    if (window.parent.LUNA_DEBUG) {
-        const key = user.role === 'guest' ? 'fiaos_guest_luna_state' : 'fiaos_pair_room_main';
-        localStorage.removeItem(key);
-        alert("Luna State removed.");
-    } else {
-        const key = user.role === 'guest' ? 'fiaos_guest_luna_state' : 'fiaos_pair_room_main';
-        localStorage.removeItem(key);
-        alert("Luna State removed.");
+window.devResetLuna = async () => {
+    if (!confirm("Luna Reset: Status wird auf Standard zurückgesetzt.")) return;
+
+    if (user.role === 'guest') {
+        localStorage.removeItem('fiaos_guest_luna_state');
+        alert("Luna Local State removed.");
+        return;
+    }
+
+    if (window.parent.FIAOS && window.parent.FIAOS.cloud) {
+        try {
+            await window.parent.FIAOS.cloud.updateLuna({
+                stats: { hunger: 50, energy: 50, hygiene: 50, fun: 50, love: 50 },
+                mood: 'happy',
+                streak: { count: 0 },
+                history: []
+            });
+            alert("Luna Cloud State reset.");
+        } catch (e) {
+            alert("Fehler beim Cloud Reset: " + e.message);
+        }
     }
 };
 
