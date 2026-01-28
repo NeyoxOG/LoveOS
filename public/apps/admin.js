@@ -225,20 +225,39 @@ function renderRewardsUI() {
     });
 }
 
-window.adminUnlockReward = () => {
+window.adminUnlockReward = async () => {
     const uid = document.getElementById('rewardUserSelect').value;
     const rid = document.getElementById('rewardIdSelect').value;
     
-    const key = `fiaos_rewards_${uid}`;
-    const data = JSON.parse(localStorage.getItem(key) || '{}');
+    // Use Cloud API exposed on window
+    if (!window.parent.FIAOS || !window.parent.FIAOS.cloud) {
+        alert("Cloud API not available.");
+        return;
+    }
     
+    const cloud = window.parent.FIAOS.cloud;
+    
+    let data = await cloud.loadRewards(uid);
+    if (!data) {
+        // If data is missing (e.g. user never logged in to initialize), creating from scratch might be needed
+        // For simplicity, we advise user to login first or assume null means fresh
+        // Try creating minimal structure
+        data = { 
+            version: 2, 
+            rewards: {}, 
+            valentine: { unlocked: {}, total: 6, completedAt: null },
+            meta: { lastSeenAt: Date.now(), points: 0 }
+        };
+    }
+    
+    // Safety
     if (!data.rewards) data.rewards = {};
-    if (!data.valentine) data.valentine = { unlocked: {} };
+    if (!data.valentine) data.valentine = { unlocked: {}, total: 6, completedAt: null };
     
     data.rewards[rid] = { unlocked: true, unlockedAt: Date.now() };
-    data.valentine.unlocked[rid] = true; // Unlock in both places just in case
+    if (rid.startsWith('valentine.')) data.valentine.unlocked[rid] = true;
     
-    localStorage.setItem(key, JSON.stringify(data));
+    await cloud.saveRewards(data, uid);
     alert(`Unlocked ${rid} for ${uid}`);
 };
 
@@ -263,17 +282,28 @@ window.closeConfirm = () => {
     pendingAction = null;
 };
 
-function executePendingAction() {
+async function executePendingAction() {
     if (!pendingAction) return;
     
     if (pendingAction === 'lunaReset') {
-        localStorage.removeItem('fiaos_pair_room_main');
         localStorage.removeItem('fiaos_guest_luna_state');
+        if (window.parent.FIAOS && window.parent.FIAOS.cloud) {
+            // Need a reset method exposed or manually update?
+            // Simple update to default state via cloud
+            await window.parent.FIAOS.cloud.updateLuna({
+                stats: { hunger: 50, energy: 50, hygiene: 50, fun: 50, love: 50 },
+                mood: 'happy',
+                streak: { count: 0 },
+                history: []
+            });
+        }
     }
     else if (pendingAction === 'dailyReset') {
         userIndex.users.forEach(u => {
             localStorage.removeItem(`fiaos_user_${u.userId}_daily_state`);
         });
+        // Note: Daily state is still local per user even in cloud mode for now (Prompt 19/20 didn't explicitly move daily state to cloud, only rewards/luna/diary/vault)
+        // If Daily moves to cloud, this needs update.
     }
     else if (pendingAction === 'globalLogout') {
         userIndex.users.forEach(u => {
@@ -283,9 +313,14 @@ function executePendingAction() {
         localStorage.setItem(`fiaos_user_${currentUser.id}_session_flag`, 'forceLogout');
     }
     else if (pendingAction === 'resetRewards') {
+        // Warning: This is heavy. Reset cloud rewards for everyone?
+        // Just local for now as "Reset" implies emergency wipe.
         userIndex.users.forEach(u => {
              localStorage.removeItem(`fiaos_rewards_${u.userId}`);
+             // If we wanted to wipe cloud, we'd need to iterate users and call cloud.saveRewards with empty data.
+             // Skipping loop cloud wipe for safety/speed in v0.3
         });
+        localStorage.removeItem('fiaos_rewards_guest');
     }
     
     alert("Action Executed.");

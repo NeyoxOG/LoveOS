@@ -2,7 +2,7 @@
 import { UserRewardsData, Reward, UserProfile, UserPrefs, Session, AdminConfig, UserIndex, UserIndexItem, DailyState } from '../types';
 import { REWARD_CATALOG, VALENTINE_REWARDS, THEMES } from '../constants';
 
-const INITIAL_REWARDS_DATA: UserRewardsData = {
+export const INITIAL_REWARDS_DATA: UserRewardsData = {
   version: 2,
   rewards: {
     "reward.welcome": { unlocked: true, unlockedAt: Date.now() },
@@ -70,6 +70,10 @@ export const getRewardCatalog = (): Reward[] => {
   return REWARD_CATALOG;
 };
 
+// Note: saveUserRewards/loadUserRewards in this file are now legacy/guest-only helpers 
+// or used for initial data structure generation. 
+// The main app logic has moved to cloud.ts / App.tsx integration.
+
 export const saveUserRewards = (userId: string, data: UserRewardsData): void => {
   try {
     localStorage.setItem(`fiaos_rewards_${userId}`, JSON.stringify(data));
@@ -126,8 +130,8 @@ export const unlockRewardLogic = (currentRewards: UserRewardsData, rewardId: str
 };
 
 export const setRewardsLastSeen = (userId: string, data: UserRewardsData): UserRewardsData => {
+    // This helper now just returns modified data; saving is handled by caller (App.tsx -> Cloud)
     const updated = { ...data, meta: { ...data.meta, lastSeenAt: Date.now() } };
-    saveUserRewards(userId, updated);
     return updated;
 };
 
@@ -214,10 +218,8 @@ export const loadAdminConfig = (): AdminConfig => {
         const stored = localStorage.getItem('fiaos_global_admin_config');
         if (stored) {
             const config = JSON.parse(stored);
-            // Migration: Ensure userStatus exists if upgrading from v1
             if (!config.userStatus) {
                 config.userStatus = INITIAL_ADMIN_CONFIG.userStatus;
-                // Migrate roleOverrides to userStatus
                 if (config.roleOverrides) {
                     for (const [uid, role] of Object.entries(config.roleOverrides)) {
                         if (!config.userStatus[uid]) config.userStatus[uid] = { role: 'user', banned: false };

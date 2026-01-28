@@ -5,7 +5,8 @@ import { NOISE_BG, REWARD_CATALOG } from './constants';
 import { loadSession, saveSession, clearSession } from './utils/session';
 import { cloud } from './utils/cloud'; // Import Cloud Adapter
 import { 
-  loadUserRewards, saveUserRewards, unlockRewardLogic, setRewardsLastSeen, 
+  INITIAL_REWARDS_DATA,
+  saveUserRewards, unlockRewardLogic, setRewardsLastSeen, 
   debugUnlockValentine, debugResetValentine,
   loadUserProfile, loadUserPrefs, applyTheme, saveLastApp,
   loadAdminConfig, updateUserIndex
@@ -113,8 +114,18 @@ const App: React.FC = () => {
       }
 
       setSession(storedSession);
-      const rewards = loadUserRewards(storedSession.userId);
-      setRewardsData(rewards);
+      
+      // Load Rewards (Cloud Sync)
+      cloud.loadRewards().then(data => {
+          if (data) {
+              setRewardsData(data);
+          } else {
+              // Init defaults
+              const initial = JSON.parse(JSON.stringify(INITIAL_REWARDS_DATA));
+              setRewardsData(initial);
+              cloud.saveRewards(initial);
+          }
+      });
       
       // If cloud user, try syncing profile in background
       if (storedSession.role !== 'guest') {
@@ -143,23 +154,24 @@ const App: React.FC = () => {
 
   // --- Rewards Logic ---
 
-  const handleUnlockReward = useCallback((rewardId: string) => {
-    const currentSession = loadSession();
-    const currentRewards = currentSession ? loadUserRewards(currentSession.userId) : null;
+  const handleUnlockReward = useCallback(async (rewardId: string) => {
+    // Reload latest to prevent conflicts, or use optimistic state
+    // For simplicity, we use current loaded state, but in production we might need to fetch latest
+    // For this prototype, using rewardsData state is acceptable
     
-    if (!currentSession || !currentRewards) return;
+    if (!rewardsData || !session) return;
 
-    const { updatedData, wasUnlocked } = unlockRewardLogic(currentRewards, rewardId);
+    const { updatedData, wasUnlocked } = unlockRewardLogic(rewardsData, rewardId);
 
     if (wasUnlocked) {
       setRewardsData(updatedData);
-      saveUserRewards(currentSession.userId, updatedData);
+      await cloud.saveRewards(updatedData);
       
       const rewardInfo = REWARD_CATALOG.find(r => r.id === rewardId);
       const rewardTitle = rewardInfo ? rewardInfo.title : "Unbekannter Erfolg";
       showToast(`Erfolg freigeschaltet: ${rewardTitle} ✨`);
     }
-  }, [showToast]);
+  }, [showToast, rewardsData, session]);
 
   // Event Bus
   useEffect(() => {
@@ -203,7 +215,7 @@ const App: React.FC = () => {
         }
     };
 
-  }, [session, handleUnlockReward, showToast]);
+  }, [session, handleUnlockReward, showToast, rewardsData]);
 
   // --- Auth Handlers ---
 
@@ -248,7 +260,7 @@ const App: React.FC = () => {
     return false;
   };
 
-  const loginSuccess = (user: User) => {
+  const loginSuccess = async (user: User) => {
     // Re-load config to be safe
     const config = loadAdminConfig();
     const userStatus = config.userStatus[user.id] || { role: user.role, banned: false };
@@ -268,9 +280,17 @@ const App: React.FC = () => {
     setSession(newSession);
     saveSession(newSession);
     
-    // Load Data
-    const rewards = loadUserRewards(user.id);
-    setRewardsData(rewards);
+    // Load Data with Cloud support
+    cloud.loadRewards().then(data => {
+        if (data) {
+            setRewardsData(data);
+        } else {
+            const initial = JSON.parse(JSON.stringify(INITIAL_REWARDS_DATA));
+            setRewardsData(initial);
+            cloud.saveRewards(initial);
+        }
+    });
+
     const profile = loadUserProfile(newSession);
     const prefs = loadUserPrefs(newSession);
     setUserProfile(profile);
@@ -344,6 +364,7 @@ const App: React.FC = () => {
     if (session && rewardsData) {
       const updated = setRewardsLastSeen(session.userId, rewardsData);
       setRewardsData(updated);
+      cloud.saveRewards(updated); // Save "seen" state to cloud
     }
   };
 

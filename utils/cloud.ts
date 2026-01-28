@@ -2,7 +2,7 @@
 import { db, auth } from './firebase';
 import { doc, getDoc, setDoc, updateDoc, collection, addDoc, getDocs, query, orderBy, limit, serverTimestamp, arrayUnion } from 'firebase/firestore';
 import { signInWithEmailAndPassword } from 'firebase/auth';
-import { Session, User } from '../types';
+import { Session, User, UserRewardsData } from '../types';
 
 // Placeholder Emails for Silent Auth
 const AUTH_MAP: Record<string, string> = {
@@ -42,10 +42,40 @@ export const cloud = {
             return true;
         } catch (e) {
             console.error("Cloud Auth Failed:", e);
-            // Fallback to local is NOT allowed for Fia/Collin in v0.3 logic, 
-            // but for stability we return false so UI can show error
             return false;
         }
+    },
+
+    // --- Rewards / Achievements ---
+    async loadRewards(targetUid?: string): Promise<UserRewardsData | null> {
+        const uid = targetUid || getUid();
+        
+        // Check if guest (either by targetUid 'guest' or current session if no target provided)
+        if (uid === 'guest') {
+            const stored = localStorage.getItem(`fiaos_rewards_guest`);
+            return stored ? JSON.parse(stored) : null;
+        }
+
+        try {
+            const ref = doc(db, `users/${uid}/data/rewards`);
+            const snap = await getDoc(ref);
+            return snap.exists() ? snap.data() as UserRewardsData : null;
+        } catch (e) {
+            console.error("Rewards Load Error", e);
+            return null;
+        }
+    },
+
+    async saveRewards(data: UserRewardsData, targetUid?: string) {
+        const uid = targetUid || getUid();
+        
+        if (uid === 'guest') {
+            localStorage.setItem(`fiaos_rewards_guest`, JSON.stringify(data));
+            return;
+        }
+        
+        const ref = doc(db, `users/${uid}/data/rewards`);
+        await setDoc(ref, data, { merge: true });
     },
 
     // --- Luna (Shared State) ---
@@ -90,13 +120,10 @@ export const cloud = {
     },
 
     async addLunaHistory(item: any) {
-        // Enforce limit of 20 in cloud via array manipulation or client-side truncation
-        // Simpler: Just update the history array in the patch
         const current = await this.loadLuna();
         let history = current.history || [];
         history.unshift(item);
         if (history.length > 50) history = history.slice(0, 50);
-        
         await this.updateLuna({ history });
     },
 
@@ -108,12 +135,10 @@ export const cloud = {
         }
 
         try {
-            // User's private diary
             const q = query(collection(db, `users/${getUid()}/diary`), orderBy('createdAt', 'desc'));
             const snap = await getDocs(q);
             const userEntries = snap.docs.map(d => ({ id: d.id, ...d.data() }));
 
-            // Shared couple diary
             const qShared = query(collection(db, `couples/${COUPLE_ID}/diary`), orderBy('createdAt', 'desc'));
             const snapShared = await getDocs(qShared);
             const sharedEntries = snapShared.docs.map(d => ({ id: d.id, ...d.data(), scope: 'shared' }));
@@ -139,7 +164,6 @@ export const cloud = {
             ? `couples/${COUPLE_ID}/diary`
             : `users/${getUid()}/diary`;
             
-        // Use entry.id as doc ID if exists, else auto-id
         const docRef = doc(db, path, entry.id);
         await setDoc(docRef, entry, { merge: true });
     },
@@ -151,9 +175,6 @@ export const cloud = {
             localStorage.setItem(`fiaos_guest_${getUid()}_diary`, JSON.stringify(list));
             return;
         }
-        
-        // Note: Delete in Firestore requires logic, simplified here assuming we know path
-        // For v0.3 we might skip strict delete or handle it in UI logic
         console.warn("Delete not fully implemented in v0.3 adapter");
     },
 
@@ -163,11 +184,6 @@ export const cloud = {
             const k = `fiaos_vault_guest_${getUid()}`;
             return JSON.parse(localStorage.getItem(k) || '{"messages":[]}');
         }
-
-        // Vault is usually shared in this context? Or personal?
-        // Prompt says "Message Vault (pro User)".
-        // But Vault usually implies sending TO someone.
-        // Let's assume Shared Vault for Couple.
         const ref = doc(db, 'couples', COUPLE_ID, 'apps', 'vault');
         const snap = await getDoc(ref);
         if (snap.exists()) return snap.data();
@@ -185,25 +201,22 @@ export const cloud = {
 
     // --- Games / Leaderboard ---
     async saveHighscore(gameId: string, score: number, extra: any = {}) {
-        if (isGuest()) return; // Guests don't save to cloud leaderboards
+        if (isGuest()) return;
 
         const uid = getUid();
         const ref = doc(db, 'leaderboards', gameId, 'scores', uid);
         
-        // Only update if higher? Firestore rules usually handle this, but here:
-        // We trust client for v0.3 prototype
         await setDoc(ref, {
             score,
             ...extra,
             updatedAt: serverTimestamp(),
             uid,
-            // Assuming profile is available in global scope or fetched
             displayName: JSON.parse(localStorage.getItem('fiaos_session') || '{}').name
         }, { merge: true });
     },
 
     async getLeaderboard(gameId: string) {
-        if (isGuest()) return []; // Empty or local mock
+        if (isGuest()) return [];
 
         const q = query(collection(db, 'leaderboards', gameId, 'scores'), orderBy('score', 'desc'), limit(10));
         const snap = await getDocs(q);
@@ -212,7 +225,7 @@ export const cloud = {
 
     // --- Profile & Settings ---
     async loadProfile() {
-        if (isGuest()) return null; // Use local logic in app
+        if (isGuest()) return null;
         const ref = doc(db, 'users', getUid());
         const snap = await getDoc(ref);
         return snap.exists() ? snap.data() : null;
