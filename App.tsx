@@ -9,7 +9,7 @@ import {
   INITIAL_REWARDS_DATA,
   unlockRewardLogic, setRewardsLastSeen, 
   loadUserProfile, loadUserPrefs, applyTheme, saveLastApp, loadLastApp,
-  loadAdminConfig, updateUserIndex
+  updateUserIndex
 } from './utils/data';
 import LoginScreen from './components/LoginScreen';
 import HomeScreen from './components/HomeScreen';
@@ -62,6 +62,8 @@ const App: React.FC = () => {
 
   const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
   const [userPrefs, setUserPrefs] = useState<UserPrefs | null>(null);
+  
+  // Admin Config State - Driven by Cloud Listener
   const [adminConfig, setAdminConfig] = useState<AdminConfig | null>(null);
 
   const [showOnboarding, setShowOnboarding] = useState(false);
@@ -70,7 +72,19 @@ const App: React.FC = () => {
 
   // --- Effects ---
 
-  // 1. Init Session
+  // 1. Global Cloud Config Listener (The Source of Truth)
+  useEffect(() => {
+    const unsubscribe = cloud.listenToAdminConfig((conf) => {
+        // console.log("Received Admin Config Update:", conf);
+        setAdminConfig(conf);
+        
+        // Save to local for fallback
+        localStorage.setItem('fiaos_global_admin_config', JSON.stringify(conf));
+    });
+    return () => unsubscribe();
+  }, []);
+
+  // 2. Init Session
   useEffect(() => {
     const existing = loadSession();
     if (existing) {
@@ -81,13 +95,27 @@ const App: React.FC = () => {
     setIsVerifying(false);
   }, []);
 
-  // 2. Load User Data
+  // 3. User Data & Ban/Maintenance Enforcement
   useEffect(() => {
     if (!session) {
         setRewardsData(null);
         setUserProfile(null);
         setUserPrefs(null);
         return;
+    }
+
+    // -- Security Check --
+    if (adminConfig && adminConfig.userStatus) {
+        const userStatus = adminConfig.userStatus[session.userId];
+        if (userStatus && userStatus.banned) {
+            handleLogout();
+            setOverlay({
+                isOpen: true,
+                title: "Account Gesperrt",
+                content: "Dein Zugang wurde vom Administrator deaktiviert. ⛔"
+            });
+            return;
+        }
     }
 
     const initUserData = async () => {
@@ -113,7 +141,7 @@ const App: React.FC = () => {
             if (cProf) profile = cProf;
         }
         setUserProfile(profile);
-        updateUserIndex(session, profile); // Update global index for admin
+        updateUserIndex(session, profile);
 
         // Rewards
         let rewards: UserRewardsData | null = null;
@@ -123,7 +151,6 @@ const App: React.FC = () => {
         } else {
             rewards = await cloud.loadRewards();
             if (!rewards) {
-                // Init rewards if new
                 rewards = JSON.parse(JSON.stringify(INITIAL_REWARDS_DATA));
                 await cloud.saveRewards(rewards!);
             }
@@ -138,25 +165,18 @@ const App: React.FC = () => {
 
     initUserData();
 
-    // Admin Config
-    const loadConfig = async () => {
-        const conf = await cloud.loadAdminConfig(); // Handles guest check internally
-        setAdminConfig(conf);
-    };
-    loadConfig();
+  }, [session, adminConfig]); // Re-run if admin config changes (live ban)
 
-  }, [session]);
-
-  // 3. Global Bridge
+  // 4. Global Bridge
   useEffect(() => {
     window.FIAOS = {
         bridgeUnlockReward: ({ rewardId }) => handleUnlockReward(rewardId),
         bridgeUnlockTheme: ({ themeId }) => handleUnlockTheme(themeId),
-        bridgeUnlockApp: ({ appId }) => console.log('Unlock App:', appId), // Placeholder
+        bridgeUnlockApp: ({ appId }) => console.log('Unlock App:', appId), 
         bridgeLunaBoost: (data) => console.log('Luna Boost:', data),
         openRewards: (tab) => {
             setRewardsTab(tab);
-            setOpenedApp(null); // Close current app to show rewards
+            setOpenedApp(null); 
             setIsRewardsOpen(true);
         },
         playSound: (type) => playSound(type as any),
@@ -164,7 +184,6 @@ const App: React.FC = () => {
     };
 
     window.FIAOS_APPLY_PREFS = (newPrefs) => {
-        // Create new object to force state update
         const updated = { ...newPrefs };
         setUserPrefs(updated);
         applyTheme(updated);
@@ -177,7 +196,8 @@ const App: React.FC = () => {
     };
 
     window.FIAOS_PROFILE_UPDATED = (p) => setUserProfile(p);
-    window.FIAOS_ADMIN_CONFIG_UPDATED = (c) => setAdminConfig(c);
+    
+    // NOTE: FIAOS_ADMIN_CONFIG_UPDATED removed here because we use the global useEffect listener now
     
     window.FIAOS_EVENTS = {
         emit: (event, data) => {
@@ -192,14 +212,23 @@ const App: React.FC = () => {
         delete window.FIAOS_ADMIN_CONFIG_UPDATED;
         delete window.FIAOS_EVENTS;
     };
-  }, [rewardsData, session]); // Deps important for reward unlocking context
+  }, [rewardsData, session]); 
 
   // --- Handlers ---
 
   const handleUserSelect = (u: User) => {
+    // Immediate Ban Check before even asking for password
+    if (adminConfig?.userStatus?.[u.id]?.banned) {
+        setOverlay({
+            isOpen: true,
+            title: "Zugriff Verweigert",
+            content: "Dieser Benutzer ist gesperrt. ⛔"
+        });
+        return;
+    }
+
     setSelectedUser(u);
     if (u.role === 'guest') {
-        // Guest login immediately
         handleLoginAttempt(u, '');
     } else {
         setIsAuthSheetOpen(true);
@@ -211,7 +240,6 @@ const App: React.FC = () => {
         return false;
     }
     
-    // Cloud Auth (Silent)
     await cloud.silentLogin(userObj.id, pass);
 
     const newSession: Session = {
@@ -227,7 +255,6 @@ const App: React.FC = () => {
     setSelectedUser(null);
     playSound('success');
 
-    // Unlock First Login
     setTimeout(() => handleUnlockReward('reward.firstLogin'), 2000);
     return true;
   };
@@ -249,14 +276,12 @@ const App: React.FC = () => {
     
     if (wasUnlocked) {
         setRewardsData(updatedData);
-        // Save
         if (session.role === 'guest') {
             localStorage.setItem('fiaos_rewards_guest', JSON.stringify(updatedData));
         } else {
             await cloud.saveRewards(updatedData);
         }
         
-        // Show Overlay
         let meta = REWARD_CATALOG.find(r => r.id === rewardId);
         if (!meta) meta = VALENTINE_REWARDS.find(r => r.id === rewardId);
         if (!meta) meta = { id: rewardId, title: 'Erfolg freigeschaltet!', icon: '🏆', description: 'Du hast einen neuen Meilenstein erreicht.' };
@@ -289,17 +314,22 @@ const App: React.FC = () => {
   };
 
   const handleAppClick = (app: AppItem) => {
-      if (adminConfig && adminConfig.appVisibility[app.id] === false && app.id !== 'settings') {
-         if (session?.role !== 'admin' && session?.role !== 'developer') {
-             setToast({ id: Date.now(), message: 'Diese App ist deaktiviert 🔒' });
-             return;
-         }
+      // Check Admin Config for App Visibility
+      if (adminConfig && adminConfig.appVisibility) {
+          if (adminConfig.appVisibility[app.id] === false && app.id !== 'settings') {
+             // Admins can see but maybe warn? Or strictly follow list?
+             // Assuming HomeScreen handles visibility, but this is a double check
+             if (session?.role !== 'admin' && session?.role !== 'developer') {
+                 setToast({ id: Date.now(), message: 'App ist deaktiviert 🔒' });
+                 return;
+             }
+          }
       }
 
       saveLastApp(session!, app.id);
       
       if (app.id === 'achievements') {
-          setRewardsTab('general'); // Explicitly route to general
+          setRewardsTab('general');
           setIsRewardsOpen(true);
       } 
       else if (app.id === 'rewards.firstAppOpen') {
@@ -316,17 +346,15 @@ const App: React.FC = () => {
 
   if (isVerifying) return <div className="bg-black w-full h-full" />;
 
-  const isMaintenance = adminConfig?.maintenanceMode && 
-                        session?.role !== 'admin' && 
-                        session?.role !== 'developer' && 
-                        !bypassMaintenance;
-
-  if (isMaintenance) {
+  // Maintenance Check
+  const isAdminUser = session?.role === 'admin' || session?.role === 'developer';
+  const maintenanceActive = adminConfig?.maintenanceMode;
+  
+  if (maintenanceActive && !isAdminUser && !bypassMaintenance) {
       return <MaintenanceScreen onBypass={() => setBypassMaintenance(true)} />;
   }
 
-  // --- Theme Background Logic ---
-  // Using React state directly for instant feedback
+  // Theme
   const activeThemeId = userPrefs?.theme || 'roseGlass';
   const activeThemeDef = THEMES[activeThemeId] || THEMES['roseGlass'];
   
@@ -339,15 +367,12 @@ const App: React.FC = () => {
         className="fixed inset-0 overflow-hidden font-sans text-white select-none transition-colors duration-700"
         style={bgStyle}
     >
-      {/* Background Gradient / Image */}
       {!customBg && (
          <div className="absolute inset-0 bg-[image:var(--bg-gradient)] transition-[background] duration-500 z-0" />
       )}
       
-      {/* Noise Overlay */}
       <div className="absolute inset-0 z-0 opacity-20 pointer-events-none" style={{ backgroundImage: `url("${NOISE_BG}")` }} />
 
-      {/* Main Content */}
       <div className="relative z-10 w-full h-full flex flex-col">
         {!session ? (
             <LoginScreen onSelectUser={handleUserSelect} />
@@ -366,7 +391,6 @@ const App: React.FC = () => {
                     onOpenAccountSheet={() => setIsAccountSheetOpen(true)}
                 />
 
-                {/* Overlays */}
                 <AppWindow 
                     isOpen={!!openedApp}
                     appId={openedApp?.id || null}
@@ -396,7 +420,6 @@ const App: React.FC = () => {
         )}
       </div>
 
-      {/* Global Overlays */}
       <AuthSheet 
         isOpen={isAuthSheetOpen}
         onClose={() => setIsAuthSheetOpen(false)}

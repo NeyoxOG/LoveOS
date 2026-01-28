@@ -1,6 +1,6 @@
 
 /**
- * AdminOS v2.0 Logic
+ * AdminOS v2.0 Logic (Fixes for Ban & Rewards)
  */
 
 const KEYS = { SESSION: 'fiaos_session' };
@@ -11,6 +11,23 @@ let cloud = null;
 let selectedUserId = null;
 let userRewardsData = null;
 let appUptime = 0;
+
+// Need a default struct if cloud data is missing for new users
+const DEFAULT_REWARDS_STRUCT = {
+  version: 2,
+  rewards: {
+    "reward.welcome": { unlocked: true, unlockedAt: Date.now() }
+  },
+  valentine: {
+    total: 6,
+    unlocked: {},
+    completedAt: null
+  },
+  meta: {
+    lastSeenAt: Date.now(),
+    points: 0
+  }
+};
 
 // App Definitions
 const APP_DEFS = [
@@ -28,7 +45,7 @@ const APP_DEFS = [
     { id: 'bucket', name: 'Ziele', icon: '📍' }
 ];
 
-// Full Catalog for Listing
+// Full Catalog
 const FULL_REWARD_CATALOG = [
     { id: 'reward.welcome', title: 'Willkommen' },
     { id: 'reward.firstLogin', title: 'Erster Login' },
@@ -50,7 +67,6 @@ const FULL_REWARD_CATALOG = [
     { id: 'bucket.done1', title: 'Bucket: Erledigt' }
 ];
 
-// Users Definition
 const USERS_LIST = [
     { id: 'fia', name: 'Fia' },
     { id: 'collin', name: 'Collin' },
@@ -82,17 +98,18 @@ function denyAccess() {
 async function loadSystemData() {
     try {
         if (cloud) {
+            // Live Admin Config Listener handles updates in Parent App, but here we explicitly fetch once to render
             adminConfig = await cloud.loadAdminConfig();
             document.getElementById('cloudDot').className = 'dot online';
             document.getElementById('cloudText').innerText = "Online";
             
-            // Load Luna
+            // Load Luna Stats
             const luna = await cloud.loadLuna();
             if (luna && luna.stats) {
                 document.getElementById('lunaHunger').value = luna.stats.hunger || 50;
                 document.getElementById('lunaLove').value = luna.stats.love || 50;
                 document.getElementById('lunaEnergy').value = luna.stats.energy || 50;
-                updateLunaStat(); // Update text labels
+                updateLunaStat();
             }
         } else {
             adminConfig = JSON.parse(localStorage.getItem('fiaos_global_admin_config') || '{}');
@@ -100,20 +117,26 @@ async function loadSystemData() {
             document.getElementById('cloudText').innerText = "Offline";
         }
 
-        // Defaults
+        // Init defaults if empty
         if (!adminConfig) adminConfig = { appVisibility: {}, userStatus: {}, maintenanceMode: false };
         if (!adminConfig.appVisibility) adminConfig.appVisibility = {};
         if (!adminConfig.userStatus) adminConfig.userStatus = {};
+
+        // Force defaults for apps
+        APP_DEFS.forEach(a => {
+            if (adminConfig.appVisibility[a.id] === undefined) adminConfig.appVisibility[a.id] = true;
+        });
 
         renderDashboard();
         renderApps();
         renderUsersList();
         
-        // Auto-load rewards for first user if on rewards tab
+        // Auto-select first user for rewards tab context (or default)
+        const defaultRewardUser = document.getElementById('rewardUserSelect').value;
         loadUserRewardsList(); 
 
     } catch(e) {
-        console.error(e);
+        console.error("Sys Load Error", e);
         document.getElementById('cloudText').innerText = "Error";
     }
 }
@@ -140,7 +163,7 @@ function renderApps() {
     grid.innerHTML = '';
     
     APP_DEFS.forEach(app => {
-        if (app.id === 'settings') return; // Settings always visible
+        if (app.id === 'settings') return; 
         const isVisible = adminConfig.appVisibility[app.id] !== false;
         
         const el = document.createElement('div');
@@ -182,7 +205,6 @@ function renderUsersList() {
 // --- Views & Navigation ---
 
 window.switchView = (viewId, btn) => {
-    // UI Update
     document.querySelectorAll('.view-section').forEach(el => el.classList.remove('active'));
     document.getElementById(`view-${viewId}`).classList.add('active');
     
@@ -194,7 +216,7 @@ window.switchView = (viewId, btn) => {
 
 window.toggleMaintenance = async () => {
     adminConfig.maintenanceMode = !adminConfig.maintenanceMode;
-    renderDashboard(); // Optimistic
+    renderDashboard(); 
     await syncConfig();
 };
 
@@ -204,14 +226,16 @@ window.forceSync = () => {
 
 window.toggleAppVisibility = async (appId) => {
     adminConfig.appVisibility[appId] = !adminConfig.appVisibility[appId];
-    renderApps(); // Optimistic
+    renderApps(); 
     await syncConfig();
 };
 
 async function syncConfig() {
-    if (cloud) await cloud.saveAdminConfig(adminConfig);
+    // Optimistic local save
     localStorage.setItem('fiaos_global_admin_config', JSON.stringify(adminConfig));
-    if (window.parent.FIAOS_ADMIN_CONFIG_UPDATED) window.parent.FIAOS_ADMIN_CONFIG_UPDATED(adminConfig);
+    // Cloud save
+    if (cloud) await cloud.saveAdminConfig(adminConfig);
+    // Notifying parent not needed as Parent listens to Cloud
 }
 
 // --- Actions: Luna ---
@@ -234,14 +258,14 @@ window.saveLunaStats = async () => {
     alert("Luna updated! 🐑");
 };
 
-// --- Actions: Users ---
+// --- Actions: Users (Ban/Details) ---
 
 window.openUserModal = async (uid, name) => {
     selectedUserId = uid;
     document.getElementById('modalUserName').innerText = name;
     document.getElementById('userModal').classList.add('open');
     
-    // Load User Specifics
+    // Check Ban Status
     const status = adminConfig.userStatus[uid] || { banned: false };
     const banTog = document.getElementById('banToggle');
     if (status.banned) banTog.classList.add('active'); else banTog.classList.remove('active');
@@ -265,17 +289,23 @@ window.closeUserModal = () => {
 window.toggleBan = async () => {
     if (!selectedUserId) return;
     if (selectedUserId === 'guest') return alert("Gast kann nicht gebannt werden.");
+    if (selectedUserId === 'collin') return alert("Admin kann nicht gebannt werden.");
     
-    if (!adminConfig.userStatus[selectedUserId]) adminConfig.userStatus[selectedUserId] = { role: 'user', banned: false };
+    if (!adminConfig.userStatus[selectedUserId]) {
+        adminConfig.userStatus[selectedUserId] = { role: 'user', banned: false };
+    }
     
+    // Toggle
     adminConfig.userStatus[selectedUserId].banned = !adminConfig.userStatus[selectedUserId].banned;
     
+    // Update UI
     const banTog = document.getElementById('banToggle');
     if (adminConfig.userStatus[selectedUserId].banned) banTog.classList.add('active'); 
     else banTog.classList.remove('active');
     
+    // Sync
     await syncConfig();
-    renderUsersList();
+    renderUsersList(); // Update list indicators
 };
 
 window.saveUserDaily = async () => {
@@ -289,6 +319,7 @@ window.saveUserDaily = async () => {
 
 window.forceLogoutUser = async () => {
     if (!selectedUserId || !cloud) return;
+    // We reuse the ban logic slightly or trigger the logout timestamp
     await cloud.adminForceLogout(selectedUserId);
     alert("Logout Signal gesendet.");
 };
@@ -304,7 +335,7 @@ window.resetUser = async () => {
     }
 };
 
-// --- Actions: Rewards ---
+// --- Actions: Rewards Management ---
 
 window.loadUserRewardsList = async () => {
     const uid = document.getElementById('rewardUserSelect').value;
@@ -312,15 +343,24 @@ window.loadUserRewardsList = async () => {
     list.innerHTML = '<div style="padding:20px; text-align:center;">Lade Daten...</div>';
     
     try {
-        if (cloud) userRewardsData = await cloud.loadRewards(uid);
-        else userRewardsData = JSON.parse(localStorage.getItem(uid === 'guest' ? 'fiaos_rewards_guest' : `fiaos_rewards_${uid}`) || '{}');
+        if (cloud) {
+            userRewardsData = await cloud.loadRewards(uid);
+        } else {
+            userRewardsData = JSON.parse(localStorage.getItem(uid === 'guest' ? 'fiaos_rewards_guest' : `fiaos_rewards_${uid}`) || 'null');
+        }
+        
+        // Critical Fix: Use Default Structure if null to prevent crashes
+        if (!userRewardsData) {
+            userRewardsData = JSON.parse(JSON.stringify(DEFAULT_REWARDS_STRUCT));
+        }
         
         if (!userRewardsData.rewards) userRewardsData.rewards = {};
         if (!userRewardsData.valentine) userRewardsData.valentine = { unlocked: {} };
 
         renderRewardsList();
     } catch(e) {
-        list.innerHTML = 'Fehler beim Laden.';
+        console.error(e);
+        list.innerHTML = 'Fehler beim Laden. Siehe Konsole.';
     }
 };
 
@@ -334,9 +374,9 @@ function renderRewardsList() {
 
         let unlocked = false;
         if (r.id.startsWith('valentine.')) {
-            unlocked = userRewardsData.valentine.unlocked[r.id] || false;
+            unlocked = userRewardsData.valentine?.unlocked?.[r.id] || false;
         } else {
-            unlocked = userRewardsData.rewards[r.id]?.unlocked || false;
+            unlocked = userRewardsData.rewards?.[r.id]?.unlocked || false;
         }
 
         const el = document.createElement('div');
@@ -364,12 +404,20 @@ window.toggleReward = async (rId) => {
     
     // Toggle Logic
     let newVal = false;
+    
+    // Ensure structure exists
     if (rId.startsWith('valentine.')) {
+        if (!userRewardsData.valentine) userRewardsData.valentine = { unlocked: {} };
+        if (!userRewardsData.valentine.unlocked) userRewardsData.valentine.unlocked = {};
+        
         newVal = !userRewardsData.valentine.unlocked[rId];
         userRewardsData.valentine.unlocked[rId] = newVal;
     } else {
+        if (!userRewardsData.rewards) userRewardsData.rewards = {};
+        
         const curr = userRewardsData.rewards[rId]?.unlocked || false;
         newVal = !curr;
+        
         if (!userRewardsData.rewards[rId]) userRewardsData.rewards[rId] = {};
         userRewardsData.rewards[rId].unlocked = newVal;
         if (newVal) userRewardsData.rewards[rId].unlockedAt = Date.now();

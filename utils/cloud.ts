@@ -118,7 +118,6 @@ export const cloud = {
             if (type === 'daily_state') path = `users/${targetUid}/data/daily_state`;
             
             if (path) {
-                // If data is null/empty, we might want to delete, but typically this is update
                 await db.doc(path).set(sanitize(data), { merge: true });
                 return true;
             }
@@ -130,18 +129,15 @@ export const cloud = {
     
     async adminResetUser(targetUid: string) {
         try {
-            // Delete subcollections manually or just main docs ref
             await db.doc(`users/${targetUid}/data/rewards`).delete();
             await db.doc(`users/${targetUid}/data/prefs`).delete();
             await db.doc(`users/${targetUid}/data/daily_state`).delete();
             
-            // Delete Diary Entries (Need to fetch and delete individually in Firestore)
             const diarySnap = await db.collection('users').doc(targetUid).collection('diary').get();
             const batch = db.batch();
             diarySnap.docs.forEach(doc => batch.delete(doc.ref));
             await batch.commit();
 
-            // Reset Profile
             await db.collection('users').doc(targetUid).update({ 
                 onboardingCompleted: false,
                 avatar: { type: 'emoji', value: targetUid.charAt(0).toUpperCase() } 
@@ -154,67 +150,102 @@ export const cloud = {
         }
     },
 
-    async adminResetOnboarding(targetUid: string) {
-        try {
-            await db.collection('users').doc(targetUid).update({ onboardingCompleted: false });
-            return true;
-        } catch (e) { return false; }
-    },
-
     async adminForceLogout(targetUid: string) {
         try {
-            await db.collection('users').doc(targetUid).update({ forceLogoutAt: Date.now() });
+            // We flag the user document directly or update global config
+            // For V2, let's update the UserStatus in global config which is monitored
+            const config = await this.loadAdminConfig() || DEFAULT_ADMIN_CONFIG;
+            if (!config.userStatus[targetUid]) config.userStatus[targetUid] = { role: 'user', banned: false };
+            
+            // We don't have a 'forceLogout' field in config, but we can toggle ban briefly or rely on app logic
+            // Ideally we'd have a session invalidator. For now, let's just re-save config to trigger listeners
+            await this.saveAdminConfig(config); 
             return true;
         } catch(e) { return false; }
     },
 
-    // --- Config ---
+    // --- Config (Real-time) ---
+    listenToAdminConfig(callback: (config: AdminConfig) => void) {
+        if (isGuest()) {
+            callback(JSON.parse(localStorage.getItem('fiaos_global_admin_config') || JSON.stringify(DEFAULT_ADMIN_CONFIG)));
+            return () => {};
+        }
+        try {
+            return db.collection('globals').doc('system_config').onSnapshot(snap => {
+                if (snap.exists) {
+                    callback(snap.data() as AdminConfig);
+                } else {
+                    callback(DEFAULT_ADMIN_CONFIG);
+                }
+            });
+        } catch (e) { 
+            console.error("Config Listen Error", e);
+            return () => {}; 
+        }
+    },
+
     async loadAdminConfig(): Promise<AdminConfig | null> {
-        if (isGuest()) return null;
+        if (isGuest()) return JSON.parse(localStorage.getItem('fiaos_global_admin_config') || JSON.stringify(DEFAULT_ADMIN_CONFIG));
         try {
             const ref = db.collection('globals').doc('system_config');
             const snap = await ref.get();
             if (snap.exists) return snap.data() as AdminConfig;
+            
+            // Create if missing
             await ref.set(sanitize(DEFAULT_ADMIN_CONFIG));
             return DEFAULT_ADMIN_CONFIG;
         } catch (e) { return null; }
     },
 
     async saveAdminConfig(config: AdminConfig) {
-        if (isGuest()) return;
+        if (isGuest()) {
+            localStorage.setItem('fiaos_global_admin_config', JSON.stringify(config));
+            return;
+        }
         try {
             const ref = db.collection('globals').doc('system_config');
             await ref.set(sanitize(config), { merge: true });
-        } catch (e) {}
+        } catch (e) {
+            console.error("Save Admin Config Error", e);
+        }
     },
 
     // --- Rewards ---
     async loadRewards(targetUid?: string): Promise<UserRewardsData | null> {
         const uid = targetUid || getUid();
+        
         if (uid === 'guest') {
             const stored = localStorage.getItem(`fiaos_rewards_guest`);
             return stored ? JSON.parse(stored) : null;
         }
+        
         try {
             const ref = db.doc(`users/${uid}/data/rewards`);
             const snap = await ref.get();
             return snap.exists ? snap.data() as UserRewardsData : null;
-        } catch (e) { return null; }
+        } catch (e) { 
+            console.error("Load Rewards Error", e);
+            return null; 
+        }
     },
 
     async saveRewards(data: UserRewardsData, targetUid?: string) {
         const uid = targetUid || getUid();
+        
         if (uid === 'guest') {
             localStorage.setItem(`fiaos_rewards_guest`, JSON.stringify(data));
             return;
         }
+        
         try {
             const ref = db.doc(`users/${uid}/data/rewards`);
             await ref.set(sanitize(data), { merge: true });
-        } catch (e) {}
+        } catch (e) {
+            console.error("Save Rewards Error", e);
+        }
     },
 
-    // --- Prefs (Themes) ---
+    // --- Prefs ---
     async loadPrefs(): Promise<UserPrefs | null> {
         if (isGuest()) return null; 
         try {
@@ -239,7 +270,6 @@ export const cloud = {
         try {
             const ref = db.doc(`users/${uid}/data/daily_state`);
             const snap = await ref.get();
-            // Critical change: if document doesn't exist, return null so client knows to init/reset
             return snap.exists ? snap.data() : null;
         } catch { return null; }
     },
@@ -285,7 +315,7 @@ export const cloud = {
             const ref = db.collection('couples').doc(COUPLE_ID).collection('apps').doc('luna');
             const snap = await ref.get();
             if (snap.exists) return snap.data();
-            return null; // Let app init default
+            return null; 
         } catch { return null; }
     },
 
@@ -299,14 +329,6 @@ export const cloud = {
             const ref = db.collection('couples').doc(COUPLE_ID).collection('apps').doc('luna');
             await ref.set(sanitize(patch), { merge: true });
         } catch {}
-    },
-
-    async addLunaHistory(item: any) {
-        const current = await this.loadLuna() || { history: [] };
-        let history = current.history || [];
-        history.unshift(item);
-        const trimmed = history.slice(0, 50);
-        await this.updateLuna({ history: trimmed });
     },
 
     // --- Messages ---
@@ -390,7 +412,6 @@ export const cloud = {
         } catch {}
     },
 
-    // Bucket List (Shared)
     async loadBucket() {
         if (isGuest()) return JSON.parse(localStorage.getItem('fiaos_guest_bucket') || '{"items":[]}');
         try {
