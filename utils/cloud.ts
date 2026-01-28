@@ -1,7 +1,7 @@
 
 import { db, auth } from './firebase';
 import { doc, getDoc, setDoc, updateDoc, collection, getDocs, query, orderBy, limit, serverTimestamp } from 'firebase/firestore';
-import { signInWithEmailAndPassword } from 'firebase/auth';
+import { signInWithEmailAndPassword, createUserWithEmailAndPassword } from 'firebase/auth';
 import { UserRewardsData } from '../types';
 
 // Placeholder Emails for Silent Auth
@@ -45,9 +45,26 @@ export const cloud = {
             await signInWithEmailAndPassword(auth, email, password);
             return true;
         } catch (e: any) {
+            // Auto-provision if missing (fixes "invalid-credential" on fresh projects)
+            if (e.code === 'auth/invalid-credential' || e.code === 'auth/user-not-found') {
+                try {
+                    console.log(`[Cloud] User ${userId} not found. Attempting to create account...`);
+                    await createUserWithEmailAndPassword(auth, email, password);
+                    console.log(`[Cloud] User ${userId} created successfully.`);
+                    return true;
+                } catch (createErr: any) {
+                    // If creation fails (e.g. weak password or email taken), fall back
+                    if (createErr.code === 'auth/email-already-in-use') {
+                         // Password was wrong for existing user
+                         console.warn(`[Cloud] Login failed: Wrong password for existing user.`);
+                    } else {
+                         console.warn(`[Cloud] Auto-creation failed:`, createErr.code);
+                    }
+                }
+            }
+            
             // Gracefully handle auth errors for smoother offline/dev experience
-            // This prevents "Cloud Auth Failed" spam when credentials don't match or users don't exist in FB yet.
-            const ignoredCodes = ['auth/invalid-credential', 'auth/user-not-found', 'auth/invalid-email', 'auth/internal-error'];
+            const ignoredCodes = ['auth/invalid-credential', 'auth/user-not-found', 'auth/invalid-email', 'auth/internal-error', 'auth/network-request-failed'];
             if (ignoredCodes.includes(e.code)) {
                 console.warn(`[Cloud] Silent login skipped: ${e.code}. Running in offline mode.`);
                 return false;
