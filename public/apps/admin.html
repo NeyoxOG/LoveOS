@@ -32,7 +32,7 @@
             user-select: none;
         }
 
-        /* --- Sidebar / Nav (Mobile: Top, Desktop: Left potentially, but sticking to mobile-first top for iframe) --- */
+        /* --- Nav --- */
         .nav-bar {
             padding: 12px;
             background: rgba(28, 28, 30, 0.7);
@@ -125,48 +125,35 @@
         .app-name { font-size: 15px; font-weight: 600; }
         .app-status { font-size: 11px; color: var(--text-sec); }
 
-        /* --- User Cards --- */
-        .user-card {
-            display: flex; align-items: center; justify-content: space-between;
-            padding: 16px; background: var(--bg-card);
-            border-bottom: 1px solid var(--border);
+        /* --- User Management --- */
+        .user-header {
+            display: flex; align-items: center; gap: 16px; padding: 20px;
+            background: linear-gradient(to right, #1c1c1e, #2c2c2e);
+            border-radius: 16px; margin-bottom: 20px;
         }
-        .user-avatar {
-            width: 40px; height: 40px; border-radius: 50%; background: #333;
-            display: flex; align-items: center; justify-content: center; font-size: 18px; margin-right: 12px;
-        }
-        .user-info { flex: 1; }
-        .user-role-badge { 
-            font-size: 10px; padding: 2px 6px; border-radius: 4px; background: #333; color: #aaa; text-transform: uppercase; margin-left: 6px; 
-        }
-        .banned .user-role-badge { background: var(--danger); color: white; }
-
-        /* --- JSON Editor --- */
-        .editor-container {
-            display: flex; flex-direction: column; height: 100%;
-        }
-        .editor-toolbar {
-            display: flex; gap: 10px; margin-bottom: 10px;
-        }
-        select, .btn-small {
-            background: var(--bg-hover); color: white; border: none; padding: 8px 12px; border-radius: 8px; font-size: 13px;
-        }
-        .btn-small { cursor: pointer; font-weight: 600; }
-        .btn-small.primary { background: var(--primary); }
+        .user-big-avatar { width: 60px; height: 60px; background: var(--primary); border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 30px; }
+        .user-actions-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 20px; }
         
-        .json-area {
-            width: 100%; height: 400px;
-            background: #111; color: #0f0;
-            font-family: 'Menlo', 'Monaco', monospace; font-size: 12px;
-            padding: 16px; border-radius: 12px; border: 1px solid var(--border);
-            resize: vertical; outline: none;
+        .action-card {
+            background: var(--bg-card); padding: 16px; border-radius: 12px;
+            display: flex; flex-direction: column; align-items: center; text-align: center; gap: 8px;
+            cursor: pointer; transition: background 0.2s;
         }
-        .json-area.error { border-color: var(--danger); }
+        .action-card:active { background: var(--bg-hover); }
+        .action-card.danger { color: var(--danger); }
+        
+        /* --- Rewards List --- */
+        .reward-toggle-item {
+            display: flex; align-items: center; justify-content: space-between;
+            padding: 12px 16px; background: var(--bg-card); border-bottom: 1px solid var(--border);
+        }
+        .reward-info { display: flex; align-items: center; gap: 10px; }
+        .reward-icon { width: 32px; height: 32px; background: rgba(255,255,255,0.1); border-radius: 8px; display: flex; justify-content: center; align-items: center; }
 
         /* --- Toggles & Buttons --- */
         .toggle {
             width: 51px; height: 31px; background: #39393d; border-radius: 15.5px;
-            position: relative; transition: 0.3s; cursor: pointer;
+            position: relative; transition: 0.3s; cursor: pointer; flex-shrink: 0;
         }
         .toggle::after {
             content: ''; position: absolute; top: 2px; left: 2px;
@@ -181,7 +168,6 @@
             font-size: 17px; font-weight: 500; border: none; border-radius: 12px; cursor: pointer;
             margin-bottom: 16px;
         }
-        .btn-block.danger { color: var(--danger); }
         .btn-block:active { background: var(--bg-hover); opacity: 0.8; }
 
         .loading-overlay {
@@ -194,7 +180,6 @@
         @keyframes spin { to { transform: rotate(360deg); } }
 
         .hidden { display: none !important; }
-
         .status-dot { width: 8px; height: 8px; border-radius: 50%; background: #666; display: inline-block; margin-right: 6px; }
         .status-dot.online { background: var(--success); box-shadow: 0 0 8px var(--success); }
 
@@ -205,23 +190,23 @@
     <div class="nav-bar">
         <div class="segmented-control">
             <div class="segment-indicator" id="segIndicator"></div>
-            <div class="segment-btn active" onclick="switchTab('dashboard', 0)">Dash</div>
-            <div class="segment-btn" onclick="switchTab('users', 1)">Users</div>
-            <div class="segment-btn" onclick="switchTab('apps', 2)">Apps</div>
-            <div class="segment-btn" onclick="switchTab('cloud', 3)">Cloud</div>
+            <div class="segment-btn active" onclick="switchTab('system', 0)">System</div>
+            <div class="segment-btn" onclick="switchTab('fia', 1)">Fia</div>
+            <div class="segment-btn" onclick="switchTab('collin', 2)">Collin</div>
+            <div class="segment-btn" onclick="switchTab('rewards', 3)">Rewards</div>
         </div>
     </div>
 
     <div class="main-view">
         
-        <!-- DASHBOARD TAB -->
-        <div id="tab-dashboard">
+        <!-- SYSTEM TAB -->
+        <div id="tab-system">
             <div class="section-title">System Status</div>
             <div class="card">
                 <div class="list-row">
                     <div class="row-left">
                         <span class="row-main">Maintenance Mode</span>
-                        <span class="row-sub">Sperrt Zugriff für User</span>
+                        <span class="row-sub">Sperrt Zugriff für User (Password Bypass)</span>
                     </div>
                     <div class="toggle" id="dashMaintToggle" onclick="toggleMaintenance()"></div>
                 </div>
@@ -234,62 +219,58 @@
                 </div>
             </div>
 
-            <div class="section-title">Schnellzugriff</div>
-            <div class="app-grid" style="grid-template-columns: 1fr 1fr;">
-                <button class="btn-block" onclick="quickAction('healLuna')" style="background: #1c1c1e; color: #ec4899; margin:0;">
-                    💖 Luna Heilen
-                </button>
-                <button class="btn-block" onclick="quickAction('resetDaily')" style="background: #1c1c1e; color: #fbbf24; margin:0;">
-                    ☀️ Reset Daily
-                </button>
-            </div>
-            
-            <button class="btn-block danger" style="margin-top:24px;" onclick="confirmAction('globalLogout')">
-                Alle User ausloggen
-            </button>
-        </div>
-
-        <!-- USERS TAB -->
-        <div id="tab-users" class="hidden">
-            <div class="section-title">Benutzerverwaltung</div>
-            <div class="card" id="userListContainer">
-                <!-- Populated by JS -->
-                <div style="padding:20px; text-align:center;">Lade User...</div>
-            </div>
-        </div>
-
-        <!-- APPS TAB -->
-        <div id="tab-apps" class="hidden">
             <div class="section-title">App Sichtbarkeit</div>
             <div class="app-grid" id="appsGrid">
                 <!-- Populated by JS -->
             </div>
         </div>
 
-        <!-- CLOUD TAB -->
-        <div id="tab-cloud" class="hidden">
-            <div class="section-title">Datenbank Inspektor</div>
-            <div class="editor-toolbar">
-                <select id="inspTarget" style="flex:1;">
-                    <option value="fia">👤 Fia</option>
-                    <option value="collin">👤 Collin</option>
-                    <option value="guest">👤 Gast (Lokal)</option>
-                </select>
-                <select id="inspType" style="flex:1;">
-                    <option value="profile">Profil</option>
-                    <option value="rewards">Rewards</option>
-                    <option value="prefs">Settings</option>
-                    <option value="luna">Luna (Shared)</option>
-                    <option value="adminConfig">Config</option>
-                </select>
-                <button class="btn-small primary" onclick="fetchData()">Laden</button>
+        <!-- USER TABS (Template populated by JS) -->
+        <div id="tab-user-detail" class="hidden">
+            <div class="user-header">
+                <div class="user-big-avatar" id="uDetailAvatar">👤</div>
+                <div>
+                    <h2 style="font-size:24px; font-weight:700;" id="uDetailName">User</h2>
+                    <p style="color:var(--text-sec); font-size:13px;" id="uDetailId">ID: ...</p>
+                </div>
             </div>
 
-            <textarea id="jsonEditor" class="json-area" spellcheck="false" placeholder="// Wähle Daten und klicke Laden..."></textarea>
+            <div class="section-title">Aktionen</div>
+            <div class="user-actions-grid">
+                <div class="action-card" onclick="actionResetOnboarding()">
+                    <span style="font-size:24px;">🚀</span>
+                    <span style="font-weight:600; font-size:13px;">Reset Intro</span>
+                </div>
+                <div class="action-card" onclick="actionForceLogout()">
+                    <span style="font-size:24px;">🔌</span>
+                    <span style="font-weight:600; font-size:13px;">Force Logout</span>
+                </div>
+            </div>
+
+            <div class="section-title">Status</div>
+            <div class="card">
+                <div class="list-row">
+                    <div class="row-left">
+                        <span class="row-main">Account Ban</span>
+                        <span class="row-sub">Sperrt Login komplett</span>
+                    </div>
+                    <div class="toggle" id="uDetailBanToggle" onclick="actionToggleBan()"></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- REWARDS TAB -->
+        <div id="tab-rewards" class="hidden">
+            <div style="padding: 0 16px 16px;">
+                <select id="rewardUserSelect" onchange="loadUserRewardsList()" style="width:100%; padding:10px; border-radius:12px; background:var(--bg-card); color:white; border:none; font-size:16px;">
+                    <option value="fia">Fia</option>
+                    <option value="collin">Collin</option>
+                    <option value="guest">Gast</option>
+                </select>
+            </div>
             
-            <div style="display:flex; justify-content:space-between; margin-top:10px;">
-                <span id="editorStatus" style="font-size:11px; color:var(--text-sec); align-self:center;">Bereit</span>
-                <button class="btn-small primary" onclick="saveData()">Speichern</button>
+            <div class="card" id="rewardsListContainer">
+                <!-- List -->
             </div>
         </div>
 

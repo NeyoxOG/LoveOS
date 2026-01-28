@@ -1,6 +1,6 @@
 
 /**
- * AdminOS Logic v2.0
+ * AdminOS Logic v2.5
  */
 
 const KEYS = { SESSION: 'fiaos_session', USER_INDEX: 'fiaos_global_user_index' };
@@ -8,19 +8,45 @@ const KEYS = { SESSION: 'fiaos_session', USER_INDEX: 'fiaos_global_user_index' }
 let currentUser = null;
 let adminConfig = null;
 let cloud = null;
-let userIndex = null;
+let selectedUserId = null;
+let userRewardsData = null; // Cache for rewards editing
 
 // App Definitions for the Grid
 const APP_DEFS = [
     { id: 'luna', name: 'Luna', icon: '🐑' },
     { id: 'valentine', name: 'Valentine', icon: '💘' },
-    { id: 'rewards', name: 'Erfolge', icon: '🏆' },
+    { id: 'rewards_app', name: 'Belohnungen', icon: '🎁' },
     { id: 'vault', name: 'Vault', icon: '💌' },
     { id: 'games', name: 'Arcade', icon: '🕹️' },
     { id: 'diary', name: 'Diary', icon: '📔' },
     { id: 'daily', name: 'Daily', icon: '✨' },
     { id: 'love', name: 'Love', icon: '💞' },
-    { id: 'settings', name: 'Settings', icon: '⚙️' } // Usually hidden from toggle
+    { id: 'messages', name: 'Chat', icon: '💬' },
+    { id: 'settings', name: 'Settings', icon: '⚙️' }
+];
+
+// Simplified Catalog for Admin Toggle
+const REWARD_CATALOG_MOCK = [
+    { id: 'reward.welcome', title: 'Willkommen' },
+    { id: 'reward.welcomeTheme', title: 'Theme: Aurora' },
+    { id: 'reward.firstLogin', title: 'Erster Login' },
+    { id: 'reward.firstAppOpen', title: 'Erste App' },
+    { id: 'reward.firstReward', title: 'Erster Erfolg' },
+    { id: 'reward.streak3', title: '3 Tage Streak' },
+    { id: 'reward.secretLove', title: 'Secret Love' },
+    { id: 'custom_theme_unlock', title: 'Theme: Custom' },
+    { id: 'daily.points100', title: 'Theme: Royal' },
+    { id: 'love_1_month', title: 'Theme: Soft Rose' },
+    { id: 'love_3_month', title: 'Theme: Midnight' },
+    { id: 'love_6_month', title: 'Theme: Pastel' },
+    { id: 'love_1_year', title: 'Theme: Eternal' },
+    // Valentine
+    { id: 'valentine.reward.pizza', title: 'Val: Pizza' },
+    { id: 'valentine.reward.photo', title: 'Val: Foto' },
+    { id: 'valentine.reward.letter', title: 'Val: Brief' },
+    { id: 'valentine.reward.care', title: 'Val: Care' },
+    { id: 'valentine.reward.art', title: 'Val: Art' },
+    { id: 'valentine.reward.secret', title: 'Val: Secret' }
 ];
 
 function init() {
@@ -34,8 +60,7 @@ function init() {
         cloud = window.parent.FIAOS.cloud;
     }
 
-    // Init UI
-    loadEverything();
+    loadSystemData();
 }
 
 function denyAccess() {
@@ -45,67 +70,47 @@ function denyAccess() {
     </div>`;
 }
 
-function ensureAdmin() {
-    if (!currentUser || (currentUser.role !== 'admin' && currentUser.role !== 'developer')) {
-        alert("Access Denied");
-        return false;
-    }
-    return true;
-}
-
-async function loadEverything() {
+async function loadSystemData() {
     toggleLoading(true);
     try {
-        // Load Admin Config
         if (cloud) {
             adminConfig = await cloud.loadAdminConfig();
             document.getElementById('cloudStatusDot').classList.add('online');
             document.getElementById('cloudStatusTxt').innerText = "Online";
         } else {
             adminConfig = JSON.parse(localStorage.getItem('fiaos_global_admin_config') || '{}');
-            document.getElementById('cloudStatusTxt').innerText = "Offline (Local)";
+            document.getElementById('cloudStatusTxt').innerText = "Offline";
         }
 
-        // Defaults
-        if (!adminConfig?.appVisibility) adminConfig.appVisibility = {};
-        if (!adminConfig?.userStatus) adminConfig.userStatus = {};
+        if (!adminConfig.appVisibility) adminConfig.appVisibility = {};
+        if (!adminConfig.userStatus) adminConfig.userStatus = {};
 
-        // Load User Index (Local Cache usually, but could be cloud)
-        const idx = localStorage.getItem(KEYS.USER_INDEX);
-        userIndex = idx ? JSON.parse(idx) : { users: [] };
-
-        renderDashboard();
-        renderApps();
-        renderUsers();
-
+        renderSystemTab();
     } catch(e) {
-        console.error("Admin Load Error", e);
-        alert("Ladefehler: " + e.message);
+        console.error(e);
+        alert("Fehler beim Laden.");
     }
     toggleLoading(false);
 }
 
 // --- Renderers ---
 
-function renderDashboard() {
+function renderSystemTab() {
+    // Maint Toggle
     const maintToggle = document.getElementById('dashMaintToggle');
     if (adminConfig.maintenanceMode) maintToggle.classList.add('active');
     else maintToggle.classList.remove('active');
-}
 
-function renderApps() {
+    // Apps Grid
     const grid = document.getElementById('appsGrid');
     grid.innerHTML = '';
-
     APP_DEFS.forEach(app => {
-        if (app.id === 'settings') return; // Skip settings
-
+        if (app.id === 'settings') return;
         const isVisible = adminConfig.appVisibility[app.id] !== false;
         
         const el = document.createElement('div');
         el.className = `app-card ${isVisible ? 'active' : 'disabled'}`;
         el.onclick = () => toggleAppVisibility(app.id);
-        
         el.innerHTML = `
             <div class="app-icon">${app.icon}</div>
             <div class="app-name">${app.name}</div>
@@ -115,94 +120,171 @@ function renderApps() {
     });
 }
 
-function renderUsers() {
-    const container = document.getElementById('userListContainer');
-    container.innerHTML = '';
+function renderUserTab(uid) {
+    selectedUserId = uid;
+    document.getElementById('uDetailName').innerText = uid.charAt(0).toUpperCase() + uid.slice(1);
+    document.getElementById('uDetailId').innerText = uid;
+    
+    // Status
+    const isBanned = adminConfig.userStatus[uid]?.banned;
+    const banToggle = document.getElementById('uDetailBanToggle');
+    if (isBanned) banToggle.classList.add('active'); else banToggle.classList.remove('active');
+}
 
-    // Merge known users with config status
-    const users = userIndex.users.map(u => {
-        const status = adminConfig.userStatus[u.userId] || { role: u.role, banned: false };
-        return { ...u, ...status };
-    });
-
-    // Ensure hardcoded users are present if not in index
-    ['fia', 'collin', 'guest'].forEach(id => {
-        if (!users.find(u => u.userId === id)) {
-            users.push({ userId: id, displayName: id.toUpperCase(), role: id === 'collin'?'admin':'user', banned: false, avatar: {type:'emoji', value:'👤'} });
+async function loadUserRewardsList() {
+    const uid = document.getElementById('rewardUserSelect').value;
+    const container = document.getElementById('rewardsListContainer');
+    container.innerHTML = '<div style="padding:20px; text-align:center;">Lade...</div>';
+    
+    try {
+        if (cloud) {
+            userRewardsData = await cloud.loadRewards(uid);
+        } else {
+            // Local fallback simulation
+            userRewardsData = JSON.parse(localStorage.getItem(uid === 'guest' ? 'fiaos_rewards_guest' : `fiaos_rewards_${uid}`) || 'null');
         }
-    });
 
-    users.forEach(u => {
-        const isBanned = adminConfig.userStatus[u.userId]?.banned;
-        const isGuest = u.userId === 'guest';
-        
-        const div = document.createElement('div');
-        div.className = `user-card ${isBanned ? 'banned' : ''}`;
-        
-        const avatar = u.avatar?.type === 'emoji' ? u.avatar.value : '👤';
-        
-        const toggleStyle = isGuest 
-            ? 'opacity:0.3; cursor:not-allowed; background:#39393d' 
-            : `transform:scale(0.8); background:${isBanned ? '#ff453a' : '#39393d'}`;
+        if (!userRewardsData) {
+            container.innerHTML = '<div style="padding:20px; text-align:center;">Keine Daten. User muss sich erst einloggen.</div>';
+            return;
+        }
 
-        div.innerHTML = `
-            <div class="user-avatar">${avatar}</div>
-            <div class="user-info">
-                <div style="font-weight:600; font-size:15px;">
-                    ${u.displayName} 
-                    <span class="user-role-badge">${u.role}</span>
+        container.innerHTML = '';
+        REWARD_CATALOG_MOCK.forEach(r => {
+            let unlocked = false;
+            // Check reward or valentine
+            if (r.id.startsWith('valentine.')) {
+                unlocked = userRewardsData.valentine?.unlocked?.[r.id] || false;
+            } else {
+                unlocked = userRewardsData.rewards?.[r.id]?.unlocked || false;
+            }
+
+            const div = document.createElement('div');
+            div.className = 'reward-toggle-item';
+            div.innerHTML = `
+                <div class="reward-info">
+                    <div class="reward-icon">${unlocked ? '🔓' : '🔒'}</div>
+                    <span>${r.title}</span>
                 </div>
-                <div style="font-size:12px; color:rgba(255,255,255,0.4);">${u.userId}</div>
-            </div>
-            <div class="toggle ${!isGuest && isBanned ? 'active' : ''}" style="${toggleStyle}" onclick="toggleBan('${u.userId}')"></div>
-        `;
-        container.appendChild(div);
-    });
+                <div class="toggle ${unlocked ? 'active' : ''}" onclick="toggleReward('${r.id}', '${uid}')"></div>
+            `;
+            container.appendChild(div);
+        });
+
+    } catch(e) {
+        container.innerHTML = '<div style="padding:20px; text-align:center;">Fehler beim Laden.</div>';
+    }
 }
 
 // --- Actions ---
 
 window.switchTab = (id, idx) => {
-    // Hide all tabs
-    document.querySelectorAll('[id^="tab-"]').forEach(el => el.classList.add('hidden'));
-    // Show target
-    document.getElementById(`tab-${id}`).classList.remove('hidden');
-    
-    // Update segment
+    // UI Update
     document.querySelectorAll('.segment-btn').forEach((b, i) => {
         if (i === idx) b.classList.add('active'); else b.classList.remove('active');
     });
     document.getElementById('segIndicator').style.transform = `translateX(${idx * 100}%)`;
+
+    // Views
+    document.getElementById('tab-system').classList.add('hidden');
+    document.getElementById('tab-user-detail').classList.add('hidden');
+    document.getElementById('tab-rewards').classList.add('hidden');
+
+    if (id === 'system') {
+        document.getElementById('tab-system').classList.remove('hidden');
+        renderSystemTab();
+    } else if (id === 'rewards') {
+        document.getElementById('tab-rewards').classList.remove('hidden');
+        loadUserRewardsList();
+    } else {
+        // User Tab
+        document.getElementById('tab-user-detail').classList.remove('hidden');
+        renderUserTab(id); // 'fia' or 'collin'
+    }
 };
 
+// System Actions
 window.toggleMaintenance = async () => {
-    if (!ensureAdmin()) return;
     adminConfig.maintenanceMode = !adminConfig.maintenanceMode;
     await syncConfig();
-    renderDashboard();
+    renderSystemTab();
 };
 
 window.toggleAppVisibility = async (appId) => {
-    if (!ensureAdmin()) return;
     adminConfig.appVisibility[appId] = !adminConfig.appVisibility[appId];
     await syncConfig();
-    renderApps();
+    renderSystemTab();
 };
 
-window.toggleBan = async (userId) => {
-    if (!ensureAdmin()) return;
+// User Actions
+window.actionToggleBan = async () => {
+    if (!selectedUserId) return;
+    if (selectedUserId === 'guest') return alert("Gast kann nicht gesperrt werden.");
     
-    if (userId === 'guest') {
-        alert("Gast-Accounts können nicht gesperrt werden.");
-        return;
+    if (!adminConfig.userStatus[selectedUserId]) {
+        adminConfig.userStatus[selectedUserId] = { role: 'user', banned: false };
+    }
+    adminConfig.userStatus[selectedUserId].banned = !adminConfig.userStatus[selectedUserId].banned;
+    await syncConfig();
+    renderUserTab(selectedUserId);
+};
+
+window.actionResetOnboarding = async () => {
+    if (!selectedUserId) return;
+    if (!confirm(`Intro für ${selectedUserId} zurücksetzen?`)) return;
+    
+    toggleLoading(true);
+    if (cloud) {
+        await cloud.adminResetOnboarding(selectedUserId);
+        alert("Erledigt. Beim nächsten Login sieht der User das Intro.");
+    } else {
+        alert("Nur mit Cloud möglich.");
+    }
+    toggleLoading(false);
+};
+
+window.actionForceLogout = async () => {
+    if (!selectedUserId) return;
+    if (!confirm(`${selectedUserId} ausloggen?`)) return;
+    
+    toggleLoading(true);
+    if (cloud) {
+        await cloud.adminForceLogout(selectedUserId);
+        alert("Logout Signal gesendet.");
+    } else {
+        alert("Nur mit Cloud möglich.");
+    }
+    toggleLoading(false);
+};
+
+// Reward Action
+window.toggleReward = async (rId, uid) => {
+    if (!userRewardsData) return;
+    
+    toggleLoading(true);
+    
+    // Toggle Logic
+    let newVal = false;
+    if (rId.startsWith('valentine.')) {
+        newVal = !userRewardsData.valentine.unlocked[rId];
+        userRewardsData.valentine.unlocked[rId] = newVal;
+    } else {
+        const curr = userRewardsData.rewards[rId]?.unlocked || false;
+        newVal = !curr;
+        if (!userRewardsData.rewards[rId]) userRewardsData.rewards[rId] = {};
+        userRewardsData.rewards[rId].unlocked = newVal;
+        if (newVal) userRewardsData.rewards[rId].unlockedAt = Date.now();
     }
 
-    if (!adminConfig.userStatus[userId]) {
-        adminConfig.userStatus[userId] = { role: 'user', banned: false };
+    if (cloud) {
+        await cloud.saveRewards(userRewardsData, uid);
+    } else {
+        // local save simulation
+        localStorage.setItem(uid === 'guest' ? 'fiaos_rewards_guest' : `fiaos_rewards_${uid}`, JSON.stringify(userRewardsData));
     }
-    adminConfig.userStatus[userId].banned = !adminConfig.userStatus[userId].banned;
-    await syncConfig();
-    renderUsers();
+    
+    await loadUserRewardsList(); // Refresh UI
+    toggleLoading(false);
 };
 
 async function syncConfig() {
@@ -211,126 +293,11 @@ async function syncConfig() {
     } else {
         localStorage.setItem('fiaos_global_admin_config', JSON.stringify(adminConfig));
     }
-    // Broadcast change
+    // Broadcast
     if (window.parent.FIAOS_ADMIN_CONFIG_UPDATED) {
         window.parent.FIAOS_ADMIN_CONFIG_UPDATED(adminConfig);
     }
 }
-
-// --- Cloud Inspector ---
-
-window.fetchData = async () => {
-    if (!ensureAdmin()) return;
-    
-    const uid = document.getElementById('inspTarget').value;
-    const type = document.getElementById('inspType').value;
-    const editor = document.getElementById('jsonEditor');
-    const status = document.getElementById('editorStatus');
-
-    toggleLoading(true);
-    editor.value = "";
-    editor.classList.remove('error');
-    
-    try {
-        let data = null;
-        if (cloud) {
-            data = await cloud.adminGetData(uid, type);
-        } else {
-            // Local fallback simulation for Guest
-            if (uid === 'guest') {
-                if (type === 'rewards') data = JSON.parse(localStorage.getItem('fiaos_rewards_guest'));
-                // ... other local fallbacks
-            }
-        }
-        
-        if (data) {
-            editor.value = JSON.stringify(data, null, 4);
-            status.innerText = `Geladen: ${new Date().toLocaleTimeString()}`;
-            status.style.color = "#32d74b";
-        } else {
-            editor.value = "null"; // Not found
-            status.innerText = "Daten nicht gefunden oder leer.";
-            status.style.color = "#ff9f0a";
-        }
-    } catch(e) {
-        editor.value = `// ERROR \n${e.message}`;
-        status.innerText = "Fehler beim Laden";
-        status.style.color = "#ff453a";
-    }
-    toggleLoading(false);
-};
-
-window.saveData = async () => {
-    if (!ensureAdmin()) return;
-
-    const uid = document.getElementById('inspTarget').value;
-    const type = document.getElementById('inspType').value;
-    const editor = document.getElementById('jsonEditor');
-    const status = document.getElementById('editorStatus');
-
-    try {
-        const raw = editor.value;
-        const data = JSON.parse(raw); // Validate JSON
-        
-        toggleLoading(true);
-        if (cloud) {
-            await cloud.adminSetData(uid, type, data);
-            status.innerText = "Gespeichert & Synchronisiert ✅";
-            status.style.color = "#32d74b";
-        } else {
-            status.innerText = "Cloud Offline. Speichern nicht möglich.";
-        }
-    } catch(e) {
-        editor.classList.add('error');
-        alert("Ungültiges JSON! Bitte Syntax prüfen.\n" + e.message);
-        status.innerText = "Syntax Fehler";
-        status.style.color = "#ff453a";
-    }
-    toggleLoading(false);
-};
-
-// --- Quick Actions ---
-
-window.quickAction = async (action) => {
-    if (!ensureAdmin()) return;
-    
-    toggleLoading(true);
-    try {
-        if (action === 'healLuna') {
-            await cloud.updateLuna({ 
-                stats: { hunger: 100, energy: 100, hygiene: 100, fun: 100, love: 100 },
-                mood: 'happy'
-            });
-            alert("Luna wurde geheilt! 🐑💖");
-        } else if (action === 'resetDaily') {
-            // Manually resetting shared daily
-            // This is complex because Daily logic is split. 
-            // We just clear shared claims for today.
-            const today = new Date().toISOString().split('T')[0];
-            // Admin logic to clear specific document not exposed easily in simple cloud api
-            // So we might need to manually edit via inspector usually.
-            // But let's assume we implement a specific helper or just log.
-            alert("Bitte nutze den Cloud Inspector für Daily Resets (couples/daily/DATE).");
-        }
-    } catch(e) {
-        alert("Fehler: " + e.message);
-    }
-    toggleLoading(false);
-};
-
-window.confirmAction = (type) => {
-    if (!ensureAdmin()) return;
-    
-    if (type === 'globalLogout') {
-        if (confirm("WARNUNG: Dies zwingt alle Nutzer zum Logout. Fortfahren?")) {
-            // Logic: toggle a token in adminConfig that App.tsx listens to?
-            // Currently App.tsx listens to 'banned'. 
-            // We could just ban everyone momentarily or set a flag.
-            // For now, simpler:
-            alert("Feature kommt bald.");
-        }
-    }
-};
 
 function toggleLoading(show) {
     const el = document.getElementById('loading');

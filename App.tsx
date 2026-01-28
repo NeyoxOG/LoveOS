@@ -19,6 +19,7 @@ import Overlay from './components/Overlay';
 import RewardsSheet from './components/RewardsSheet';
 import AppWindow from './components/AppWindow';
 import Onboarding from './components/Onboarding';
+import MaintenanceScreen from './components/MaintenanceScreen';
 
 // Debug Interface Extension
 declare global {
@@ -65,6 +66,8 @@ const App: React.FC = () => {
 
   const [showOnboarding, setShowOnboarding] = useState(false);
   const [customBg, setCustomBg] = useState<string | null>(null);
+  
+  const [maintenanceBypass, setMaintenanceBypass] = useState(false);
 
   const showToast = useCallback((message: string) => {
     setToast({ id: Date.now(), message });
@@ -140,7 +143,6 @@ const App: React.FC = () => {
                     setAdminConfig(remoteConfig);
                     // Remote Ban Check
                     if (remoteConfig.userStatus[storedSession.userId]?.banned) {
-                        console.warn("User banned remotely.");
                         clearSession();
                         setSession(null);
                         showToast("Account wurde gesperrt. ⛔");
@@ -163,7 +165,11 @@ const App: React.FC = () => {
                     cloud.saveRewards(initial);
                 }
 
+                // Profile check for Forced Logout
                 if (profile) {
+                    // Check force logout timestamp vs login time (simplified)
+                    // In real app, check timestamps. For now, we trust the session is valid unless flag set.
+                    // If onboarding was reset remotely:
                     setUserProfile(profile as UserProfile);
                     if (!profile.onboardingCompleted) setShowOnboarding(true);
                 } else {
@@ -223,15 +229,30 @@ const App: React.FC = () => {
       }
   };
 
-  // --- PERIODIC BAN CHECK ---
+  // --- PERIODIC CHECKS (Ban & Logout) ---
   useEffect(() => {
     if (!session || session.role === 'guest') return;
 
     const checkStatus = async () => {
         const remoteConfig = await cloud.loadAdminConfig();
-        if (remoteConfig && remoteConfig.userStatus[session.userId]?.banned) {
-            handleLogout();
-            showToast("Zugriff entzogen: Account gesperrt. 🔒");
+        if (remoteConfig) {
+            setAdminConfig(remoteConfig);
+            if (remoteConfig.userStatus[session.userId]?.banned) {
+                handleLogout();
+                showToast("Zugriff entzogen: Account gesperrt. 🔒");
+                return;
+            }
+        }
+        
+        // Check user profile for forced logout
+        const profile = await cloud.loadProfile() as any;
+        if (profile && profile.forceLogoutAt) {
+            // If forced logout time is newer than login time... 
+            // Simplified: If session.lastLoginAt < forceLogoutAt
+            if (session.lastLoginAt < profile.forceLogoutAt) {
+                handleLogout();
+                showToast("Sitzung wurde fern-beendet. 🔌");
+            }
         }
     };
 
@@ -465,6 +486,13 @@ const App: React.FC = () => {
               <div className="text-white/50 text-sm font-medium tracking-widest animate-pulse">FIAOS</div>
           </div>
       );
+  }
+
+  // Check Maintenance Mode
+  const isMaintenance = adminConfig?.maintenanceMode && !maintenanceBypass && session?.role !== 'admin' && session?.role !== 'developer';
+  
+  if (isMaintenance) {
+      return <MaintenanceScreen onBypass={() => setMaintenanceBypass(true)} />;
   }
 
   // Calculate Background Style
