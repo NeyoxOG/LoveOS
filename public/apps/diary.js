@@ -1,19 +1,21 @@
 
 /**
- * Diary App Logic (Cloud Enhanced)
+ * Diary Logic 2.0
  */
 
 const KEYS = { SESSION: 'fiaos_session' };
 
+// Mood Value Map for Chart
+const MOOD_VALUES = {
+    '💗': 100, '✨': 90, '😊': 80, '🌙': 70,
+    '😐': 50, '😔': 30, '😡': 10
+};
+
 let user = null;
-let entries = [];
 let cloud = null;
-let currentTab = 'user';
+let entries = [];
 let currentMood = '💗';
-let isShared = false;
-let currentSearch = '';
-let editingId = null;
-let isSyncing = false;
+let viewMode = 'list'; // 'list' | 'calendar'
 
 function init() {
     const sessionStr = localStorage.getItem(KEYS.SESSION);
@@ -24,256 +26,185 @@ function init() {
         cloud = window.parent.FIAOS.cloud;
     }
 
-    if (user.role === 'guest') {
-        document.getElementById('scopeControl').style.display = 'none';
-        document.getElementById('scopeToggleRow').style.display = 'none';
-        updateSyncUI('Lokal (Gast)', 'offline');
-    } else {
-        updateSyncUI('Verbinde...', 'loading');
-    }
-
     loadData();
 }
 
-function updateSyncUI(text, status) {
-    const dot = document.getElementById('syncDot');
-    const txt = document.getElementById('syncText');
-    
-    txt.innerText = text;
-    dot.className = 'sync-dot ' + status;
-}
-
 async function loadData() {
-    try {
-        if (cloud && user.role !== 'guest') {
-            isSyncing = true;
-            updateSyncUI('Synchronisiere...', 'loading');
-            entries = await cloud.loadDiary();
-            updateSyncUI('Cloud Sync', 'online');
-        } else {
-            entries = await cloud.loadDiary(); 
-            if (user.role !== 'guest') updateSyncUI('Offline Mode', 'offline');
-        }
-    } catch(e) {
-        console.error("Load failed", e);
-        updateSyncUI('Fehler', 'offline');
-        entries = [];
-    } finally {
-        isSyncing = false;
-        renderTimeline();
+    if (cloud && user.role !== 'guest') {
+        entries = await cloud.loadDiary();
+    } else {
+        entries = JSON.parse(localStorage.getItem('fiaos_guest_diary') || '[]');
     }
+    
+    // Sort descending
+    entries.sort((a,b) => b.createdAt - a.createdAt);
+    
+    renderChart();
+    renderList();
+    renderCalendar();
 }
 
-function renderTimeline() {
-    const container = document.getElementById('timeline');
+// --- Views ---
+
+function setView(mode) {
+    viewMode = mode;
+    document.getElementById('btnList').classList.toggle('active', mode === 'list');
+    document.getElementById('btnCal').classList.toggle('active', mode === 'calendar');
+    
+    document.getElementById('listView').style.display = mode === 'list' ? 'flex' : 'none';
+    document.getElementById('calendarView').style.display = mode === 'calendar' ? 'grid' : 'none';
+}
+
+// --- Renderers ---
+
+function renderChart() {
+    const container = document.getElementById('chartBars');
     container.innerHTML = '';
+    
+    // Last 7 entries (reverse for chronological left-to-right)
+    const recent = entries.slice(0, 7).reverse();
+    
+    // Fill if less than 7
+    while (recent.length < 7) recent.unshift(null);
 
-    let filtered = entries.filter(e => {
-        if (currentTab === 'user' && e.scope !== 'user') return false;
-        if (currentTab === 'shared' && e.scope !== 'shared') return false;
-        if (currentSearch) {
-            const q = currentSearch.toLowerCase();
-            return (e.title && e.title.toLowerCase().includes(q)) || e.text.toLowerCase().includes(q);
-        }
-        return true;
+    recent.forEach(entry => {
+        const val = entry ? (MOOD_VALUES[entry.mood] || 50) : 0;
+        const col = document.createElement('div');
+        col.className = 'chart-col';
+        
+        const dayLabel = entry ? new Date(entry.createdAt).toLocaleDateString('de-DE', {weekday:'short'}).slice(0,2) : '-';
+        
+        col.innerHTML = `
+            <div class="bar-bg">
+                <div class="bar-fill" style="height: ${val}%"></div>
+            </div>
+            <div class="col-label">${dayLabel}</div>
+        `;
+        container.appendChild(col);
     });
+}
 
-    if (filtered.length === 0) {
-        container.innerHTML = '<div class="empty-state">Noch keine Einträge.<br>Tippe auf + um zu schreiben. ✍️</div>';
+function renderList() {
+    const list = document.getElementById('listView');
+    list.innerHTML = '';
+    
+    if (entries.length === 0) {
+        list.innerHTML = '<div style="text-align:center; color:#666; margin-top:40px;">Dein Journal ist leer.</div>';
         return;
     }
 
-    filtered.forEach((entry, index) => {
+    entries.forEach(entry => {
         const date = new Date(entry.createdAt);
-        const day = date.getDate();
-        const month = date.toLocaleDateString('de-DE', { month: 'short' });
+        const dateStr = date.toLocaleDateString('de-DE', { day: 'numeric', month: 'long' });
         
         const el = document.createElement('div');
         el.className = 'entry-card';
-        el.style.animationDelay = `${index * 0.05}s`;
-        el.onclick = () => openDetail(entry.id);
+        el.onclick = () => openEditor(entry); // Edit mode
         
         el.innerHTML = `
-            <div class="entry-mood-container">
-                <div class="entry-mood">${entry.mood}</div>
-                <div class="entry-day">${day}</div>
-                <div class="entry-month">${month}</div>
-            </div>
-            <div class="entry-content">
-                <div class="entry-header">
-                    <div class="entry-title">${entry.title || 'Gedanke'}</div>
-                    ${entry.pinned ? '<span class="pinned-icon">📌</span>' : ''}
-                </div>
-                <div class="entry-preview">${entry.text}</div>
-                ${entry.scope === 'shared' ? `
-                    <div class="entry-meta">
-                        <span class="author-badge">Von ${entry.authorName || 'Unbekannt'}</span>
-                    </div>` : ''
-                }
+            <div class="entry-mood-box">${entry.mood}</div>
+            <div class="entry-info">
+                <div class="entry-date">${dateStr}</div>
+                <div class="entry-title">${entry.title || 'Ohne Titel'}</div>
+                <div class="entry-snippet">${entry.text}</div>
             </div>
         `;
-        container.appendChild(el);
+        list.appendChild(el);
     });
 }
 
-window.filterEntries = (val) => {
-    currentSearch = val;
-    renderTimeline();
+function renderCalendar() {
+    const cal = document.getElementById('calendarView');
+    cal.innerHTML = '';
+    
+    // Simple current month view logic
+    const now = new Date();
+    const year = now.getFullYear();
+    const month = now.getMonth();
+    
+    const daysInMonth = new Date(year, month + 1, 0).getDate();
+    
+    for(let d=1; d<=daysInMonth; d++) {
+        // Check if entry exists on this day
+        // Simplified check: iterate entries
+        const hasEntry = entries.some(e => {
+            const ed = new Date(e.createdAt);
+            return ed.getDate() === d && ed.getMonth() === month && ed.getFullYear() === year;
+        });
+        
+        const el = document.createElement('div');
+        el.className = `cal-day ${hasEntry ? 'has-entry' : ''}`;
+        el.innerHTML = `
+            ${d}
+            ${hasEntry ? '<div class="cal-dot"></div>' : ''}
+        `;
+        cal.appendChild(el);
+    }
+}
+
+// --- Editor ---
+
+let editingId = null;
+
+window.openEditor = (existingEntry = null) => {
+    editingId = existingEntry ? existingEntry.id : null;
+    
+    document.getElementById('inpTitle').value = existingEntry ? existingEntry.title : '';
+    document.getElementById('inpBody').value = existingEntry ? existingEntry.text : '';
+    setMood(existingEntry ? existingEntry.mood : '💗');
+    
+    document.getElementById('editor').classList.add('active');
 };
 
-window.setTab = (tab, idx) => {
-    if (user.role === 'guest' && tab === 'shared') {
-        alert("Nur für Fia & Collin verfügbar.");
-        return;
-    }
-    playSound('click');
-    currentTab = tab;
-    document.getElementById('segIndicator').style.transform = `translateX(${idx * 100}%)`;
-    renderTimeline();
+window.closeEditor = () => {
+    document.getElementById('editor').classList.remove('active');
+};
+
+window.setMood = (m) => {
+    currentMood = m;
+    document.querySelectorAll('.mood-opt').forEach(el => {
+        el.classList.toggle('selected', el.innerText === m);
+    });
 };
 
 window.saveEntry = async () => {
     const title = document.getElementById('inpTitle').value.trim();
-    const text = document.getElementById('inpText').value.trim();
+    const text = document.getElementById('inpBody').value.trim();
     
-    if (!text) { alert("Bitte schreibe etwas..."); return; }
+    if (!text) return;
 
-    updateSyncUI('Speichere...', 'loading');
+    const entry = {
+        id: editingId || crypto.randomUUID(),
+        title, text, mood: currentMood,
+        createdAt: editingId ? (entries.find(e=>e.id===editingId).createdAt) : Date.now(),
+        updatedAt: Date.now(),
+        authorUserId: user.id,
+        authorName: user.name,
+        scope: 'user' // Default to private for Journal 2.0 simplification
+    };
 
-    // Create or Update
-    let entry = entries.find(e => e.id === editingId);
-    if (!entry) {
-        entry = {
-            id: crypto.randomUUID(),
-            createdAt: Date.now(),
-            updatedAt: Date.now(),
-            authorUserId: user.id,
-            authorName: user.name,
-            scope: isShared ? 'shared' : 'user',
-            title: title,
-            text: text,
-            mood: currentMood,
-            pinned: false
-        };
+    // Optimistic Update
+    if (editingId) {
+        const idx = entries.findIndex(e => e.id === editingId);
+        if (idx !== -1) entries[idx] = entry;
     } else {
-        entry.title = title;
-        entry.text = text;
-        entry.mood = currentMood;
-        entry.scope = isShared ? 'shared' : 'user';
-        entry.updatedAt = Date.now();
+        entries.unshift(entry);
     }
-
-    try {
+    
+    closeEditor();
+    renderList();
+    renderChart();
+    renderCalendar();
+    
+    if (cloud && user.role !== 'guest') {
         await cloud.saveDiaryEntry(entry);
-        
-        // Update local list manually
-        const existIdx = entries.findIndex(e => e.id === entry.id);
-        if (existIdx >= 0) entries[existIdx] = entry; else entries.unshift(entry);
-        entries.sort((a,b) => b.createdAt - a.createdAt);
-        
-        playSound('success');
-        closeEditor();
-        updateSyncUI('Gespeichert', 'online');
-        renderTimeline();
-    } catch(e) {
-        alert("Speichern fehlgeschlagen: Offline?");
-        updateSyncUI('Offline', 'offline');
+    } else {
+        localStorage.setItem('fiaos_guest_diary', JSON.stringify(entries));
     }
+    
+    if(window.parent.FIAOS) window.parent.FIAOS.playSound('success');
 };
 
-window.deleteCurrentEntry = async (id) => {
-    if (confirm("Wirklich löschen?")) {
-        // Mock Delete via save with removed flag or just alert
-        alert("Löschen Funktion noch nicht im Cloud-Adapter aktiv.");
-        closeDetail();
-    }
-};
-
-// UI Helpers
-window.openEditor = () => { 
-    editingId = null; 
-    document.getElementById('inpTitle').value = ''; 
-    document.getElementById('inpText').value = ''; 
-    selectMood('💗'); 
-    isShared = (currentTab === 'shared'); 
-    updateSharedToggle(); 
-    document.getElementById('editorOverlay').classList.add('active'); 
-    playSound('open');
-};
-
-window.closeEditor = () => { 
-    document.getElementById('editorOverlay').classList.remove('active'); 
-    playSound('close');
-};
-
-window.selectMood = (m) => { 
-    currentMood = m; 
-    document.querySelectorAll('.mood-opt').forEach(el => {
-        if (el.innerText === m) el.classList.add('selected');
-        else el.classList.remove('selected');
-    });
-};
-
-window.toggleShared = () => { 
-    if (user.role === 'guest') return; 
-    isShared = !isShared; 
-    updateSharedToggle(); 
-    playSound('click');
-};
-
-function updateSharedToggle() { 
-    const t = document.getElementById('toggleShared'); 
-    if (isShared) t.classList.add('active'); else t.classList.remove('active'); 
-}
-
-let viewingId = null;
-window.openDetail = (id) => { 
-    viewingId = id; 
-    const entry = entries.find(e => e.id === id); 
-    if (!entry) return; 
-    renderDetailContent(entry); 
-    document.getElementById('detailView').classList.add('active'); 
-    playSound('open');
-};
-
-window.closeDetail = () => { 
-    document.getElementById('detailView').classList.remove('active'); 
-    playSound('close');
-};
-
-window.editCurrentEntry = () => { 
-    const entry = entries.find(e => e.id === viewingId); 
-    if (!entry) return; 
-    editingId = entry.id; 
-    document.getElementById('inpTitle').value = entry.title; 
-    document.getElementById('inpText').value = entry.text; 
-    selectMood(entry.mood); 
-    isShared = entry.scope === 'shared'; 
-    updateSharedToggle(); 
-    document.getElementById('detailView').classList.remove('active');
-    document.getElementById('editorOverlay').classList.add('active'); 
-};
-
-function renderDetailContent(entry) {
-    const dateStr = new Date(entry.createdAt).toLocaleString('de-DE', { weekday:'long', year:'numeric', month:'long', day:'numeric', hour:'2-digit', minute:'2-digit' });
-    document.getElementById('detailContent').innerHTML = `
-        <div class="detail-mood-large">${entry.mood}</div>
-        <div class="detail-date">${dateStr}</div>
-        <div class="detail-title">${entry.title || 'Ohne Titel'}</div>
-        <div class="detail-text">${entry.text}</div>
-        <div class="detail-meta">
-            <span>${entry.scope === 'shared' ? '👫 Wir' : '🔒 Nur ich'}</span>
-            <span>•</span>
-            <span>Verfasst von ${entry.authorName}</span>
-        </div>
-        <button class="delete-btn" onclick="deleteCurrentEntry('${entry.id}')">Eintrag löschen</button>
-    `;
-}
-
-function playSound(type) {
-    if (window.parent.FIAOS && window.parent.FIAOS.playSound) {
-        window.parent.FIAOS.playSound(type);
-    }
-}
+window.setView = setView;
 
 init();

@@ -4,8 +4,14 @@
  */
 
 const KEYS = { SESSION: 'fiaos_session' };
-const PREFS_KEY = (uid) => `fiaos_user_${uid}_prefs`; 
-const PROFILE_KEY = (uid) => `fiaos_user_${uid}_profile`;
+
+// Key generator MUST match utils/data.ts
+const PREFS_KEY = (uid) => {
+    return uid === 'guest' ? 'fiaos_guest_guest_prefs' : `fiaos_user_${uid}_prefs`;
+};
+const PROFILE_KEY = (uid) => {
+    return uid === 'guest' ? 'fiaos_guest_guest_profile' : `fiaos_user_${uid}_profile`;
+};
 
 let user = null;
 let prefs = {};
@@ -16,7 +22,7 @@ let cloud = null;
 // Emojis for Avatar Picker
 const AVATAR_EMOJIS = ["👽", "🦊", "🐱", "🐶", "🦁", "🐯", "🐨", "🐼", "🐻", "🐰", "🐹", "🐭", "🦄", "🦋", "🍄", "🌺", "🌸", "🌼", "⚡", "🔥", "💧", "❄️", "🌟", "🌙", "🌍", "🪐", "🍕", "🍔", "🍟", "🍩"];
 
-// Themes Defs (Visual) - Updated with new options
+// Themes Defs (Visual) - Exact match with constants.ts
 const THEMES_UI = [
     { id: 'roseGlass', name: 'FiaOS Rose', color: '#4a0423', unlockRewardId: null },
     { id: 'lavender', name: 'Lavender', color: '#4c1d95', unlockRewardId: null },
@@ -54,7 +60,7 @@ async function loadEverything() {
         const pStr = localStorage.getItem(PREFS_KEY('guest'));
         prefs = pStr ? JSON.parse(pStr) : defaultPrefs();
         
-        const profStr = localStorage.getItem('fiaos_guest_guest_profile');
+        const profStr = localStorage.getItem(PROFILE_KEY('guest'));
         profile = profStr ? JSON.parse(profStr) : defaultProfile();
 
         const rewStr = localStorage.getItem('fiaos_rewards_guest');
@@ -69,8 +75,15 @@ async function loadEverything() {
 
             rewards = await cloud.loadRewards();
         } else {
-            prefs = defaultPrefs();
-            profile = defaultProfile();
+            // Local fallback for non-guest (unlikely but safe)
+            const pStr = localStorage.getItem(PREFS_KEY(user.id));
+            prefs = pStr ? JSON.parse(pStr) : defaultPrefs();
+            
+            const profStr = localStorage.getItem(PROFILE_KEY(user.id));
+            profile = profStr ? JSON.parse(profStr) : defaultProfile();
+            
+            const rewStr = localStorage.getItem(`fiaos_rewards_${user.id}`);
+            rewards = rewStr ? JSON.parse(rewStr) : null;
         }
     }
     
@@ -110,7 +123,7 @@ function renderUI() {
     // Themes
     const tList = document.getElementById('themeList');
     tList.innerHTML = THEMES_UI.map(t => {
-        // Unlock check: generic rewards OR valentine rewards OR no requirement
+        // Unlock check
         const isUnlocked = !t.unlockRewardId || 
                            (rewards?.rewards?.[t.unlockRewardId]?.unlocked) || 
                            (rewards?.valentine?.unlocked?.[t.unlockRewardId]);
@@ -146,6 +159,7 @@ function renderUI() {
         label.innerText = "Zuletzt geöffnet";
     } else {
         sel.value = prefs.quickstartApp || 'luna';
+        // Need to wait for DOM or just use logic
         const opt = sel.querySelector(`option[value="${sel.value}"]`);
         label.innerText = opt ? opt.innerText : "App";
     }
@@ -181,7 +195,7 @@ window.saveProfile = async () => {
     }
     
     if (user.role === 'guest') {
-        localStorage.setItem('fiaos_guest_guest_profile', JSON.stringify(profile));
+        localStorage.setItem(PROFILE_KEY('guest'), JSON.stringify(profile));
     } else if (cloud) {
         await cloud.saveProfile(profile);
     }
@@ -197,11 +211,10 @@ window.uploadWallpaper = () => {
     if (input.files && input.files[0]) {
         const reader = new FileReader();
         reader.onload = function(e) {
-            // Save to LocalStorage (Browser specific)
             try {
                 localStorage.setItem('fiaos_wallpaper_custom', e.target.result);
                 alert("Bild gespeichert! (Nur dieses Gerät)");
-                applyPrefs(); // Force refresh in parent
+                applyPrefs(); 
             } catch(err) {
                 alert("Bild zu groß für Speicher! Bitte kleineres Bild wählen.");
             }
@@ -231,7 +244,8 @@ async function applyPrefs() {
     renderUI();
     
     if (window.parent.FIAOS_APPLY_PREFS) {
-        window.parent.FIAOS_APPLY_PREFS(prefs);
+        // Send a deep copy to ensure React state update works
+        window.parent.FIAOS_APPLY_PREFS(JSON.parse(JSON.stringify(prefs)));
     }
 
     if (user.role === 'guest') {

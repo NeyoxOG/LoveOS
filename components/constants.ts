@@ -167,6 +167,59 @@ export const THEMES: Record<string, ThemeDef> = {
       textDim: 'rgba(255, 255, 255, 0.5)'
     }
   },
+  // --- New Themes added to match Settings ---
+  lavender: {
+    id: 'lavender',
+    name: 'Lavender',
+    colors: {
+      bgGradient: 'linear-gradient(to bottom, #4c1d95, #2e1065)',
+      cardBg: 'rgba(255, 255, 255, 0.1)',
+      text: '#e9d5ff',
+      textDim: 'rgba(233, 213, 255, 0.6)'
+    }
+  },
+  mint: {
+    id: 'mint',
+    name: 'Mint',
+    colors: {
+      bgGradient: 'linear-gradient(to bottom, #064e3b, #065f46)',
+      cardBg: 'rgba(255, 255, 255, 0.1)',
+      text: '#d1fae5',
+      textDim: 'rgba(209, 250, 229, 0.6)'
+    }
+  },
+  ocean: {
+    id: 'ocean',
+    name: 'Ocean',
+    colors: {
+      bgGradient: 'linear-gradient(to bottom, #0c4a6e, #0369a1)',
+      cardBg: 'rgba(255, 255, 255, 0.1)',
+      text: '#e0f2fe',
+      textDim: 'rgba(224, 242, 254, 0.6)'
+    }
+  },
+  sunset: {
+    id: 'sunset',
+    name: 'Sunset',
+    colors: {
+      bgGradient: 'linear-gradient(to bottom, #7c2d12, #9a3412)',
+      cardBg: 'rgba(255, 255, 255, 0.1)',
+      text: '#ffedd5',
+      textDim: 'rgba(255, 237, 213, 0.6)'
+    }
+  },
+  aurora: {
+    id: 'aurora',
+    name: 'Aurora',
+    unlockRewardId: 'reward.welcomeTheme',
+    colors: {
+      bgGradient: 'linear-gradient(45deg, #2b5876 0%, #4e4376 100%)',
+      cardBg: 'rgba(255, 255, 255, 0.1)',
+      text: '#e0e7ff',
+      textDim: 'rgba(224, 231, 255, 0.6)'
+    }
+  },
+  // --- Unlockables ---
   softRose: {
     id: 'softRose',
     name: 'Soft Rose',

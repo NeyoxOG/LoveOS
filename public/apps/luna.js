@@ -63,7 +63,7 @@ function updateMood() {
 function performAction(type) {
     if (!state) return;
     const now = Date.now();
-    if (now - (state.lastActions[type] || 0) < COOLDOWNS[type]) { showToast("Warte noch..."); return; }
+    if (now - (state.lastActions[type] || 0) < COOLDOWNS[type]) { showToast("Luna braucht eine Pause..."); return; }
 
     showOverlay(type, () => {
         state.lastActions[type] = now;
@@ -73,6 +73,11 @@ function performAction(type) {
         if (type === 'sleep') { state.stats.energy = 100; state.stats.hunger -= 10; }
         if (type === 'love') { state.stats.love += 15; }
         
+        // Clamp stats
+        ['hunger', 'energy', 'hygiene', 'fun', 'love'].forEach(k => {
+            if (state.stats[k] > 100) state.stats[k] = 100;
+        });
+
         // Use Cloud history add
         cloud.addLunaHistory({ by: user.name, text: type, ts: now });
         setTimeout(loadState, 500); // Reload to get updated history
@@ -81,23 +86,37 @@ function performAction(type) {
 
 function render() {
     if (!state) return;
-    document.getElementById('petVisual').className = `lamb-wrapper mood-${state.mood}`;
-    document.getElementById('moodLabel').innerText = `Mood: ${state.mood}`;
     
-    ['hunger','energy','hygiene','fun','love'].forEach(k => {
-        const val = state.stats[k] || 0;
-        const el = document.getElementById(`ring-${k}`);
-        if(el) el.innerHTML = `<div style="text-align:center">${Math.round(val)}%</div>`;
-    });
+    // Update Pet Classes
+    const visual = document.getElementById('petVisual');
+    visual.className = `pet-container mood-${state.mood}`;
+    
+    // Update Text
+    const label = document.getElementById('moodLabel');
+    if (state.mood === 'hungry') label.innerText = "Luna hat Hunger 🍎";
+    else if (state.mood === 'tired') label.innerText = "Luna ist müde 😴";
+    else if (state.mood === 'loved') label.innerText = "Luna fühlt sich geliebt 💖";
+    else label.innerText = "Luna schwebt glücklich ☁️";
+
+    // Update Bars
+    const updateBar = (id, val) => {
+        const el = document.getElementById(id);
+        if (el) el.style.width = `${Math.max(5, val)}%`;
+    };
+    updateBar('bar-hunger', state.stats.hunger);
+    updateBar('bar-energy', state.stats.energy);
+    updateBar('bar-love', state.stats.love);
 
     // Timeline Fix
     const list = document.getElementById('timelineList');
     if (state.history && state.history.length > 0) {
         list.innerHTML = state.history.slice(0, 15).map(h => {
             const date = new Date(h.ts);
-            const timeStr = !isNaN(date.getTime()) ? date.toLocaleTimeString() : 'Just now';
+            const timeStr = !isNaN(date.getTime()) ? date.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}) : 'Just now';
             const isMe = h.by === user.name;
-            return `<div class="event ${isMe ? 'me' : ''}"><div class="bubble"><b>${h.by}</b>: ${h.text} <div class="ts">${timeStr}</div></div></div>`;
+            const actionMap = { 'feed': 'gefüttert 🍎', 'play': 'gespielt 🪁', 'care': 'gepflegt 🧼', 'sleep': 'schlafen gelegt 🌙', 'love': 'geliebt 💗' };
+            
+            return `<div class="event ${isMe ? 'me' : ''}"><div class="bubble"><b>${h.by}</b> hat Luna ${actionMap[h.text] || h.text} <div class="ts">${timeStr}</div></div></div>`;
         }).join('');
     } else {
         list.innerHTML = '<div style="text-align:center; opacity:0.5; margin-top:20px;">Noch keine Einträge</div>';
@@ -106,6 +125,12 @@ function render() {
 
 function showOverlay(type, cb) {
     const ov = document.getElementById('actionOverlay');
+    const emojis = { feed: '🍎', play: '🪁', care: '🧼', sleep: '🌙', love: '💗' };
+    const texts = { feed: 'Lecker!', play: 'Juhu!', care: 'Frisch!', sleep: 'Gute Nacht', love: 'Danke!' };
+    
+    document.getElementById('sceneEmoji').innerText = emojis[type] || '✨';
+    document.getElementById('sceneText').innerText = texts[type] || 'Yay!';
+    
     ov.classList.add('active');
     setTimeout(() => { ov.classList.remove('active'); cb(); }, 1500);
 }

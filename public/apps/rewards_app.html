@@ -7,19 +7,18 @@
     <title>Belohnungen</title>
     <style>
         :root {
-            --bg-dark: #000;
+            --bg-dark: #000000;
             --bg-card: #1c1c1e;
-            --primary: #f59e0b; /* Gold/Amber */
             --text: #ffffff;
-            --text-dim: rgba(255, 255, 255, 0.5);
-            --border: rgba(255, 255, 255, 0.1);
+            --text-sec: rgba(255, 255, 255, 0.55);
+            --accent: #f59e0b;
         }
 
         * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
 
         body {
             margin: 0; padding: 0;
-            font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "Segoe UI", Roboto, sans-serif;
             background: var(--bg-dark);
             color: var(--text);
             height: 100vh;
@@ -29,131 +28,133 @@
             user-select: none;
         }
 
-        /* Top Bar */
-        .topbar {
-            padding: 16px 20px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            background: rgba(28, 28, 30, 0.8);
-            backdrop-filter: blur(20px);
-            border-bottom: 1px solid var(--border);
-            z-index: 50;
+        /* Header */
+        .header {
+            padding: 20px 24px;
+            padding-top: calc(20px + env(safe-area-inset-top));
+            display: flex; justify-content: space-between; align-items: flex-end;
+            background: rgba(0,0,0,0.8); backdrop-filter: blur(20px);
+            position: sticky; top: 0; z-index: 50;
+            border-bottom: 1px solid rgba(255,255,255,0.1);
         }
-        .title { font-size: 17px; font-weight: 600; text-align: center; }
-
-        /* Controls */
-        .tabs-container {
-            padding: 12px 16px;
-            background: rgba(28, 28, 30, 0.5);
-        }
-        .segmented-control {
-            background: rgba(118, 118, 128, 0.24);
-            border-radius: 9px;
-            padding: 2px;
-            display: flex;
-            position: relative;
-        }
-        .segment-btn {
-            flex: 1; padding: 6px 0; text-align: center; font-size: 13px; font-weight: 500; color: #fff; z-index: 2; cursor: pointer;
-        }
-        .segment-indicator {
-            position: absolute; top: 2px; bottom: 2px; width: 50%; background: #636366; border-radius: 7px;
-            box-shadow: 0 3px 8px rgba(0,0,0,0.12); transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1); z-index: 1;
+        .header-title { font-size: 32px; font-weight: 800; letter-spacing: -0.5px; }
+        .header-date { font-size: 13px; color: var(--text-sec); text-transform: uppercase; font-weight: 600; margin-bottom: 4px; }
+        .user-points { 
+            background: rgba(255,255,255,0.1); padding: 6px 12px; 
+            border-radius: 20px; font-size: 14px; font-weight: 700; color: #fbbf24;
+            display: flex; align-items: center; gap: 6px;
         }
 
-        /* Main Content */
-        .list-container {
-            flex: 1;
-            overflow-y: auto;
-            padding: 20px;
-            display: flex;
-            flex-direction: column;
-            gap: 16px;
+        /* Scroll Area */
+        .content {
+            flex: 1; overflow-y: auto; padding-bottom: 80px;
+            overflow-x: hidden;
         }
 
-        /* Card Style */
-        .reward-card {
-            background: var(--bg-card);
-            border-radius: 16px;
-            padding: 16px;
-            display: flex;
-            align-items: center;
-            gap: 16px;
-            border: 1px solid var(--border);
-            transition: transform 0.2s, background 0.2s;
-            position: relative;
-            overflow: hidden;
+        /* Hero Card */
+        .hero-section { padding: 24px; }
+        .hero-card {
+            background: linear-gradient(135deg, #4f46e5, #9333ea);
+            border-radius: 24px; padding: 24px;
+            position: relative; overflow: hidden;
+            box-shadow: 0 10px 40px rgba(79, 70, 229, 0.4);
+            min-height: 200px; display: flex; flex-direction: column; justify-content: flex-end;
         }
-        .reward-card:active { transform: scale(0.98); background: rgba(255,255,255,0.1); }
+        .hero-bg-icon {
+            position: absolute; top: -20px; right: -20px; font-size: 140px; opacity: 0.2; transform: rotate(15deg);
+        }
+        .hero-label { font-size: 12px; font-weight: 700; text-transform: uppercase; color: rgba(255,255,255,0.7); margin-bottom: 8px; }
+        .hero-title { font-size: 28px; font-weight: 800; line-height: 1.1; margin-bottom: 8px; max-width: 80%; }
+        .hero-desc { font-size: 15px; color: rgba(255,255,255,0.8); margin-bottom: 20px; max-width: 90%; }
         
-        .card-icon {
-            width: 48px; height: 48px; border-radius: 12px;
-            background: rgba(255,255,255,0.05);
-            display: flex; justify-content: center; align-items: center;
-            font-size: 24px; flex-shrink: 0;
-        }
-        .card-info { flex: 1; min-width: 0; }
-        .card-title { font-size: 16px; font-weight: 600; color: #fff; margin-bottom: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-        .card-desc { font-size: 12px; color: var(--text-dim); margin-bottom: 4px; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
-        .card-meta { font-size: 10px; color: var(--primary); text-transform: uppercase; font-weight: 700; letter-spacing: 0.5px; }
-
-        /* Action Button */
-        .redeem-btn {
-            background: var(--primary); color: #000; border: none;
-            padding: 8px 16px; border-radius: 20px; font-size: 13px; font-weight: 700;
-            cursor: pointer; flex-shrink: 0;
-            box-shadow: 0 4px 10px rgba(245, 158, 11, 0.3);
+        .hero-btn {
+            background: #fff; color: #000; border: none; padding: 12px 24px;
+            border-radius: 30px; font-weight: 700; font-size: 15px; width: fit-content;
+            cursor: pointer; box-shadow: 0 4px 15px rgba(0,0,0,0.2);
             transition: transform 0.2s;
         }
-        .redeem-btn:active { transform: scale(0.9); }
+        .hero-btn:active { transform: scale(0.95); }
+
+        /* Sections */
+        .section { margin-bottom: 32px; }
+        .section-header { 
+            padding: 0 24px; margin-bottom: 16px; 
+            display: flex; justify-content: space-between; align-items: flex-end; 
+        }
+        .section-title { font-size: 22px; font-weight: 700; }
+        .section-more { font-size: 15px; color: var(--accent); font-weight: 600; cursor: pointer; }
+
+        /* Horizontal Scroll */
+        .h-scroll {
+            display: flex; gap: 16px; overflow-x: auto; padding: 0 24px;
+            padding-bottom: 20px; scroll-snap-type: x mandatory;
+            scrollbar-width: none;
+        }
+        .h-scroll::-webkit-scrollbar { display: none; }
+
+        .reward-card {
+            flex: 0 0 160px; scroll-snap-align: start;
+            background: var(--bg-card); border-radius: 20px; padding: 16px;
+            display: flex; flex-direction: column; gap: 12px;
+            border: 1px solid rgba(255,255,255,0.1);
+            position: relative; overflow: hidden;
+            transition: transform 0.2s;
+        }
+        .reward-card:active { transform: scale(0.96); }
+        .reward-card.locked { opacity: 0.6; }
         
-        .redeemed-badge {
-            color: #4ade80; font-size: 13px; font-weight: 600; display: flex; align-items: center; gap: 4px;
+        .card-icon-box {
+            width: 50px; height: 50px; border-radius: 14px;
+            background: rgba(255,255,255,0.08); display: flex; justify-content: center; align-items: center;
+            font-size: 24px; box-shadow: 0 4px 10px rgba(0,0,0,0.2);
         }
+        
+        .card-content h3 { font-size: 15px; font-weight: 600; margin: 0 0 4px 0; line-height: 1.3; }
+        .card-content p { font-size: 12px; color: var(--text-sec); margin: 0; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+        
+        .status-badge {
+            position: absolute; top: 12px; right: 12px;
+            width: 20px; height: 20px; border-radius: 50%;
+            display: flex; justify-content: center; align-items: center; font-size: 10px;
+        }
+        .status-badge.locked { background: rgba(255,255,255,0.1); color: #fff; }
+        .status-badge.unlocked { background: #34c759; color: #000; }
+        .status-badge.redeemed { background: var(--bg-dark); border: 1px solid var(--text-sec); color: var(--text-sec); }
 
-        /* Confetti Overlay */
-        .confetti-container {
-            position: fixed; inset: 0; pointer-events: none; z-index: 100; overflow: hidden;
-        }
-        .confetti {
-            position: absolute; width: 8px; height: 8px; background: #f00;
-            animation: fall 3s linear forwards;
-        }
-        @keyframes fall {
-            0% { transform: translateY(-10vh) rotate(0deg); opacity: 1; }
-            100% { transform: translateY(110vh) rotate(720deg); opacity: 0; }
-        }
+        .progress-container { margin: 0 24px 8px 24px; }
+        .progress-bar { height: 4px; background: rgba(255,255,255,0.1); border-radius: 2px; overflow: hidden; }
+        .progress-fill { height: 100%; background: var(--accent); width: 0%; border-radius: 2px; }
+        .progress-text { font-size: 12px; color: var(--text-sec); margin-top: 6px; font-weight: 500; }
 
-        .empty-state {
-            text-align: center; color: var(--text-dim); margin-top: 60px;
-            font-size: 14px;
-        }
-
-        .category-header {
-            font-size: 13px; color: var(--text-dim); text-transform: uppercase;
-            margin-top: 10px; margin-bottom: 4px; padding-left: 4px; letter-spacing: 0.5px;
-        }
+        /* Confetti */
+        .confetti-container { position: fixed; inset: 0; pointer-events: none; z-index: 100; overflow: hidden; }
+        .confetti { position: absolute; width: 8px; height: 8px; background: #f00; animation: fall 3s linear forwards; }
+        @keyframes fall { 0% { transform: translateY(-10vh) rotate(0deg); opacity: 1; } 100% { transform: translateY(110vh) rotate(720deg); opacity: 0; } }
 
     </style>
 </head>
 <body>
 
-    <div class="topbar">
-        <div class="title">Belohnungen 🎁</div>
-    </div>
-
-    <div class="tabs-container">
-        <div class="segmented-control">
-            <div class="segment-indicator" id="segIndicator"></div>
-            <div class="segment-btn" onclick="filterList('active', 0)">Verfügbar</div>
-            <div class="segment-btn" onclick="filterList('redeemed', 1)">Eingelöst</div>
+    <div class="header">
+        <div>
+            <div class="header-date">Sonntag, 18. Mai</div>
+            <div class="header-title">Belohnungen</div>
+        </div>
+        <div class="user-points">
+            <span>✨</span> <span id="pointsVal">0</span>
         </div>
     </div>
 
-    <div class="list-container" id="list">
-        <!-- JS populates -->
-        <div class="empty-state">Lade Belohnungen...</div>
+    <div class="content" id="contentArea">
+        <!-- Hero -->
+        <div class="hero-section" id="heroSection">
+            <!-- Populated by JS -->
+        </div>
+
+        <!-- Categories -->
+        <div id="categoriesArea">
+            <!-- Populated by JS -->
+        </div>
     </div>
 
     <div class="confetti-container" id="confetti"></div>

@@ -96,38 +96,6 @@ const App: React.FC = () => {
     }
   }, [rewardsData, session]);
 
-  // --- FORCE UNLOCK VALENTINE (Migration Fix) ---
-  useEffect(() => {
-    if (session && rewardsData) {
-        let changed = false;
-        const newData = JSON.parse(JSON.stringify(rewardsData));
-        
-        // Ensure Valentine structure exists
-        if (!newData.valentine) newData.valentine = { total: 6, unlocked: {}, completedAt: null };
-        if (!newData.valentine.unlocked) newData.valentine.unlocked = {};
-
-        // Force unlock all valentine rewards
-        VALENTINE_REWARDS.forEach(r => {
-            if (!newData.valentine.unlocked[r.id]) {
-                newData.valentine.unlocked[r.id] = true;
-                changed = true;
-            }
-        });
-
-        // Set completion flag if not set
-        if (!newData.valentine.completedAt) {
-            newData.valentine.completedAt = Date.now();
-            changed = true;
-        }
-
-        if (changed) {
-            console.log("Auto-completing Valentine Rewards...");
-            setRewardsData(newData);
-            cloud.saveRewards(newData);
-        }
-    }
-  }, [session, rewardsData]);
-
   // --- INITIALIZATION (Run Once) ---
   useEffect(() => {
     let isMounted = true;
@@ -173,14 +141,12 @@ const App: React.FC = () => {
 
                     if (profile) {
                         setUserProfile(profile as UserProfile);
-                        // Check logic: if falsy (false or undefined), show onboarding
                         if (!profile.onboardingCompleted) setShowOnboarding(true);
                         else setShowOnboarding(false);
                     } else {
                         const local = loadUserProfile(storedSession);
                         setUserProfile(local);
                         cloud.saveProfile(local);
-                        // Local fallback likely means new user locally
                         setShowOnboarding(true);
                     }
 
@@ -250,12 +216,16 @@ const App: React.FC = () => {
       }
     };
 
-    window.FIAOS_APPLY_PREFS = (prefs: UserPrefs) => {
-        setUserPrefs(prefs);
-        applyTheme(prefs);
-        checkCustomWallpaper(prefs);
+    window.FIAOS_APPLY_PREFS = (newPrefs: UserPrefs) => {
+        // Create new object to force React re-render
+        const updatedPrefs = { ...newPrefs };
+        setUserPrefs(updatedPrefs);
+        
+        applyTheme(updatedPrefs);
+        checkCustomWallpaper(updatedPrefs);
+        
         if (session && session.role !== 'guest') {
-            cloud.savePrefs(prefs);
+            cloud.savePrefs(updatedPrefs);
         }
     };
 
@@ -309,13 +279,12 @@ const App: React.FC = () => {
   const handleLogout = useCallback(() => {
     playSound('close');
     clearSession();
-    // Critical: Reset all state to prevent onboarding loop or ghost data
     setSession(null);
     setRewardsData(null);
     setOpenedApp(null);
     setUserProfile(null); 
     setUserPrefs(null);
-    setShowOnboarding(false); // Explicitly close on logout
+    setShowOnboarding(false);
     setIsAccountSheetOpen(false);
     setCustomBg(null);
     document.documentElement.style.cssText = ''; 
@@ -327,7 +296,6 @@ const App: React.FC = () => {
         playSound('error');
         return;
     }
-    
     playSound('click');
     if (user.role === 'guest') loginSuccess(user);
     else {
@@ -407,7 +375,6 @@ const App: React.FC = () => {
     
     setUserProfile(profile);
     
-    // Correctly set onboarding state based on profile (support undefined for new/reset users)
     if (!profile.onboardingCompleted) {
         setShowOnboarding(true);
     } else {
@@ -429,7 +396,6 @@ const App: React.FC = () => {
       
       if (userProfile) {
           const updated = { ...userProfile, onboardingCompleted: true };
-          // Update local state immediately to prevent UI flicker/revert
           setUserProfile(updated);
           
           if (session && session.role !== 'guest') {

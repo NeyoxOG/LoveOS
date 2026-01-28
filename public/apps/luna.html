@@ -1,3 +1,4 @@
+
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -12,8 +13,6 @@
             --love: #ec4899;
             --text: #f8fafc;
             --text-dim: rgba(248, 250, 252, 0.5);
-            --lamb-white: #fff7f0;
-            --lamb-shadow: #e2dcd5;
         }
 
         * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
@@ -103,8 +102,9 @@
         /* --- Status View --- */
         .scene-container {
             width: 100%;
-            height: 320px;
-            background: linear-gradient(to bottom, #1e1b4b 0%, #312e81 60%, #064e3b 60%, #065f46 100%); /* Midnight Meadow */
+            flex: 1;
+            max-height: 400px;
+            background: linear-gradient(to bottom, #0f172a 0%, #1e1b4b 100%);
             border-radius: 24px;
             position: relative;
             overflow: hidden;
@@ -112,82 +112,109 @@
             display: flex;
             justify-content: center;
             align-items: center;
+            flex-direction: column;
         }
         
         /* Atmospheric elements */
-        .stars { position: absolute; inset: 0; background-image: radial-gradient(white 1px, transparent 1px); background-size: 50px 50px; opacity: 0.2; }
-        .glow-overlay { position: absolute; inset: 0; background: radial-gradient(circle at center, transparent 30%, rgba(0,0,0,0.5) 100%); }
+        .stars { position: absolute; inset: 0; background-image: radial-gradient(white 1px, transparent 1px); background-size: 40px 40px; opacity: 0.3; }
+        .glow-overlay { position: absolute; inset: 0; background: radial-gradient(circle at center, rgba(129, 140, 248, 0.1) 0%, transparent 70%); }
 
-        /* --- Pet Visuals (Luna v2) --- */
-        .lamb-wrapper {
+        /* --- Celestial Cloud Sheep --- */
+        .pet-container {
             position: relative;
-            width: 160px;
-            height: 160px;
-            filter: drop-shadow(0 10px 20px rgba(0,0,0,0.5));
+            width: 200px; height: 200px;
+            animation: float 6s ease-in-out infinite;
+        }
+        @keyframes float { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-20px); } }
+
+        /* Core Body - Glowing Cloud */
+        .body-cloud {
+            position: absolute; inset: 20px;
+            background: radial-gradient(circle at 30% 30%, #fff, #e0e7ff);
+            border-radius: 50% 50% 45% 45%;
+            filter: drop-shadow(0 0 20px rgba(165, 180, 252, 0.6));
+            z-index: 10;
             animation: breathe 4s ease-in-out infinite;
         }
-        .head {
-            position: absolute; top: 10px; left: 50%; transform: translateX(-50%);
-            width: 90px; height: 80px; background: var(--lamb-white); border-radius: 45px; z-index: 10;
+        @keyframes breathe { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.03); } }
+
+        /* Fluff Puffs */
+        .puff {
+            position: absolute; background: #fff; border-radius: 50%;
+            box-shadow: 0 0 15px rgba(255,255,255,0.5);
         }
-        .body {
-            position: absolute; top: 60px; left: 50%; transform: translateX(-50%);
-            width: 100px; height: 80px; background: var(--lamb-white); border-radius: 50px; z-index: 5;
+        .puff:nth-child(1) { width: 60px; height: 60px; top: 10px; left: 10px; }
+        .puff:nth-child(2) { width: 50px; height: 50px; top: 20px; right: 10px; }
+        .puff:nth-child(3) { width: 70px; height: 50px; bottom: 20px; left: 20px; }
+        .puff:nth-child(4) { width: 60px; height: 60px; bottom: 10px; right: 20px; }
+
+        /* Face */
+        .face {
+            position: absolute; top: 50px; left: 50%; transform: translateX(-50%);
+            width: 80px; height: 70px; 
+            background: #f8fafc; 
+            border-radius: 40px; 
+            z-index: 12;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.1);
         }
-        .wool-puff { position: absolute; background: var(--lamb-white); border-radius: 50%; }
-        /* Wool on head */
-        .head .wool-puff:nth-child(1) { width: 40px; height: 40px; top: -10px; left: 25px; }
-        .head .wool-puff:nth-child(2) { width: 30px; height: 30px; top: 5px; left: 0px; }
-        .head .wool-puff:nth-child(3) { width: 30px; height: 30px; top: 5px; right: 0px; }
+        .eye { 
+            position: absolute; top: 25px; width: 8px; height: 8px; background: #1e1b4b; border-radius: 50%; 
+            animation: blink 4s infinite;
+        }
+        .eye.left { left: 20px; } 
+        .eye.right { right: 20px; }
+        
+        .blush { position: absolute; top: 35px; width: 12px; height: 8px; background: #fda4af; border-radius: 50%; opacity: 0.6; }
+        .blush.left { left: 12px; } .blush.right { right: 12px; }
+        
+        .mouth {
+            position: absolute; bottom: 20px; left: 50%; transform: translateX(-50%);
+            width: 10px; height: 5px; border-bottom: 2px solid #1e1b4b; border-radius: 0 0 10px 10px;
+        }
+
+        /* Scarf */
+        .scarf {
+            position: absolute; top: 105px; left: 50%; transform: translateX(-50%);
+            width: 90px; height: 20px; background: linear-gradient(90deg, #ec4899, #8b5cf6);
+            border-radius: 10px; z-index: 13;
+            box-shadow: 0 2px 10px rgba(236, 72, 153, 0.4);
+        }
+
         /* Paws */
         .paw {
-            position: absolute; bottom: -5px; width: 20px; height: 25px; background: var(--lamb-white); border-radius: 10px; z-index: 6;
+            position: absolute; bottom: 20px; width: 20px; height: 25px; background: #fff; border-radius: 10px; z-index: 11;
         }
-        .paw.left { left: 35px; } .paw.right { right: 35px; }
-        
-        .scarf {
-            position: absolute; top: 80px; left: 50%; transform: translateX(-50%);
-            width: 90px; height: 25px; background: #fb7185; border-radius: 12px; z-index: 11;
-            box-shadow: 0 2px 5px rgba(0,0,0,0.2);
-        }
-        .face { position: absolute; top: 35px; width: 100%; height: 100%; z-index: 12; }
-        .eye { position: absolute; top: 0; width: 8px; height: 8px; background: #1a1a1a; border-radius: 50%; }
-        .eye.left { left: 25px; } .eye.right { right: 25px; }
-        .blush { position: absolute; top: 12px; width: 10px; height: 6px; background: #ffb7c5; border-radius: 50%; opacity: 0.6; }
-        .blush.left { left: 18px; } .blush.right { right: 18px; }
-        .mouth {
-            position: absolute; top: 18px; left: 50%; transform: translateX(-50%);
-            width: 8px; height: 4px; border-bottom: 2px solid #1a1a1a; border-radius: 0 0 10px 10px;
-        }
+        .paw.left { left: 50px; } .paw.right { right: 50px; }
 
-        /* Mood modifiers */
-        .lamb-wrapper.mood-hungry .eye { height: 10px; width: 10px; top: -2px; }
-        .lamb-wrapper.mood-hungry .mouth { width: 6px; height: 6px; border: 2px solid #1a1a1a; border-radius: 50%; border-top: 0; }
-        .lamb-wrapper.mood-tired .eye { height: 2px; top: 4px; }
-        .lamb-wrapper.mood-loved .blush { opacity: 1; transform: scale(1.2); }
-        .lamb-wrapper.mood-sad .head { filter: grayscale(0.5); }
-        
-        @keyframes breathe { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.02); } }
+        @keyframes blink { 0%, 96%, 100% { transform: scaleY(1); } 98% { transform: scaleY(0.1); } }
 
-        /* Info Card */
-        .info-card {
-            background: var(--bg-card); border-radius: 20px; padding: 16px; border: 1px solid rgba(255,255,255,0.05);
+        /* Stats Bars floating below */
+        .stats-overlay {
+            width: 80%;
+            margin-top: 20px;
             display: flex; flex-direction: column; gap: 8px;
         }
-        .mood-row { display: flex; justify-content: space-between; align-items: center; }
-        .mood-label { font-size: 15px; font-weight: 600; color: #fff; }
-        .streak-badge { font-size: 11px; background: rgba(255,255,255,0.1); padding: 4px 8px; border-radius: 12px; }
-        .check-row { font-size: 13px; color: var(--text-dim); display: flex; gap: 10px; }
-        
-        /* Stats Rings Grid */
-        .stats-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 8px; }
-        .stat-item { display: flex; flex-direction: column; align-items: center; gap: 6px; }
-        .ring-container { width: 48px; height: 48px; position: relative; }
-        .ring-svg { transform: rotate(-90deg); width: 100%; height: 100%; }
-        .ring-bg { fill: none; stroke: rgba(255,255,255,0.1); stroke-width: 4; }
-        .ring-progress { fill: none; stroke-width: 4; stroke-linecap: round; stroke-dasharray: 100; stroke-dashoffset: 0; transition: stroke-dashoffset 0.5s ease; }
-        .ring-icon { position: absolute; inset: 0; display: flex; justify-content: center; align-items: center; font-size: 16px; }
-        .stat-label { font-size: 10px; color: var(--text-dim); }
+        .stat-bar-container {
+            display: flex; align-items: center; gap: 8px;
+        }
+        .stat-icon { width: 20px; font-size: 14px; text-align: center; }
+        .stat-track { flex: 1; height: 6px; background: rgba(255,255,255,0.1); border-radius: 3px; overflow: hidden; }
+        .stat-fill { height: 100%; border-radius: 3px; transition: width 0.5s ease; }
+
+        /* Mood States */
+        .mood-hungry .eye { height: 2px; top: 28px; animation: none; } /* Squint */
+        .mood-tired .eye { top: 30px; animation: blink 6s infinite; }
+        .mood-loved .blush { opacity: 1; transform: scale(1.3); }
+        .mood-loved .body-cloud { filter: drop-shadow(0 0 30px rgba(236, 72, 153, 0.6)); }
+
+        /* Info below scene */
+        .info-card {
+            margin-top: 20px;
+            background: var(--bg-card); border-radius: 20px; padding: 16px; border: 1px solid rgba(255,255,255,0.05);
+            display: flex; justify-content: space-between; align-items: center;
+        }
+        .mood-text { font-size: 15px; font-weight: 600; color: #fff; }
+        .streak-pill { background: rgba(255,255,255,0.1); padding: 4px 10px; border-radius: 20px; font-size: 12px; }
 
         /* --- Care View --- */
         .care-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
@@ -244,11 +271,10 @@
 
     <div class="header">
         <div class="header-top">
-            <!-- Back handled by parent frame usually, but visually represented -->
             <div></div> 
             <div class="title-group">
                 <div class="title">Luna 🐑</div>
-                <div class="subtitle">Couple Pet</div>
+                <div class="subtitle">Cloud Companion</div>
             </div>
             <div style="width: 24px;"></div>
         </div>
@@ -267,46 +293,43 @@
                 <div class="glow-overlay"></div>
                 <div class="stars"></div>
                 
-                <div class="lamb-wrapper" id="petVisual">
-                    <div class="wool-puff" style="top: -20px; left: 40px; width: 50px; height: 50px;"></div>
-                    <div class="head">
-                        <div class="wool-puff"></div>
-                        <div class="wool-puff"></div>
-                        <div class="wool-puff"></div>
-                        <div class="face">
-                            <div class="eye left"></div>
-                            <div class="eye right"></div>
-                            <div class="blush left"></div>
-                            <div class="blush right"></div>
-                            <div class="mouth"></div>
-                        </div>
+                <div class="pet-container" id="petVisual">
+                    <div class="body-cloud"></div>
+                    <div class="puff"></div>
+                    <div class="puff"></div>
+                    <div class="puff"></div>
+                    <div class="puff"></div>
+                    <div class="face">
+                        <div class="eye left"></div>
+                        <div class="eye right"></div>
+                        <div class="blush left"></div>
+                        <div class="blush right"></div>
+                        <div class="mouth"></div>
                     </div>
-                    <div class="body"></div>
                     <div class="paw left"></div>
                     <div class="paw right"></div>
                     <div class="scarf"></div>
                 </div>
+
+                <div class="stats-overlay">
+                    <div class="stat-bar-container">
+                        <span class="stat-icon">🍎</span>
+                        <div class="stat-track"><div class="stat-fill" id="bar-hunger" style="background:#f43f5e; width:50%"></div></div>
+                    </div>
+                    <div class="stat-bar-container">
+                        <span class="stat-icon">⚡</span>
+                        <div class="stat-track"><div class="stat-fill" id="bar-energy" style="background:#f59e0b; width:50%"></div></div>
+                    </div>
+                    <div class="stat-bar-container">
+                        <span class="stat-icon">💗</span>
+                        <div class="stat-track"><div class="stat-fill" id="bar-love" style="background:#d946ef; width:50%"></div></div>
+                    </div>
+                </div>
             </div>
 
             <div class="info-card">
-                <div class="mood-row">
-                    <span class="mood-label" id="moodLabel">Luna ist glücklich 💗</span>
-                    <span class="streak-badge" id="streakLabel">🔥 0 Tage</span>
-                </div>
-                <div class="check-row">
-                    <span>Gefüttert: <span id="fedCheck">❌</span></span>
-                    <span>•</span>
-                    <span id="lastActionText">Keine Aktion heute</span>
-                </div>
-            </div>
-
-            <div class="stats-grid">
-                <!-- Rings generated by JS -->
-                <div class="stat-item" id="ring-hunger"></div>
-                <div class="stat-item" id="ring-energy"></div>
-                <div class="stat-item" id="ring-hygiene"></div>
-                <div class="stat-item" id="ring-fun"></div>
-                <div class="stat-item" id="ring-love"></div>
+                <span class="mood-text" id="moodLabel">Luna schwebt glücklich ☁️</span>
+                <span class="streak-pill" id="streakLabel">🔥 0 Tage</span>
             </div>
         </div>
 
@@ -316,31 +339,31 @@
                 <div class="care-card" onclick="performAction('feed')" id="card-feed">
                     <div class="care-icon">🍎</div>
                     <div class="care-title">Füttern</div>
-                    <div class="care-desc">Hunger stillen & Liebe zeigen</div>
+                    <div class="care-desc">Sternenstaub-Snack</div>
                     <div class="care-cooldown">Warten...</div>
                 </div>
                 <div class="care-card" onclick="performAction('play')" id="card-play">
-                    <div class="care-icon">🧶</div>
+                    <div class="care-icon">🪁</div>
                     <div class="care-title">Spielen</div>
-                    <div class="care-desc">Energie verbrauchen, Spaß haben</div>
+                    <div class="care-desc">Durch Wolken hüpfen</div>
                     <div class="care-cooldown">Warten...</div>
                 </div>
                 <div class="care-card" onclick="performAction('care')" id="card-care">
                     <div class="care-icon">🧼</div>
                     <div class="care-title">Pflege</div>
-                    <div class="care-desc">Baden & Sauber machen</div>
+                    <div class="care-desc">Wolle bürsten</div>
                     <div class="care-cooldown">Warten...</div>
                 </div>
                 <div class="care-card" onclick="performAction('sleep')" id="card-sleep">
                     <div class="care-icon">🌙</div>
                     <div class="care-title">Schlafen</div>
-                    <div class="care-desc">Energie tanken, Ruhe gönnen</div>
+                    <div class="care-desc">Traumreise starten</div>
                     <div class="care-cooldown">Warten...</div>
                 </div>
                 <div class="care-card" style="grid-column: span 2; background: rgba(236, 72, 153, 0.1); border-color: rgba(236, 72, 153, 0.3);" onclick="performAction('love')" id="card-love">
                     <div class="care-icon">💗</div>
                     <div class="care-title" style="color: #f472b6;">Liebe geben</div>
-                    <div class="care-desc">Extra Zuneigung für Luna</div>
+                    <div class="care-desc">Eine Umarmung senden</div>
                     <div class="care-cooldown">Warten...</div>
                 </div>
             </div>
