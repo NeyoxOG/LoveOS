@@ -6,8 +6,8 @@ export const INITIAL_REWARDS_DATA: UserRewardsData = {
   version: 2,
   rewards: {
     "reward.welcome": { unlocked: true, unlockedAt: Date.now() },
-    "reward.welcomeTheme": { unlocked: true, unlockedAt: Date.now() }, // Auto-unlocked but needs claiming
-    "custom_theme_unlock": { unlocked: true, unlockedAt: Date.now() }, // Unlock Custom by default or via achievement, setting to true for easier access as requested
+    "reward.welcomeTheme": { unlocked: true, unlockedAt: Date.now() }, 
+    "custom_theme_unlock": { unlocked: true, unlockedAt: Date.now() }, 
     "reward.firstLogin": { unlocked: false, unlockedAt: null },
     "reward.firstAppOpen": { unlocked: false, unlockedAt: null },
     "reward.firstReward": { unlocked: false, unlockedAt: null },
@@ -17,14 +17,14 @@ export const INITIAL_REWARDS_DATA: UserRewardsData = {
   valentine: {
     total: 6,
     unlocked: {
-      "valentine.reward.pizza": false,
-      "valentine.reward.photo": false,
-      "valentine.reward.letter": false,
-      "valentine.reward.care": false,
-      "valentine.reward.art": false,
-      "valentine.reward.secret": false,
+      "valentine.reward.pizza": true,
+      "valentine.reward.photo": true,
+      "valentine.reward.letter": true,
+      "valentine.reward.care": true,
+      "valentine.reward.art": true,
+      "valentine.reward.secret": true,
     },
-    completedAt: null
+    completedAt: Date.now() // Standardmäßig abgeschlossen
   },
   meta: {
     lastSeenAt: Date.now(),
@@ -48,7 +48,9 @@ const INITIAL_ADMIN_CONFIG: AdminConfig = {
     diary: true,
     daily: true,
     love: true,
-    rewards_app: true
+    rewards_app: true,
+    story: true,
+    bucket: true
   },
   userStatus: {
     "fia": { role: "user", banned: false },
@@ -95,7 +97,9 @@ export const loadUserRewards = (userId: string): UserRewardsData => {
       return initial;
     }
     const data = JSON.parse(stored) as UserRewardsData;
-    if (!data.valentine) {
+    
+    // Auto-migrate valentine to unlocked if missing or old version
+    if (!data.valentine || data.version < 2) {
       data.valentine = JSON.parse(JSON.stringify(INITIAL_REWARDS_DATA.valentine));
       data.version = 2;
       saveUserRewards(userId, data);
@@ -113,6 +117,7 @@ export const unlockRewardLogic = (currentRewards: UserRewardsData, rewardId: str
 
   // Check if it's a valentine reward
   if (rewardId.startsWith('valentine.')) {
+     if (!data.valentine) data.valentine = { total: 6, unlocked: {}, completedAt: null };
      if (!data.valentine.unlocked[rewardId]) {
         data.valentine.unlocked[rewardId] = true;
         wasUnlocked = true;
@@ -133,7 +138,6 @@ export const unlockRewardLogic = (currentRewards: UserRewardsData, rewardId: str
 };
 
 export const setRewardsLastSeen = (userId: string, data: UserRewardsData): UserRewardsData => {
-    // This helper now just returns modified data; saving is handled by caller (App.tsx -> Cloud)
     const updated = { ...data, meta: { ...data.meta, lastSeenAt: Date.now() } };
     return updated;
 };
@@ -194,7 +198,6 @@ export const applyTheme = (prefs: UserPrefs) => {
     const theme = THEMES[prefs.theme] || THEMES['roseGlass'];
     const root = document.documentElement;
     
-    // Set theme ID attribute for CSS selectors
     root.setAttribute('data-theme', theme.id);
     
     if (theme) {

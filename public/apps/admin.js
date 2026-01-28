@@ -1,6 +1,6 @@
 
 /**
- * AdminOS Logic v2.6
+ * AdminOS Logic v2.8 (Fixed Rewards List & Maintenance)
  */
 
 const KEYS = { SESSION: 'fiaos_session' };
@@ -23,17 +23,74 @@ const APP_DEFS = [
     { id: 'love', name: 'Love', icon: '💞' },
     { id: 'messages', name: 'Chat', icon: '💬' },
     { id: 'settings', name: 'Settings', icon: '⚙️' },
-    { id: 'story', name: 'Story', icon: '🎞️' }
+    { id: 'story', name: 'Story', icon: '🎞️' },
+    { id: 'bucket', name: 'Ziele', icon: '📍' }
 ];
 
-// Simplified Catalog for Admin Toggle (Partial list)
-const REWARD_CATALOG_MOCK = [
+// FULL CATALOG - Copy from constants.ts to ensure Admin sees EVERYTHING
+const FULL_REWARD_CATALOG = [
+    // General
     { id: 'reward.welcome', title: 'Willkommen' },
-    { id: 'reward.welcomeTheme', title: 'Theme: Aurora' },
-    { id: 'reward.streak3', title: '3 Tage Streak' },
+    { id: 'reward.firstLogin', title: 'Erster Login' },
+    { id: 'reward.firstAppOpen', title: 'Erste App' },
+    { id: 'reward.firstReward', title: 'Erster Erfolg' },
+    { id: 'reward.streak3', title: '3 Tage da' },
     { id: 'reward.secretLove', title: 'Secret Love' },
-    { id: 'daily.points100', title: 'Theme: Royal' },
-    { id: 'valentine.reward.pizza', title: 'Val: Pizza' }
+    { id: 'reward.welcomeTheme', title: 'Theme: Aurora' },
+    { id: 'custom_theme_unlock', title: 'Theme: Custom' },
+
+    // Valentine
+    { id: 'valentine.reward.pizza', title: 'Val: Pizza' },
+    { id: 'valentine.reward.photo', title: 'Val: Foto' },
+    { id: 'valentine.reward.letter', title: 'Val: Brief' },
+    { id: 'valentine.reward.care', title: 'Val: Care Day' },
+    { id: 'valentine.reward.art', title: 'Val: Malen' },
+    { id: 'valentine.reward.secret', title: 'Val: Secret' },
+
+    // Games
+    { id: 'games.stack.10', title: 'Stack: 10' },
+    { id: 'games.stack.50', title: 'Stack: 50' },
+    { id: 'games.stack.100', title: 'Stack: 100' },
+    { id: 'games.react.first', title: 'Reflex: First' },
+    { id: 'games.react.combo10', title: 'Reflex: Combo 10' },
+    { id: 'games.react.200', title: 'Reflex: 200 Pts' },
+    { id: 'games.block.starter', title: 'Block: 500' },
+    { id: 'games.block.master', title: 'Block: 1500' },
+    { id: 'games.block.combo', title: 'Block: Combo' },
+    { id: 'games.puzzle.solve', title: 'Puzzle: Solved' },
+    { id: 'games.puzzle.sub60', title: 'Puzzle: <60s' },
+    { id: 'games.puzzle.sub40', title: 'Puzzle: <40s' },
+    { id: 'snake_score_10', title: 'Snake: 10' },
+    { id: 'snake_score_25', title: 'Snake: 25' },
+    { id: 'snake_score_50', title: 'Snake: 50' },
+    { id: 'snake.survival', title: 'Snake: Survival' },
+    { id: 'flappy_score_5', title: 'Flappy: 5' },
+    { id: 'flappy_score_15', title: 'Flappy: 15' },
+    { id: 'flappy_score_30', title: 'Flappy: 30' },
+
+    // Diary
+    { id: 'diary.first', title: 'Diary: First' },
+    { id: 'diary.shared', title: 'Diary: Shared' },
+    { id: 'diary.streak3', title: 'Diary: 3 Days' },
+    { id: 'diary.10', title: 'Diary: 10 Entries' },
+    { id: 'diary.30', title: 'Diary: 30 Entries' },
+
+    // Bucket
+    { id: 'bucket.first', title: 'Bucket: Erstellt' },
+    { id: 'bucket.done1', title: 'Bucket: Erledigt' },
+
+    // Daily
+    { id: 'daily.first', title: 'Daily: First' },
+    { id: 'daily.streak3', title: 'Daily: 3 Streak' },
+    { id: 'daily.streak7', title: 'Daily: 7 Streak' },
+    { id: 'daily.total10', title: 'Daily: 10 Total' },
+    { id: 'daily.points100', title: 'Daily: 100 Pts (Royal)' },
+
+    // Love
+    { id: 'love_1_month', title: 'Love: 1 Monat' },
+    { id: 'love_3_month', title: 'Love: 3 Monate' },
+    { id: 'love_6_month', title: 'Love: 6 Monate' },
+    { id: 'love_1_year', title: 'Love: 1 Jahr' },
 ];
 
 function init() {
@@ -65,17 +122,20 @@ async function loadSystemData() {
             document.getElementById('cloudStatusDot').classList.add('online');
             document.getElementById('cloudStatusTxt').innerText = "Online";
         } else {
+            // Fallback for totally offline scenarios
             adminConfig = JSON.parse(localStorage.getItem('fiaos_global_admin_config') || '{}');
-            document.getElementById('cloudStatusTxt').innerText = "Offline";
+            document.getElementById('cloudStatusTxt').innerText = "Offline Mode";
         }
 
+        // Initialize missing structure
+        if (!adminConfig) adminConfig = { appVisibility: {}, userStatus: {}, maintenanceMode: false };
         if (!adminConfig.appVisibility) adminConfig.appVisibility = {};
         if (!adminConfig.userStatus) adminConfig.userStatus = {};
 
         renderSystemTab();
     } catch(e) {
         console.error(e);
-        alert("Fehler beim Laden.");
+        alert("Fehler beim Laden der Admin Config.");
     }
     toggleLoading(false);
 }
@@ -84,6 +144,7 @@ async function loadSystemData() {
 
 function renderSystemTab() {
     const maintToggle = document.getElementById('dashMaintToggle');
+    // Ensure accurate visual state
     if (adminConfig.maintenanceMode) maintToggle.classList.add('active');
     else maintToggle.classList.remove('active');
 
@@ -91,6 +152,7 @@ function renderSystemTab() {
     grid.innerHTML = '';
     APP_DEFS.forEach(app => {
         if (app.id === 'settings') return;
+        // Default to true if undefined
         const isVisible = adminConfig.appVisibility[app.id] !== false;
         
         const el = document.createElement('div');
@@ -110,6 +172,11 @@ function renderUserTab(uid) {
     document.getElementById('uDetailName').innerText = uid.charAt(0).toUpperCase() + uid.slice(1);
     document.getElementById('uDetailId').innerText = uid;
     
+    // Ensure user status obj exists
+    if (!adminConfig.userStatus[uid]) {
+        adminConfig.userStatus[uid] = { role: 'user', banned: false };
+    }
+
     const isBanned = adminConfig.userStatus[uid]?.banned;
     const banToggle = document.getElementById('uDetailBanToggle');
     if (isBanned) banToggle.classList.add('active'); else banToggle.classList.remove('active');
@@ -147,13 +214,16 @@ async function loadUserRewardsList() {
         }
 
         if (!userRewardsData) {
-            container.innerHTML = '<div style="padding:20px; text-align:center;">Keine Daten. User muss sich erst einloggen.</div>';
-            return;
+            // Falls keine Daten da sind (User war nie eingeloggt), erstelle Dummy für Admin
+            userRewardsData = { rewards: {}, valentine: { unlocked: {} } };
         }
 
         container.innerHTML = '';
-        REWARD_CATALOG_MOCK.forEach(r => {
+        
+        // Loop through the FULL catalog
+        FULL_REWARD_CATALOG.forEach(r => {
             let unlocked = false;
+            // Robust check
             if (r.id.startsWith('valentine.')) {
                 unlocked = userRewardsData.valentine?.unlocked?.[r.id] || false;
             } else {
@@ -165,7 +235,7 @@ async function loadUserRewardsList() {
             div.innerHTML = `
                 <div class="reward-info">
                     <div class="reward-icon">${unlocked ? '🔓' : '🔒'}</div>
-                    <span>${r.title}</span>
+                    <span style="font-size:13px;">${r.title}</span>
                 </div>
                 <div class="toggle ${unlocked ? 'active' : ''}" onclick="toggleReward('${r.id}', '${uid}')"></div>
             `;
@@ -173,6 +243,7 @@ async function loadUserRewardsList() {
         });
 
     } catch(e) {
+        console.error(e);
         container.innerHTML = '<div style="padding:20px; text-align:center;">Fehler beim Laden.</div>';
     }
 }
@@ -202,9 +273,19 @@ window.switchTab = (id, idx) => {
 };
 
 window.toggleMaintenance = async () => {
-    adminConfig.maintenanceMode = !adminConfig.maintenanceMode;
-    await syncConfig();
-    renderSystemTab();
+    toggleLoading(true);
+    try {
+        adminConfig.maintenanceMode = !adminConfig.maintenanceMode;
+        await syncConfig();
+        // Give time for Cloud latency if any
+        setTimeout(() => {
+            renderSystemTab();
+            toggleLoading(false);
+        }, 500);
+    } catch(e) {
+        alert("Error saving config");
+        toggleLoading(false);
+    }
 };
 
 window.toggleAppVisibility = async (appId) => {
@@ -236,7 +317,6 @@ window.actionResetUser = async () => {
         if (cloud) {
             await cloud.adminResetUser(selectedUserId);
             alert("User wurde zurückgesetzt.");
-            // Refresh view to show zeroed stats
             renderUserTab(selectedUserId);
         } else {
             alert("Offline Reset nicht implementiert.");
@@ -244,6 +324,12 @@ window.actionResetUser = async () => {
         toggleLoading(false);
     }
 };
+
+window.actionForceLogout = async () => {
+    if (!selectedUserId || !cloud) return;
+    await cloud.adminForceLogout(selectedUserId);
+    alert("Force Logout Signal gesendet.");
+}
 
 window.actionSaveDaily = async () => {
     if (!selectedUserId || !cloud) return;
@@ -256,7 +342,6 @@ window.actionSaveDaily = async () => {
     }
 
     toggleLoading(true);
-    // Merge true allows partial updates if structure changes, but for stats we set specific fields
     await cloud.adminSetData(selectedUserId, 'daily_state', { streak, points });
     toggleLoading(false);
     alert("Daily Stats gespeichert.");
@@ -266,12 +351,19 @@ window.actionSaveDaily = async () => {
 window.toggleReward = async (rId, uid) => {
     if (!userRewardsData) return;
     
+    // Optimistic UI Update not done here to ensure consistency, show loading
     toggleLoading(true);
+    
     let newVal = false;
     if (rId.startsWith('valentine.')) {
+        // Ensure structure
+        if (!userRewardsData.valentine) userRewardsData.valentine = { total: 0, unlocked: {}, completedAt: null };
+        if (!userRewardsData.valentine.unlocked) userRewardsData.valentine.unlocked = {};
+        
         newVal = !userRewardsData.valentine.unlocked[rId];
         userRewardsData.valentine.unlocked[rId] = newVal;
     } else {
+        if (!userRewardsData.rewards) userRewardsData.rewards = {};
         const curr = userRewardsData.rewards[rId]?.unlocked || false;
         newVal = !curr;
         if (!userRewardsData.rewards[rId]) userRewardsData.rewards[rId] = {};
@@ -287,8 +379,12 @@ window.toggleReward = async (rId, uid) => {
 };
 
 async function syncConfig() {
+    // Save to Cloud
     if (cloud) await cloud.saveAdminConfig(adminConfig);
-    else localStorage.setItem('fiaos_global_admin_config', JSON.stringify(adminConfig));
+    // Also save to LocalStorage for immediate fallback/speed
+    localStorage.setItem('fiaos_global_admin_config', JSON.stringify(adminConfig));
+    
+    // Notify Parent (App.tsx) to update state
     if (window.parent.FIAOS_ADMIN_CONFIG_UPDATED) window.parent.FIAOS_ADMIN_CONFIG_UPDATED(adminConfig);
 }
 
