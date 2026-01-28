@@ -1,3 +1,4 @@
+
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -10,6 +11,7 @@
             --bg-card: #1c1c1e;
             --primary: #818cf8;
             --danger: #ef4444;
+            --success: #22c55e;
             --text: #ffffff;
             --text-dim: rgba(255, 255, 255, 0.5);
             --border: rgba(255, 255, 255, 0.1);
@@ -69,7 +71,7 @@
         .segment-indicator {
             position: absolute;
             top: 2px; bottom: 2px;
-            width: 20%;
+            width: 25%;
             background: #636366;
             border-radius: 7px;
             box-shadow: 0 3px 8px rgba(0,0,0,0.12);
@@ -107,6 +109,9 @@
         .list-avatar { width: 36px; height: 36px; border-radius: 50%; background: #333; display: flex; justify-content: center; align-items: center; font-size: 18px; }
         .list-info { display: flex; flex-direction: column; }
         .list-sub { font-size: 12px; color: var(--text-dim); }
+        .list-tag { font-size: 10px; padding: 2px 6px; border-radius: 4px; background: #333; color: #aaa; margin-left: 6px; font-weight: 600; text-transform: uppercase; }
+        .list-tag.banned { background: rgba(239, 68, 68, 0.2); color: #ef4444; }
+        .list-tag.admin { background: rgba(99, 102, 241, 0.2); color: #818cf8; }
 
         /* Controls */
         .toggle {
@@ -120,17 +125,13 @@
         .toggle.active::after { transform: translateX(20px); }
 
         button.btn {
-            background: #007aff; color: white; border: none; padding: 6px 12px; border-radius: 8px; font-size: 13px; font-weight: 500; cursor: pointer;
+            background: #007aff; color: white; border: none; padding: 6px 14px; border-radius: 16px; font-size: 13px; font-weight: 600; cursor: pointer;
         }
         button.btn.danger { background: var(--danger); }
         button.btn.secondary { background: rgba(255,255,255,0.1); }
+        button.btn.full { width: 100%; padding: 14px; border-radius: 12px; font-size: 15px; }
         
-        .action-row {
-            padding: 16px; display: flex; gap: 10px;
-        }
-        .action-row button { flex: 1; padding: 12px; }
-
-        /* Modal Overlay for User Edit */
+        /* Modal Overlay */
         .modal {
             position: fixed; inset: 0; background: rgba(0,0,0,0.5); backdrop-filter: blur(5px);
             z-index: 100; display: none; align-items: flex-end;
@@ -138,14 +139,18 @@
         .modal.active { display: flex; }
         .modal-sheet {
             background: #1c1c1e; width: 100%; border-top-left-radius: 20px; border-top-right-radius: 20px;
-            padding: 20px; box-shadow: 0 -10px 40px rgba(0,0,0,0.5); border-top: 1px solid var(--border);
+            padding: 24px; box-shadow: 0 -10px 40px rgba(0,0,0,0.5); border-top: 1px solid var(--border);
             animation: slideUp 0.3s ease-out;
         }
         @keyframes slideUp { from { transform: translateY(100%); } to { transform: translateY(0); } }
 
         select {
-            background: #333; color: white; border: none; padding: 8px; border-radius: 8px; width: 100%; font-size: 16px; margin-top: 4px;
+            background: #2c2c2e; color: white; border: none; padding: 12px; border-radius: 12px; width: 100%; font-size: 16px; margin-top: 8px; appearance: none;
         }
+        label { font-size: 12px; color: var(--text-dim); text-transform: uppercase; letter-spacing: 0.5px; display: block; margin-top: 16px; }
+
+        .confirm-actions { display: flex; gap: 12px; margin-top: 30px; }
+        .confirm-actions button { flex: 1; }
 
     </style>
 </head>
@@ -161,8 +166,7 @@
             <div class="segment-btn" onclick="switchTab('users', 0)">Users</div>
             <div class="segment-btn" onclick="switchTab('apps', 1)">Apps</div>
             <div class="segment-btn" onclick="switchTab('rewards', 2)">Rewards</div>
-            <div class="segment-btn" onclick="switchTab('luna', 3)">Luna</div>
-            <div class="segment-btn" onclick="switchTab('system', 4)">System</div>
+            <div class="segment-btn" onclick="switchTab('system', 3)">System</div>
         </div>
     </div>
 
@@ -170,7 +174,7 @@
         
         <!-- USERS TAB -->
         <div id="tab-users">
-            <div class="group-title">Registered Users</div>
+            <div class="group-title">User Management</div>
             <div class="card-group" id="usersList">
                 <!-- Populated by JS -->
             </div>
@@ -182,43 +186,29 @@
             <div class="card-group" id="appsList">
                 <!-- Populated by JS -->
             </div>
-            <p style="font-size:12px; color:#666; padding:0 16px;">Deaktivierte Apps sind für alle Nutzer (außer Admin) unsichtbar.</p>
+            <p style="font-size:12px; color:#666; padding:0 16px; text-align:center;">Versteckte Apps sind nicht im Home, Dock oder per Link erreichbar.</p>
         </div>
 
         <!-- REWARDS TAB -->
         <div id="tab-rewards" class="hidden">
-            <div class="action-row">
-                 <button class="btn secondary" onclick="resetRewardsAll()">Reset ALL Rewards</button>
-            </div>
             <div class="group-title">Unlock Tool</div>
             <div class="card-group" style="padding:16px;">
-                <label style="font-size:12px; color:#888;">Target User</label>
+                <label>Target User</label>
                 <select id="rewardUserSelect"></select>
-                <br><br>
-                <label style="font-size:12px; color:#888;">Reward ID</label>
+                
+                <label>Reward ID</label>
                 <select id="rewardIdSelect"></select>
-                <br><br>
-                <button class="btn" style="width:100%" onclick="adminUnlockReward()">Unlock Selected</button>
-            </div>
-        </div>
-
-        <!-- LUNA TAB -->
-        <div id="tab-luna" class="hidden">
-            <div class="group-title">Shared State</div>
-            <div class="card-group">
-                <div class="list-item">
-                    <span>Reset Shared State</span>
-                    <button class="btn danger" onclick="resetLunaState()">Reset</button>
+                
+                <div style="margin-top:20px;">
+                    <button class="btn full" onclick="adminUnlockReward()">Unlock Selected 🔓</button>
                 </div>
-                <div class="list-item">
-                     <span>Set Mood</span>
-                     <select style="width:100px;" onchange="setLunaMood(this.value)">
-                         <option value="">-</option>
-                         <option value="happy">Happy</option>
-                         <option value="sad">Sad</option>
-                         <option value="hungry">Hungry</option>
-                         <option value="loved">Loved</option>
-                     </select>
+            </div>
+            
+            <div class="group-title">Mass Actions</div>
+            <div class="card-group">
+                <div class="list-item" onclick="confirmAction('resetRewards')">
+                    <span style="color:var(--text-dim)">Reset ALL Rewards</span>
+                    <button class="btn secondary">Reset</button>
                 </div>
             </div>
         </div>
@@ -233,15 +223,27 @@
                 </div>
             </div>
 
-            <div class="group-title">Data Management</div>
+            <div class="group-title">System Actions</div>
+            <div class="card-group">
+                <div class="list-item" onclick="confirmAction('lunaReset')">
+                    <span>Luna Reset</span>
+                    <button class="btn danger">Execute</button>
+                </div>
+                <div class="list-item" onclick="confirmAction('dailyReset')">
+                    <span>Daily Reset</span>
+                    <button class="btn danger">Execute</button>
+                </div>
+                <div class="list-item" onclick="confirmAction('globalLogout')">
+                    <span>Global Logout</span>
+                    <button class="btn danger">Execute</button>
+                </div>
+            </div>
+            
+            <div class="group-title">Data</div>
             <div class="card-group">
                 <div class="list-item" onclick="exportConfig()">
-                    <span>Export Global Config</span>
-                    <span>JSON ›</span>
-                </div>
-                <div class="list-item" onclick="factoryReset()">
-                    <span style="color:var(--danger)">Factory Reset</span>
-                    <span>⚠️</span>
+                    <span>Export Config JSON</span>
+                    <span>›</span>
                 </div>
             </div>
         </div>
@@ -251,23 +253,40 @@
     <!-- User Edit Modal -->
     <div class="modal" id="userModal">
         <div class="modal-sheet">
-            <h3 style="margin-top:0">Edit User</h3>
-            <p id="editUserName" style="color:#888; margin-bottom:20px;"></p>
+            <h3 style="margin-top:0; font-size:22px;">Edit User</h3>
+            <p id="editUserName" style="color:#888; margin-bottom:20px; font-size:14px;"></p>
             
-            <label style="font-size:12px; color:#888;">Role</label>
+            <label>Role</label>
             <select id="editUserRole">
                 <option value="user">User</option>
                 <option value="admin">Admin</option>
                 <option value="guest">Guest</option>
                 <option value="developer">Developer</option>
-                <option value="banned">Banned</option>
             </select>
 
-            <div style="margin-top:20px; display:flex; gap:10px;">
-                <button class="btn" style="flex:1" onclick="saveUserEdit()">Save</button>
-                <button class="btn danger" style="flex:1" onclick="kickUser()">Kick (Logout)</button>
+            <label>Status</label>
+            <div style="background:#2c2c2e; padding:12px; border-radius:12px; display:flex; justify-content:space-between; align-items:center; margin-top:8px;">
+                <span>Banned</span>
+                <div class="toggle" id="editUserBanToggle" onclick="toggleEditBan()"></div>
             </div>
-            <button class="btn secondary" style="width:100%; margin-top:10px;" onclick="closeModal()">Cancel</button>
+
+            <div class="confirm-actions">
+                <button class="btn secondary" onclick="closeModal()">Cancel</button>
+                <button class="btn danger" onclick="forceLogoutUser()">Force Logout</button>
+                <button class="btn" style="background:white; color:black;" onclick="saveUserEdit()">Save</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Confirmation Modal -->
+    <div class="modal" id="confirmModal">
+        <div class="modal-sheet">
+            <h3 style="margin-top:0; font-size:22px;">Are you sure?</h3>
+            <p id="confirmText" style="color:#888; margin-bottom:20px; font-size:14px;">This action cannot be undone.</p>
+            <div class="confirm-actions">
+                <button class="btn secondary" onclick="closeConfirm()">Cancel</button>
+                <button class="btn danger" id="confirmBtnAction">Confirm</button>
+            </div>
         </div>
     </div>
 

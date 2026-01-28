@@ -1,30 +1,38 @@
+
 /**
  * Settings App Logic
  */
 
 const KEYS = {
     SESSION: 'fiaos_session',
-    PROFILE_PREFIX: 'fiaos_user_', // or fiaos_guest_
-    PREFS_PREFIX: 'fiaos_user_'
+    PROFILE_PREFIX: 'fiaos_user_', 
+    PREFS_PREFIX: 'fiaos_user_',
+    REWARDS_PREFIX: 'fiaos_rewards_'
 };
 
 let user = null;
 let profileKey = '';
 let prefsKey = '';
+let rewardsKey = '';
 
 let profile = {};
 let prefs = {};
+let userRewards = {};
 
-// Default Themes
+// Themes Registry (synced with constants.ts logic)
 const THEMES = [
-    { id: 'roseGlass', name: 'Rose', bg: '#2e1065' },
-    { id: 'midnight', name: 'Night', bg: '#000' },
-    { id: 'cloud', name: 'Cloud', bg: '#e7f0fd', text: '#333' },
-    { id: 'matcha', name: 'Matcha', bg: '#d4fc79', text: '#064e3b' }
+    { id: 'roseGlass', name: 'Default', bg: '#2e1065', unlockId: null },
+    { id: 'softRose', name: 'Soft Rose', bg: '#be185d', unlockId: 'love_1_month' },
+    { id: 'midnightLove', name: 'Midnight', bg: '#1e1b4b', unlockId: 'love_3_month' },
+    { id: 'pastelSky', name: 'Pastel Sky', bg: '#7dd3fc', text:'#333', unlockId: 'love_6_month' },
+    { id: 'eternal', name: 'Eternal', bg: '#713f12', unlockId: 'love_1_year' },
+    // Legacy mapping support
+    { id: 'midnight', name: 'Dark Mode', bg: '#000', unlockId: null },
+    { id: 'cloud', name: 'Cloud', bg: '#e7f0fd', text: '#333', unlockId: null },
+    { id: 'matcha', name: 'Matcha', bg: '#d4fc79', text: '#064e3b', unlockId: null }
 ];
 
 function init() {
-    // 1. Get Session
     const sessionStr = localStorage.getItem(KEYS.SESSION);
     if (!sessionStr) return;
     user = JSON.parse(sessionStr);
@@ -32,17 +40,17 @@ function init() {
     const prefix = user.role === 'guest' ? 'fiaos_guest_' : 'fiaos_user_';
     profileKey = `${prefix}${user.id}_profile`;
     prefsKey = `${prefix}${user.id}_prefs`;
+    rewardsKey = `${KEYS.REWARDS_PREFIX}${user.id}`;
 
-    // 2. Load Data
     loadData();
-
-    // 3. Render
     renderUI();
 
-    // 4. Admin Check
-    if (user.role === 'admin') {
-        document.getElementById('devSection').classList.remove('hidden');
-    }
+    // Dev Section Visibility Rule: Visible to all, but disabled if not admin
+    const isAdmin = user.role === 'admin' || user.role === 'developer';
+    const devBtns = document.querySelectorAll('.dev-btn');
+    devBtns.forEach(btn => {
+        btn.disabled = !isAdmin;
+    });
 }
 
 function loadData() {
@@ -69,6 +77,11 @@ function loadData() {
             reduceMotion: false
         };
     }
+
+    // Rewards (to check unlocks)
+    const rStr = localStorage.getItem(rewardsKey);
+    if (rStr) userRewards = JSON.parse(rStr);
+    else userRewards = { rewards: {} };
 }
 
 function renderUI() {
@@ -90,26 +103,31 @@ function renderUI() {
 function renderThemes() {
     const grid = document.getElementById('themeGrid');
     grid.innerHTML = '';
+    
     THEMES.forEach(t => {
+        const isUnlocked = !t.unlockId || (userRewards.rewards && userRewards.rewards[t.unlockId]?.unlocked);
+        
         const div = document.createElement('div');
-        div.className = `theme-card ${prefs.theme === t.id ? 'selected' : ''}`;
+        div.className = `theme-card ${prefs.theme === t.id ? 'selected' : ''} ${!isUnlocked ? 'locked' : ''}`;
         div.style.background = t.bg;
         div.style.color = t.text || '#fff';
-        div.innerText = t.name;
-        div.onclick = () => setTheme(t.id);
+        
+        if (isUnlocked) {
+            div.innerText = t.name;
+            div.onclick = () => setTheme(t.id);
+        } else {
+            div.innerHTML = `<span style="opacity:0.6">🔒</span><span style="font-size:10px; opacity:0.6; margin-left:4px;">Locked</span>`;
+            div.style.cursor = 'not-allowed';
+            div.title = `Benötigt: ${t.unlockId}`;
+        }
+        
         grid.appendChild(div);
     });
 }
 
 function renderAccents() {
     const swatches = document.querySelectorAll('.color-swatch');
-    swatches.forEach(s => {
-        // Simple check by converting rgb to hex is hard, checking logic roughly
-        // Just remove selected class first
-        s.classList.remove('selected');
-        // If inline style matches (approx)
-        // Ignoring exact visual match for simplicity in vanilla JS without hex conversion lib
-    });
+    swatches.forEach(s => s.classList.remove('selected'));
 }
 
 // --- Actions ---
@@ -117,10 +135,7 @@ function renderAccents() {
 function saveProfile() {
     const name = document.getElementById('inpName').value;
     if (name) profile.displayName = name;
-    
     localStorage.setItem(profileKey, JSON.stringify(profile));
-    
-    // Notify OS
     if (window.parent.FIAOS_PROFILE_UPDATED) {
         window.parent.FIAOS_PROFILE_UPDATED(profile);
     }
@@ -137,15 +152,12 @@ function promptAvatar() {
 
 function savePrefs() {
     localStorage.setItem(prefsKey, JSON.stringify(prefs));
-    
-    // Notify OS
     if (window.parent.FIAOS_APPLY_PREFS) {
         window.parent.FIAOS_APPLY_PREFS(prefs);
     }
     renderUI();
 }
 
-// Pref Setters
 window.setTheme = (id) => {
     prefs.theme = id;
     savePrefs();
@@ -185,14 +197,17 @@ window.resetData = () => {
 window.devUnlockRewards = () => {
     if (window.parent.FIAOS_DEBUG) {
         window.parent.FIAOS_DEBUG.unlockAll();
-        alert("Rewards Unlocked");
+        // Reload local data to reflect changes
+        setTimeout(() => {
+            loadData();
+            renderUI();
+            alert("Rewards Unlocked");
+        }, 500);
     }
 };
 
 window.devResetLuna = () => {
     if (window.parent.LUNA_DEBUG) {
-        // This won't work cross-frame directly unless exposed differently
-        // But we can delete the key manually
         const key = user.role === 'guest' ? 'fiaos_guest_luna_state' : 'fiaos_pair_room_main';
         localStorage.removeItem(key);
         alert("Luna State removed.");
@@ -203,5 +218,4 @@ window.devResetLuna = () => {
     }
 };
 
-// Start
 init();

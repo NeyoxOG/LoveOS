@@ -1,7 +1,9 @@
+
 import React, { useState, useEffect, useCallback } from 'react';
 import { User, Session, AppItem, ToastState, OverlayState, UserRewardsData, UserProfile, UserPrefs, AdminConfig } from './types';
 import { NOISE_BG, REWARD_CATALOG } from './constants';
 import { loadSession, saveSession, clearSession } from './utils/session';
+import { cloud } from './utils/cloud'; // Import Cloud Adapter
 import { 
   loadUserRewards, saveUserRewards, unlockRewardLogic, setRewardsLastSeen, 
   debugUnlockValentine, debugResetValentine,
@@ -34,6 +36,7 @@ declare global {
         bridgeUnlockTheme: (data: { themeId: string }) => void;
         bridgeUnlockApp: (data: { appId: string }) => void;
         bridgeLunaBoost: (data: any) => void;
+        cloud: typeof cloud; // Expose Cloud API
     };
     FIAOS_APPLY_PREFS?: (prefs: UserPrefs) => void;
     FIAOS_PROFILE_UPDATED?: (profile: UserProfile) => void;
@@ -64,8 +67,22 @@ const App: React.FC = () => {
   const [userPrefs, setUserPrefs] = useState<UserPrefs | null>(null);
   const [adminConfig, setAdminConfig] = useState<AdminConfig | null>(null);
 
+  const showToast = useCallback((message: string) => {
+    setToast({ id: Date.now(), message });
+  }, []);
+
   // Initialize App (load session)
   useEffect(() => {
+    // Expose Cloud API for iframes
+    window.FIAOS = {
+        ...(window.FIAOS || {}),
+        cloud: cloud,
+        bridgeUnlockReward: ({ rewardId }) => handleUnlockReward(rewardId),
+        bridgeUnlockTheme: ({ themeId }) => showToast(`Neues Theme verfügbar: ${themeId} 🎨`),
+        bridgeUnlockApp: ({ appId }) => showToast(`Neue App freigeschaltet: ${appId} 📲`),
+        bridgeLunaBoost: (data) => showToast("Luna fühlt sich besser! 🐑💖")
+    } as any;
+
     // Load Global Config first
     const config = loadAdminConfig();
     setAdminConfig(config);
@@ -73,42 +90,56 @@ const App: React.FC = () => {
     const storedSession = loadSession();
     if (storedSession) {
       
-      // Check for forced logout
+      // 1. Check for forced logout via localStorage flag
       const freshCheck = localStorage.getItem(`fiaos_user_${storedSession.userId}_session_flag`);
       if (freshCheck === 'forceLogout') {
           handleLogout();
+          localStorage.removeItem(`fiaos_user_${storedSession.userId}_session_flag`); // Clear flag
           return;
       }
 
-      // Check Maintenance Mode
-      if (config.maintenanceMode && storedSession.role !== 'admin' && storedSession.role !== 'developer') {
-         // Force logout if in maintenance mode and not admin
-         // Or just show maintenance screen logic handled in render
+      // 2. Check Ban Status from Config
+      const userStatus = config.userStatus[storedSession.userId];
+      if (userStatus && userStatus.banned) {
+          handleLogout();
+          showToast("Account deaktiviert.");
+          return;
       }
 
-      // Apply Role Overrides
-      if (config.roleOverrides[storedSession.userId]) {
-         storedSession.role = config.roleOverrides[storedSession.userId];
+      // 3. Update Role from Config
+      if (userStatus && userStatus.role !== storedSession.role) {
+          storedSession.role = userStatus.role;
+          saveSession(storedSession); // Sync
       }
 
       setSession(storedSession);
       const rewards = loadUserRewards(storedSession.userId);
       setRewardsData(rewards);
       
-      const profile = loadUserProfile(storedSession);
+      // If cloud user, try syncing profile in background
+      if (storedSession.role !== 'guest') {
+          cloud.loadProfile().then(p => {
+              if (p) setUserProfile(p as UserProfile);
+              else {
+                  const local = loadUserProfile(storedSession);
+                  setUserProfile(local);
+                  // Init cloud doc
+                  cloud.saveProfile(local); 
+              }
+          });
+      } else {
+          const profile = loadUserProfile(storedSession);
+          setUserProfile(profile);
+      }
+
       const prefs = loadUserPrefs(storedSession);
-      setUserProfile(profile);
       setUserPrefs(prefs);
       applyTheme(prefs);
 
       // Update Index
-      updateUserIndex(storedSession, profile);
+      if (userProfile) updateUserIndex(storedSession, userProfile);
     }
-  }, []);
-
-  const showToast = useCallback((message: string) => {
-    setToast({ id: Date.now(), message });
-  }, []);
+  }, [showToast]);
 
   // --- Rewards Logic ---
 
@@ -130,46 +161,18 @@ const App: React.FC = () => {
     }
   }, [showToast]);
 
-  // Event Bus & Bridge
+  // Event Bus
   useEffect(() => {
-    // Legacy event bus
     window.FIAOS_EVENTS = {
       emit: (event: string, data?: any) => {
         console.log(`OS Event: ${event}`, data);
         if (event === 'luna.streak.3') handleUnlockReward('reward.streak3');
         if (event === 'luna.milestone.3') showToast("Meilenstein: 3 Tage Streak! 🔥");
-        if (event === 'luna.milestone.7') showToast("Wow! 7 Tage Luna gepflegt! 🐑✨");
-        if (event === 'luna.milestone.14') showToast("14 Tage! Ihr seid die Besten! 💖");
-        
-        if (event === 'vault.created') showToast("Nachricht im Tresor verschlossen 💌");
         
         if (event === 'games.unlock' || event === 'diary.unlock') {
             if (data?.id) handleUnlockReward(data.id);
         }
       }
-    };
-
-    // Central Bridge for Apps
-    window.FIAOS = {
-        bridgeUnlockReward: ({ rewardId }) => {
-            console.log("Bridge: Unlock Reward", rewardId);
-            handleUnlockReward(rewardId);
-        },
-        bridgeUnlockTheme: ({ themeId }) => {
-            console.log("Bridge: Unlock Theme", themeId);
-            showToast(`Neues Theme verfügbar: ${themeId} 🎨`);
-            // Store unlock logic in user prefs/profile later
-        },
-        bridgeUnlockApp: ({ appId }) => {
-            console.log("Bridge: Unlock App", appId);
-            // This would update admin config or user permissions
-            showToast(`Neue App freigeschaltet: ${appId} 📲`);
-        },
-        bridgeLunaBoost: (data) => {
-            console.log("Bridge: Luna Boost", data);
-            showToast("Luna fühlt sich besser! 🐑💖");
-            // Would ideally communicate with Luna iframe or update storage directly
-        }
     };
 
     window.FIAOS_APPLY_PREFS = (prefs: UserPrefs) => {
@@ -184,64 +187,36 @@ const App: React.FC = () => {
              setSession(newSession);
              saveSession(newSession);
              updateUserIndex(newSession, profile);
+             // Sync to cloud
+             if (session.role !== 'guest') cloud.saveProfile(profile);
         }
     };
 
     window.FIAOS_ADMIN_CONFIG_UPDATED = (config: AdminConfig) => {
-        console.log("Admin Config Updated Global", config);
         setAdminConfig(config);
-        showToast("Systemkonfiguration aktualisiert 🔄");
-        // Force re-check permissions if needed
         if (session) {
-            if (config.roleOverrides[session.userId] && config.roleOverrides[session.userId] !== session.role) {
-                // Role changed, reload session logic roughly
-                const updatedSession = { ...session, role: config.roleOverrides[session.userId] };
-                setSession(updatedSession);
+            const userStatus = config.userStatus[session.userId];
+            if (userStatus && userStatus.banned) {
+                showToast("Session wurde vom Admin beendet 🔒");
+                handleLogout();
             }
         }
     };
 
   }, [session, handleUnlockReward, showToast]);
 
-  // Expose Debug API
-  useEffect(() => {
-    window.FIAOS_DEBUG = {
-      unlock: (rewardId: string) => {
-        const currentSession = loadSession();
-        if (!currentSession) {
-          console.warn("FIAOS_DEBUG: No user logged in.");
-          return;
-        }
-        handleUnlockReward(rewardId);
-      },
-      unlockAll: () => {
-         if (!loadSession()) return;
-         REWARD_CATALOG.forEach(r => handleUnlockReward(r.id));
-      },
-      unlockValentine: () => {
-        const currentSession = loadSession();
-        if (!currentSession) return;
-        const rewards = loadUserRewards(currentSession.userId);
-        const updated = debugUnlockValentine(rewards);
-        setRewardsData(updated);
-        saveUserRewards(currentSession.userId, updated);
-        showToast("Valentine: All Unlocked ❤️");
-      },
-      resetValentine: () => {
-        const currentSession = loadSession();
-        if (!currentSession) return;
-        const rewards = loadUserRewards(currentSession.userId);
-        const updated = debugResetValentine(rewards);
-        setRewardsData(updated);
-        saveUserRewards(currentSession.userId, updated);
-        showToast("Valentine: Reset 🔄");
-      }
-    };
-  }, [handleUnlockReward, showToast]);
-
   // --- Auth Handlers ---
 
   const handleSelectUser = (user: User) => {
+    // Check Ban *before* prompt
+    const config = loadAdminConfig();
+    const userStatus = config.userStatus[user.id];
+    
+    if (userStatus && userStatus.banned) {
+        showToast("Dieser Account wurde gesperrt ⛔");
+        return;
+    }
+
     if (user.role === 'guest') {
       loginSuccess(user);
     } else {
@@ -252,7 +227,21 @@ const App: React.FC = () => {
 
   const attemptLogin = async (password: string): Promise<boolean> => {
     if (!selectedUser) return false;
+    
     if (password === selectedUser.password) {
+      // Local Auth Success
+      
+      // Trigger Silent Cloud Auth if not guest
+      if (selectedUser.role !== 'guest') {
+          // Fire and forget, or await? Awaiting ensures session validity
+          const cloudAuthSuccess = await cloud.silentLogin(selectedUser.id, password);
+          if (!cloudAuthSuccess) {
+              console.warn("Cloud login failed, falling back to local simulation mode (could be network)");
+              // We allow login but features might be limited. Or show toast.
+              showToast("Offline Modus: Cloud-Verbindung fehlgeschlagen ☁️❌");
+          }
+      }
+
       loginSuccess(selectedUser);
       return true;
     }
@@ -260,30 +249,26 @@ const App: React.FC = () => {
   };
 
   const loginSuccess = (user: User) => {
-    // Check maintenance
+    // Re-load config to be safe
     const config = loadAdminConfig();
-    if (config.maintenanceMode && user.role !== 'admin') {
-         // Apply Override check before blocking
-         const overrideRole = config.roleOverrides[user.id];
-         if (overrideRole !== 'admin' && overrideRole !== 'developer') {
-             showToast("Wartungsarbeiten aktiv. Login nicht möglich.");
-             return;
-         }
-    }
+    const userStatus = config.userStatus[user.id] || { role: user.role, banned: false };
 
-    // Role might be overridden
-    const finalRole = config.roleOverrides[user.id] || user.role;
+    if (userStatus.banned) {
+        showToast("Login verweigert: Account gesperrt.");
+        closeAuthSheet();
+        return;
+    }
 
     const newSession: Session = {
       userId: user.id,
       name: user.name,
-      role: finalRole,
+      role: userStatus.role,
       lastLoginAt: Date.now()
     };
     setSession(newSession);
     saveSession(newSession);
     
-    // Load User Data
+    // Load Data
     const rewards = loadUserRewards(user.id);
     setRewardsData(rewards);
     const profile = loadUserProfile(newSession);
@@ -293,7 +278,6 @@ const App: React.FC = () => {
     applyTheme(prefs);
     
     updateUserIndex(newSession, profile);
-    
     closeAuthSheet();
 
     setTimeout(() => {
@@ -303,7 +287,6 @@ const App: React.FC = () => {
   };
 
   const handleLogout = () => {
-    showToast("Erfolgreich abgemeldet 👋");
     clearSession();
     setSession(null);
     setRewardsData(null);
@@ -312,7 +295,7 @@ const App: React.FC = () => {
     setUserPrefs(null);
     setIsAccountSheetOpen(false);
     
-    // Reset Theme to default
+    // Reset Theme
     document.documentElement.style.cssText = '';
     document.body.className = '';
   };
@@ -330,51 +313,28 @@ const App: React.FC = () => {
        return;
     }
 
-    // Check visibility via Admin Config
     if (adminConfig && !adminConfig.appVisibility[app.id] && app.id !== 'settings') {
          if (session.role !== 'admin' && session.role !== 'developer') {
-             showToast("Diese App ist aktuell deaktiviert 🔒");
+             showToast("Diese App ist aktuell nicht verfügbar 🔒");
              return;
          }
     }
     
-    // Save last app
     saveLastApp(session, app.id);
     handleUnlockReward('reward.firstAppOpen');
 
     if (app.id === 'valentine') {
       setRewardsTab('valentine');
       setIsRewardsOpen(true);
-    } else if (app.id === 'luna') {
-      setOpenedApp({ id: 'luna', name: 'Luna' });
-    } else if (app.id === 'vault') {
-      setOpenedApp({ id: 'vault', name: 'Message Vault' });
-    } else if (app.id === 'settings') {
-      setOpenedApp({ id: 'settings', name: 'Einstellungen' });
-    } else if (app.id === 'admin') {
-      setOpenedApp({ id: 'admin', name: 'Admin Center' });
-    } else if (app.id === 'games') {
-      setOpenedApp({ id: 'games', name: 'Arcade' });
-    } else if (app.id === 'diary') {
-      setOpenedApp({ id: 'diary', name: 'Tagebuch' });
-    } else if (app.id === 'daily') {
-      setOpenedApp({ id: 'daily', name: 'Daily' });
-    } else if (app.id === 'love') {
-      setOpenedApp({ id: 'love', name: 'Love' });
+    } else if (['luna', 'vault', 'settings', 'admin', 'games', 'diary', 'daily', 'love'].includes(app.id)) {
+      setOpenedApp({ id: app.id, name: app.name });
     } else {
       showToast("Bald verfügbar ✨");
     }
   };
 
-  const openOverlay = (title: string, content: string) => {
-    setOverlay({ isOpen: true, title, content });
-  };
-
   const handleOpenRewards = (tab = 'general') => {
-    if (!session) {
-      showToast("Bitte einloggen, um Erfolge zu sehen.");
-      return;
-    }
+    if (!session) return;
     setRewardsTab(tab);
     setIsRewardsOpen(true);
   };
@@ -387,35 +347,12 @@ const App: React.FC = () => {
     }
   };
 
-  const handleOpenSettingsFromSheet = (subTab = 'account') => {
-    setOpenedApp({ id: 'settings', name: 'Einstellungen' });
-  };
-
-  // Maintenance Screen
-  if (session && adminConfig?.maintenanceMode && session.role !== 'admin' && session.role !== 'developer') {
-      return (
-          <div className="h-full w-full bg-black text-white flex flex-col items-center justify-center p-6 text-center z-50">
-              <div className="text-6xl mb-6 animate-pulse">💗</div>
-              <h1 className="text-3xl font-bold mb-4">Wartungsarbeiten</h1>
-              <p className="text-white/60 mb-8 max-w-xs">FiaOS wird gerade mit Liebe aktualisiert. Bitte komm später wieder.</p>
-              <button onClick={handleLogout} className="px-6 py-3 bg-white/10 rounded-full font-medium hover:bg-white/20">Abmelden</button>
-          </div>
-      );
-  }
-
   return (
     <div className="relative h-full w-full bg-slate-950 overflow-hidden font-sans text-slate-50 selection:bg-indigo-500/30">
-      
-      {/* Background Elements */}
       <div className="absolute inset-0 bg-gradient-to-br from-[#0f1016] via-[#161622] to-[#08080a] z-0 transition-colors duration-500" style={{ background: 'var(--bg-primary, linear-gradient(to bottom right, #0f1016, #08080a))' }} />
       <div className="absolute top-[-20%] left-[-20%] w-[80%] h-[80%] bg-indigo-500/20 rounded-full blur-[100px] pointer-events-none opacity-40 mix-blend-screen animate-pulse duration-[10000ms]" style={{ backgroundColor: 'var(--accent)' }} />
-      
-      <div 
-        className="absolute inset-0 z-0 pointer-events-none opacity-40 mix-blend-overlay"
-        style={{ backgroundImage: `url("${NOISE_BG}")` }}
-      />
+      <div className="absolute inset-0 z-0 pointer-events-none opacity-40 mix-blend-overlay" style={{ backgroundImage: `url("${NOISE_BG}")` }} />
 
-      {/* Main Content Area */}
       <main className="relative h-full z-10 flex flex-col overflow-y-auto no-scrollbar scroll-smooth">
         {session ? (
           <HomeScreen 
@@ -423,7 +360,7 @@ const App: React.FC = () => {
             onLogout={handleLogout}
             onAppClick={handleAppClick}
             onShowToast={showToast}
-            onOpenOverlay={openOverlay}
+            onOpenOverlay={(t, c) => setOverlay({isOpen:true, title:t, content:c})}
             onOpenRewards={handleOpenRewards}
             onOpenAccountSheet={() => setIsAccountSheetOpen(true)}
           />
@@ -432,7 +369,6 @@ const App: React.FC = () => {
         )}
       </main>
 
-      {/* App Window */}
       <AppWindow 
         isOpen={!!openedApp} 
         appId={openedApp?.id || null}
@@ -440,7 +376,6 @@ const App: React.FC = () => {
         onClose={() => setOpenedApp(null)}
       />
 
-      {/* Overlays & Sheets */}
       <AuthSheet 
         isOpen={isAuthSheetOpen} 
         onClose={closeAuthSheet} 
@@ -453,7 +388,7 @@ const App: React.FC = () => {
         onClose={() => setIsAccountSheetOpen(false)}
         profile={userProfile}
         onLogout={handleLogout}
-        onOpenSettings={handleOpenSettingsFromSheet}
+        onOpenSettings={() => setOpenedApp({ id: 'settings', name: 'Einstellungen' })}
       />
 
       <RewardsSheet 

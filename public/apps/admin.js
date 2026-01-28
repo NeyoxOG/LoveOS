@@ -1,5 +1,6 @@
+
 /**
- * Admin App Logic
+ * Admin App Logic v2
  */
 
 const KEYS = {
@@ -12,11 +13,13 @@ let currentUser = null;
 let adminConfig = null;
 let userIndex = null;
 let editingUserId = null;
+let pendingAction = null;
 
-// Mock Data for Rewards List
+// Mock Data for Rewards List (Matches constants.ts)
 const REWARDS = [
-    'reward.welcome', 'reward.firstLogin', 'reward.streak3', 
-    'valentine.reward.pizza', 'valentine.reward.letter'
+    'reward.welcome', 'reward.firstLogin', 'reward.streak3', 'reward.secretLove',
+    'valentine.reward.pizza', 'valentine.reward.letter', 'valentine.reward.photo',
+    'love_1_month', 'love_3_month', 'love_6_month', 'love_1_year'
 ];
 
 function init() {
@@ -37,8 +40,6 @@ function init() {
     renderApps();
     renderRewardsUI();
     renderSystem();
-
-    // 4. Poll for updates (optional, keeping it simple)
 }
 
 function denyAccess() {
@@ -53,12 +54,19 @@ function denyAccess() {
 function loadData() {
     // Config
     const cfg = localStorage.getItem(KEYS.CONFIG);
-    if (cfg) adminConfig = JSON.parse(cfg);
-    else adminConfig = { 
-        appVisibility: { luna: true, valentine: true, vault: true }, 
-        roleOverrides: {}, 
-        maintenanceMode: false 
-    };
+    if (cfg) {
+        adminConfig = JSON.parse(cfg);
+        // Ensure new structure
+        if (!adminConfig.userStatus) adminConfig.userStatus = {};
+    } else {
+        // Fallback default
+        adminConfig = { 
+            appVisibility: { luna: true, valentine: true, vault: true }, 
+            userStatus: {}, 
+            maintenanceMode: false,
+            updatedAt: Date.now()
+        };
+    }
 
     // User Index
     const idx = localStorage.getItem(KEYS.USER_INDEX);
@@ -67,8 +75,11 @@ function loadData() {
 }
 
 function saveConfig() {
+    adminConfig.updatedAt = Date.now();
+    adminConfig.lastEditedBy = currentUser.name;
     localStorage.setItem(KEYS.CONFIG, JSON.stringify(adminConfig));
-    // Notify OS
+    
+    // Notify OS via Window Bridge
     if (window.parent.FIAOS_ADMIN_CONFIG_UPDATED) {
         window.parent.FIAOS_ADMIN_CONFIG_UPDATED(adminConfig);
     }
@@ -87,15 +98,25 @@ function renderUsers() {
     list.innerHTML = '';
     
     userIndex.users.forEach(u => {
-        const role = adminConfig.roleOverrides[u.userId] || u.role;
+        // Get status from config or default
+        const status = adminConfig.userStatus[u.userId] || { role: u.role, banned: false };
+        
+        // Tags
+        let tags = '';
+        if (status.role === 'admin') tags += `<span class="list-tag admin">Admin</span>`;
+        if (status.banned) tags += `<span class="list-tag banned">Banned</span>`;
+
         const div = document.createElement('div');
         div.className = 'list-item';
         div.innerHTML = `
             <div class="list-item-content">
                 <div class="list-avatar">${u.avatar?.value || '👤'}</div>
                 <div class="list-info">
-                    <span style="font-weight:600">${u.displayName}</span>
-                    <span class="list-sub">${u.userId} • ${role}</span>
+                    <div>
+                        <span style="font-weight:600">${u.displayName}</span>
+                        ${tags}
+                    </div>
+                    <span class="list-sub">${u.userId} • ${status.role}</span>
                 </div>
             </div>
             <button class="btn secondary" onclick="openUserEdit('${u.userId}')">Edit</button>
@@ -107,31 +128,57 @@ function renderUsers() {
 window.openUserEdit = (uid) => {
     editingUserId = uid;
     const user = userIndex.users.find(u => u.userId === uid);
-    const role = adminConfig.roleOverrides[uid] || user.role;
+    const status = adminConfig.userStatus[uid] || { role: user.role, banned: false };
     
     document.getElementById('editUserName').innerText = `${user.displayName} (${uid})`;
-    document.getElementById('editUserRole').value = role;
+    document.getElementById('editUserRole').value = status.role;
+    
+    // Toggle UI
+    const tog = document.getElementById('editUserBanToggle');
+    if (status.banned) tog.classList.add('active');
+    else tog.classList.remove('active');
+
     document.getElementById('userModal').classList.add('active');
+};
+
+window.toggleEditBan = () => {
+    document.getElementById('editUserBanToggle').classList.toggle('active');
 };
 
 window.saveUserEdit = () => {
     const newRole = document.getElementById('editUserRole').value;
-    adminConfig.roleOverrides[editingUserId] = newRole;
+    const isBanned = document.getElementById('editUserBanToggle').classList.contains('active');
+    
+    adminConfig.userStatus[editingUserId] = {
+        role: newRole,
+        banned: isBanned
+    };
+    
     saveConfig();
     closeModal();
     renderUsers();
+    
+    // Auto logout if banning
+    if (isBanned) {
+        forceLogoutUser(editingUserId);
+    }
 };
 
-window.kickUser = () => {
-    if (confirm("Force logout this user?")) {
-        localStorage.setItem(`fiaos_user_${editingUserId}_session_flag`, 'forceLogout');
-        alert("Kick flag set.");
+window.forceLogoutUser = (targetId) => {
+    const uid = targetId || editingUserId;
+    if (!uid) return;
+    
+    localStorage.setItem(`fiaos_user_${uid}_session_flag`, 'forceLogout');
+    
+    if (!targetId) { // If called from modal
+        alert("Logout flag set for " + uid);
         closeModal();
     }
 };
 
 window.closeModal = () => {
     document.getElementById('userModal').classList.remove('active');
+    editingUserId = null;
 };
 
 // --- Apps Tab ---
@@ -139,14 +186,17 @@ function renderApps() {
     const list = document.getElementById('appsList');
     list.innerHTML = '';
     
-    const apps = ['luna', 'valentine', 'rewards', 'vault', 'messages', 'settings', 'admin'];
+    // Full list from constants.ts knowledge
+    const apps = ['luna', 'valentine', 'rewards', 'vault', 'messages', 'settings', 'admin', 'games', 'diary', 'daily', 'love'];
     
     apps.forEach(appId => {
+        if (appId === 'settings') return; // Cannot hide settings
+        
         const isVisible = adminConfig.appVisibility[appId] !== false;
         const div = document.createElement('div');
         div.className = 'list-item';
         div.innerHTML = `
-            <span style="text-transform:capitalize">${appId}</span>
+            <span style="text-transform:capitalize; font-weight:500;">${appId}</span>
             <div class="toggle ${isVisible ? 'active' : ''}" onclick="toggleApp('${appId}')"></div>
         `;
         list.appendChild(div);
@@ -179,52 +229,68 @@ window.adminUnlockReward = () => {
     const uid = document.getElementById('rewardUserSelect').value;
     const rid = document.getElementById('rewardIdSelect').value;
     
-    // Low level write
     const key = `fiaos_rewards_${uid}`;
     const data = JSON.parse(localStorage.getItem(key) || '{}');
     
     if (!data.rewards) data.rewards = {};
     if (!data.valentine) data.valentine = { unlocked: {} };
     
-    // Unlock generic
     data.rewards[rid] = { unlocked: true, unlockedAt: Date.now() };
-    // Unlock valentine if applicable
-    data.valentine.unlocked[rid] = true;
+    data.valentine.unlocked[rid] = true; // Unlock in both places just in case
     
     localStorage.setItem(key, JSON.stringify(data));
     alert(`Unlocked ${rid} for ${uid}`);
 };
 
-window.resetRewardsAll = () => {
-    if (confirm("Reset ALL rewards for ALL users?")) {
+// --- System Actions ---
+
+window.confirmAction = (action) => {
+    pendingAction = action;
+    const modal = document.getElementById('confirmModal');
+    const txt = document.getElementById('confirmText');
+    
+    if (action === 'lunaReset') txt.innerText = "Reset Luna Status (Hunger, Mood, Streak)? Affects shared state.";
+    if (action === 'dailyReset') txt.innerText = "Reset Daily Claims for all users?";
+    if (action === 'globalLogout') txt.innerText = "Log out ALL users immediately?";
+    if (action === 'resetRewards') txt.innerText = "Wipe ALL rewards for ALL users?";
+    
+    document.getElementById('confirmBtnAction').onclick = executePendingAction;
+    modal.classList.add('active');
+};
+
+window.closeConfirm = () => {
+    document.getElementById('confirmModal').classList.remove('active');
+    pendingAction = null;
+};
+
+function executePendingAction() {
+    if (!pendingAction) return;
+    
+    if (pendingAction === 'lunaReset') {
+        localStorage.removeItem('fiaos_pair_room_main');
+        localStorage.removeItem('fiaos_guest_luna_state');
+    }
+    else if (pendingAction === 'dailyReset') {
+        userIndex.users.forEach(u => {
+            localStorage.removeItem(`fiaos_user_${u.userId}_daily_state`);
+        });
+    }
+    else if (pendingAction === 'globalLogout') {
+        userIndex.users.forEach(u => {
+            localStorage.setItem(`fiaos_user_${u.userId}_session_flag`, 'forceLogout');
+        });
+        // Also self
+        localStorage.setItem(`fiaos_user_${currentUser.id}_session_flag`, 'forceLogout');
+    }
+    else if (pendingAction === 'resetRewards') {
         userIndex.users.forEach(u => {
              localStorage.removeItem(`fiaos_rewards_${u.userId}`);
         });
-        alert("All rewards reset.");
     }
-};
-
-// --- Luna Tab ---
-window.resetLunaState = () => {
-    // Shared key
-    if (confirm("Reset Luna Shared State?")) {
-        localStorage.removeItem('fiaos_pair_room_main');
-        localStorage.removeItem('fiaos_guest_luna_state');
-        alert("Luna reset.");
-    }
-};
-
-window.setLunaMood = (mood) => {
-    if (!mood) return;
-    const key = 'fiaos_pair_room_main'; // Assuming pair for now
-    const raw = localStorage.getItem(key);
-    if (raw) {
-        const state = JSON.parse(raw);
-        state.mood = mood;
-        localStorage.setItem(key, JSON.stringify(state));
-        alert("Mood updated.");
-    }
-};
+    
+    alert("Action Executed.");
+    closeConfirm();
+}
 
 // --- System Tab ---
 function renderSystem() {
@@ -242,18 +308,10 @@ window.toggleMaintenance = () => {
 window.exportConfig = () => {
     const data = {
         config: adminConfig,
-        index: userIndex,
-        // could include more
+        index: userIndex
     };
     navigator.clipboard.writeText(JSON.stringify(data, null, 2));
     alert("Config copied to clipboard.");
-};
-
-window.factoryReset = () => {
-    if (confirm("FACTORY RESET: This will wipe EVERYTHING. Are you sure?")) {
-        localStorage.clear();
-        window.parent.location.reload();
-    }
 };
 
 // Start

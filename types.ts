@@ -1,3 +1,4 @@
+
 export type UserRole = 'admin' | 'developer' | 'user' | 'guest' | 'banned';
 export type UserBadge = 'vip' | 'developer';
 
@@ -40,11 +41,17 @@ export interface OverlayState {
 
 // --- Rewards System Types ---
 
+export type RewardType = 'reward' | 'theme_unlock' | 'cosmetic_unlock';
+export type RewardCategory = 'general' | 'love' | 'games' | 'diary' | 'valentine';
+
 export interface Reward {
   id: string;
   title: string;
   description: string;
   icon: string;
+  type?: RewardType;
+  category?: RewardCategory;
+  payload?: any;
 }
 
 export interface RewardProgress {
@@ -85,11 +92,14 @@ export interface UserPrefs {
   wallpaper: string;
   reduceMotion: boolean;
   uiDensity: 'cozy' | 'compact';
+  quickstartMode: 'lastApp' | 'fixed';
+  quickstartApp: string;
 }
 
 export interface ThemeDef {
   id: string;
   name: string;
+  unlockRewardId?: string; // If set, requires this reward
   colors: {
     bgGradient: string;
     cardBg: string;
@@ -100,13 +110,20 @@ export interface ThemeDef {
 
 // --- Admin System ---
 
+export interface UserStatusConfig {
+    role: UserRole;
+    banned: boolean;
+}
+
 export interface AdminConfig {
-  appVisibility: Record<string, boolean>;
-  roleOverrides: Record<string, UserRole>;
-  userBadges: Record<string, UserBadge[]>;
+  appVisibility: Record<string, boolean>; // true = visible, false = hidden
+  userStatus: Record<string, UserStatusConfig>; // userId -> { role, banned }
   maintenanceMode: boolean;
   lastEditedBy: string;
   updatedAt: number;
+  // Deprecated but kept for type safety during migration if needed
+  roleOverrides?: Record<string, UserRole>; 
+  userBadges?: Record<string, UserBadge[]>;
 }
 
 export interface UserIndexItem {
@@ -128,6 +145,8 @@ export interface GameStats {
   reaction: { best: number, last: number, plays: number, bestCombo: number };
   fillbox: { best: number, last: number, plays: number };
   puzzle: { bestTimeMs: number | null, lastTimeMs: number | null, plays: number, bestMoves: number | null };
+  snake: { best: number, last: number, plays: number };
+  flappy: { best: number, last: number, plays: number };
 }
 
 export interface LeaderboardEntry {
@@ -143,6 +162,8 @@ export interface GlobalArcadeData {
   reaction: LeaderboardEntry[];
   fillbox: LeaderboardEntry[];
   puzzle: LeaderboardEntry[];
+  snake: LeaderboardEntry[];
+  flappy: LeaderboardEntry[];
 }
 
 // --- Diary System ---

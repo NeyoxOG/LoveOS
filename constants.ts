@@ -1,3 +1,4 @@
+
 import { User, AppItem, Reward, ThemeDef, DailyOffer } from './types';
 
 export const USERS: User[] = [
@@ -42,54 +43,100 @@ export const NOISE_BG = `data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='
 
 export const REWARD_CATALOG: Reward[] = [
   // Basics
-  { id: 'reward.welcome', title: 'Willkommen in FiaOS', description: 'Der Anfang einer Reise ✨', icon: '✨' },
-  { id: 'reward.firstLogin', title: 'Erster Login', description: 'Du bist erfolgreich eingeloggt 🔐', icon: '🔐' },
-  { id: 'reward.firstAppOpen', title: 'Erste App geöffnet', description: 'Ein kleiner Schritt für dich... 📱', icon: '📱' },
-  { id: 'reward.firstReward', title: 'Erster Erfolg', description: 'Aller Anfang ist leicht 🧩', icon: '🧩' },
-  { id: 'reward.streak3', title: '3 Tage da', description: 'Du brennst für uns! 🔥', icon: '🔥' },
-  { id: 'reward.secretLove', title: 'Secret Love', description: 'Du hast das Geheimnis gefunden 💗', icon: '💗' },
+  { id: 'reward.welcome', title: 'Willkommen in FiaOS', description: 'Der Anfang einer Reise ✨', icon: '✨', category: 'general' },
+  { id: 'reward.firstLogin', title: 'Erster Login', description: 'Du bist erfolgreich eingeloggt 🔐', icon: '🔐', category: 'general' },
+  { id: 'reward.firstAppOpen', title: 'Erste App geöffnet', description: 'Ein kleiner Schritt für dich... 📱', icon: '📱', category: 'general' },
+  { id: 'reward.firstReward', title: 'Erster Erfolg', description: 'Aller Anfang ist leicht 🧩', icon: '🧩', category: 'general' },
+  { id: 'reward.streak3', title: '3 Tage da', description: 'Du brennst für uns! 🔥', icon: '🔥', category: 'general' },
+  { id: 'reward.secretLove', title: 'Secret Love', description: 'Du hast das Geheimnis gefunden 💗', icon: '💗', category: 'general' },
   
   // Games
-  { id: 'games.stack.10', title: 'Stapler: Anfänger', description: '10 Herzen gestapelt 🧱', icon: '🧱' },
-  { id: 'games.stack.50', title: 'Stapler: Profi', description: '50 Herzen gestapelt 🏗️', icon: '🏗️' },
-  { id: 'games.stack.100', title: 'Stapler: Meister', description: '100 Herzen! Der Turm wackelt nicht. 👑', icon: '👑' },
-  { id: 'games.react.first', title: 'Reflex: Erster Treffer', description: 'Ein perfekter Schlag ⚡', icon: '⚡' },
-  { id: 'games.react.combo10', title: 'Reflex: Combo King', description: '10x Perfekt in Folge 🔥', icon: '🔥' },
-  { id: 'games.react.200', title: 'Reflex: Speedster', description: 'Über 200 Punkte erreicht 🚀', icon: '🚀' },
-  { id: 'games.fill.first', title: 'Packer: Erste Box', description: 'Ordnung muss sein 📦', icon: '📦' },
-  { id: 'games.fill.300', title: 'Packer: Tetris God', description: 'Über 300 Punkte 🧠', icon: '🧠' },
-  { id: 'games.fill.perfect', title: 'Packer: Perfektion', description: 'Eine Runde ohne Fehler ✨', icon: '✨' },
-  { id: 'games.puzzle.solve', title: 'Puzzle: Gelöst', description: 'Bild zusammengesetzt 🧩', icon: '🧩' },
-  { id: 'games.puzzle.sub60', title: 'Puzzle: Schnell', description: 'Unter 60 Sekunden ⏱️', icon: '⏱️' },
-  { id: 'games.puzzle.sub40', title: 'Puzzle: Blitz', description: 'Unter 40 Sekunden ⚡', icon: '⚡' },
+  { id: 'games.stack.10', title: 'Stapler: Anfänger', description: '10 Herzen gestapelt 🧱', icon: '🧱', category: 'games' },
+  { id: 'games.stack.50', title: 'Stapler: Profi', description: '50 Herzen gestapelt 🏗️', icon: '🏗️', category: 'games' },
+  { id: 'games.stack.100', title: 'Stapler: Meister', description: '100 Herzen! Der Turm wackelt nicht. 👑', icon: '👑', category: 'games' },
+  { id: 'games.react.first', title: 'Reflex: Erster Treffer', description: 'Ein perfekter Schlag ⚡', icon: '⚡', category: 'games' },
+  { id: 'games.react.combo10', title: 'Reflex: Combo King', description: '10x Perfekt in Folge 🔥', icon: '🔥', category: 'games' },
+  { id: 'games.react.200', title: 'Reflex: Speedster', description: 'Über 200 Punkte erreicht 🚀', icon: '🚀', category: 'games' },
+  { id: 'games.fill.first', title: 'Packer: Erste Box', description: 'Ordnung muss sein 📦', icon: '📦', category: 'games' },
+  { id: 'games.fill.300', title: 'Packer: Tetris God', description: 'Über 300 Punkte 🧠', icon: '🧠', category: 'games' },
+  { id: 'games.fill.perfect', title: 'Packer: Perfektion', description: 'Eine Runde ohne Fehler ✨', icon: '✨', category: 'games' },
+  { id: 'games.puzzle.solve', title: 'Puzzle: Gelöst', description: 'Bild zusammengesetzt 🧩', icon: '🧩', category: 'games' },
+  { id: 'games.puzzle.sub60', title: 'Puzzle: Schnell', description: 'Unter 60 Sekunden ⏱️', icon: '⏱️', category: 'games' },
+  { id: 'games.puzzle.sub40', title: 'Puzzle: Blitz', description: 'Unter 40 Sekunden ⚡', icon: '⚡', category: 'games' },
+  { id: 'snake_score_10', title: 'Snake: Anfänger', description: '10 Punkte erreicht 🐍', icon: '🐍', category: 'games' },
+  { id: 'snake_score_25', title: 'Snake: Jäger', description: '25 Punkte. Schlange wächst! 🍎', icon: '🍎', category: 'games' },
+  { id: 'snake_score_50', title: 'Snake: Legende', description: '50 Punkte. Das Display wird eng. 🏆', icon: '🏆', category: 'games' },
+  
+  // Flappy Love
+  { id: 'flappy_score_5', title: 'Flappy: Start', description: 'Die ersten 5 Hindernisse 🐦', icon: '🐦', category: 'games' },
+  { id: 'flappy_score_15', title: 'Flappy: Profi', description: '15 Hindernisse überwunden 🌬️', icon: '🌬️', category: 'games' },
+  { id: 'flappy_score_30', title: 'Flappy: Meister', description: '30 Punkte! Du kannst fliegen. 💗', icon: '💗', category: 'games' },
 
   // Diary
-  { id: 'diary.first', title: 'Tagebuch: Erster Eintrag', description: 'Liebes Tagebuch... 📔', icon: '📔' },
-  { id: 'diary.shared', title: 'Tagebuch: Wir', description: 'Ein gemeinsamer Moment 👫', icon: '👫' },
-  { id: 'diary.streak3', title: 'Tagebuch: 3 Tage', description: 'Bleib dran! 🔥', icon: '🔥' },
-  { id: 'diary.10', title: 'Tagebuch: Sammler', description: '10 Einträge verfasst ✍️', icon: '✍️' },
-  { id: 'diary.30', title: 'Tagebuch: Autor', description: '30 Einträge! Ein echtes Buch. 📖', icon: '📖' },
+  { id: 'diary.first', title: 'Tagebuch: Erster Eintrag', description: 'Liebes Tagebuch... 📔', icon: '📔', category: 'diary' },
+  { id: 'diary.shared', title: 'Tagebuch: Wir', description: 'Ein gemeinsamer Moment 👫', icon: '👫', category: 'diary' },
+  { id: 'diary.streak3', title: 'Tagebuch: 3 Tage', description: 'Bleib dran! 🔥', icon: '🔥', category: 'diary' },
+  { id: 'diary.10', title: 'Tagebuch: Sammler', description: '10 Einträge verfasst ✍️', icon: '✍️', category: 'diary' },
+  { id: 'diary.30', title: 'Tagebuch: Autor', description: '30 Einträge! Ein echtes Buch. 📖', icon: '📖', category: 'diary' },
 
   // Daily
-  { id: 'daily.first', title: 'Daily: Der Anfang', description: 'Erstes Daily abgeholt ☀️', icon: '☀️' },
-  { id: 'daily.streak3', title: 'Daily: 3 Tage', description: 'Die Sonne geht auf 🔥', icon: '🔥' },
-  { id: 'daily.streak7', title: 'Daily: Eine Woche', description: 'Treue Seele 🗓️', icon: '🗓️' },
-  { id: 'daily.total10', title: 'Daily: Sammler', description: '10 Belohnungen gesammelt 🎁', icon: '🎁' },
+  { id: 'daily.first', title: 'Daily: Der Anfang', description: 'Erstes Daily abgeholt ☀️', icon: '☀️', category: 'general' },
+  { id: 'daily.streak3', title: 'Daily: 3 Tage', description: 'Die Sonne geht auf 🔥', icon: '🔥', category: 'general' },
+  { id: 'daily.streak7', title: 'Daily: Eine Woche', description: 'Treue Seele 🗓️', icon: '🗓️', category: 'general' },
+  { id: 'daily.total10', title: 'Daily: Sammler', description: '10 Belohnungen gesammelt 🎁', icon: '🎁', category: 'general' },
+
+  // Love & Themes
+  { 
+    id: 'love_1_month', 
+    title: '1 Monat Wir', 
+    description: 'Theme: Soft Rose freigeschaltet 🌹', 
+    icon: '🌹', 
+    type: 'theme_unlock', 
+    category: 'love',
+    payload: { themeId: 'softRose' } 
+  },
+  { 
+    id: 'love_3_month', 
+    title: '3 Monate Wir', 
+    description: 'Theme: Midnight Love freigeschaltet 🌙', 
+    icon: '🌙', 
+    type: 'theme_unlock', 
+    category: 'love',
+    payload: { themeId: 'midnightLove' } 
+  },
+  { 
+    id: 'love_6_month', 
+    title: '6 Monate Wir', 
+    description: 'Theme: Pastel Sky freigeschaltet ☁️', 
+    icon: '☁️', 
+    type: 'theme_unlock', 
+    category: 'love',
+    payload: { themeId: 'pastelSky' } 
+  },
+  { 
+    id: 'love_1_year', 
+    title: '1 Jahr Unendlichkeit', 
+    description: 'Theme: Eternal freigeschaltet 💍', 
+    icon: '💍', 
+    type: 'theme_unlock', 
+    category: 'love',
+    payload: { themeId: 'eternal' } 
+  },
 ];
 
 export const VALENTINE_REWARDS: Reward[] = [
-  { id: 'valentine.reward.pizza', title: 'Pizza Date', description: 'Mit dir schmeckt alles besser. 🍕', icon: '🍕' },
-  { id: 'valentine.reward.photo', title: 'Foto-Date', description: 'Eine Erinnerung für immer. 📸', icon: '📸' },
-  { id: 'valentine.reward.letter', title: 'Brief: Wir in 5 Jahren', description: 'Ein Blick nach vorn. ✉️', icon: '✉️' },
-  { id: 'valentine.reward.care', title: 'Care Day', description: 'Heute geht’s nur um uns. 🫶', icon: '🫶' },
-  { id: 'valentine.reward.art', title: 'Gemeinsam malen', description: 'Unser Chaos, unser Kunstwerk. 🎨', icon: '🎨' },
-  { id: 'valentine.reward.secret', title: 'Geheime Nachricht', description: 'Nur für dich. 💌', icon: '💌' },
+  { id: 'valentine.reward.pizza', title: 'Pizza Date', description: 'Mit dir schmeckt alles besser. 🍕', icon: '🍕', category: 'valentine' },
+  { id: 'valentine.reward.photo', title: 'Foto-Date', description: 'Eine Erinnerung für immer. 📸', icon: '📸', category: 'valentine' },
+  { id: 'valentine.reward.letter', title: 'Brief: Wir in 5 Jahren', description: 'Ein Blick nach vorn. ✉️', icon: '✉️', category: 'valentine' },
+  { id: 'valentine.reward.care', title: 'Care Day', description: 'Heute geht’s nur um uns. 🫶', icon: '🫶', category: 'valentine' },
+  { id: 'valentine.reward.art', title: 'Gemeinsam malen', description: 'Unser Chaos, unser Kunstwerk. 🎨', icon: '🎨', category: 'valentine' },
+  { id: 'valentine.reward.secret', title: 'Geheime Nachricht', description: 'Nur für dich. 💌', icon: '💌', category: 'valentine' },
 ];
 
 export const THEMES: Record<string, ThemeDef> = {
   roseGlass: {
     id: 'roseGlass',
-    name: 'Rose Glass',
+    name: 'Default',
     colors: {
       bgGradient: 'linear-gradient(to bottom right, #2e1065, #000)',
       cardBg: 'rgba(255, 255, 255, 0.08)',
@@ -97,34 +144,48 @@ export const THEMES: Record<string, ThemeDef> = {
       textDim: 'rgba(255, 255, 255, 0.5)'
     }
   },
-  midnight: {
-    id: 'midnight',
-    name: 'Midnight',
+  softRose: {
+    id: 'softRose',
+    name: 'Soft Rose',
+    unlockRewardId: 'love_1_month',
     colors: {
-      bgGradient: 'linear-gradient(to bottom, #000, #111)',
-      cardBg: '#1c1c1e',
-      text: '#e5e5e5',
-      textDim: '#888'
+      bgGradient: 'linear-gradient(to bottom right, #be185d, #4c0519)',
+      cardBg: 'rgba(255, 200, 210, 0.1)',
+      text: '#fff0f5',
+      textDim: 'rgba(255, 240, 245, 0.6)'
     }
   },
-  cloud: {
-    id: 'cloud',
-    name: 'Cloud',
+  midnightLove: {
+    id: 'midnightLove',
+    name: 'Midnight Love',
+    unlockRewardId: 'love_3_month',
     colors: {
-      bgGradient: 'linear-gradient(to top, #accbee 0%, #e7f0fd 100%)',
-      cardBg: 'rgba(255, 255, 255, 0.6)',
-      text: '#1e293b',
-      textDim: 'rgba(30, 41, 59, 0.5)'
+      bgGradient: 'linear-gradient(to bottom, #1e1b4b, #312e81)',
+      cardBg: 'rgba(129, 140, 248, 0.1)',
+      text: '#e0e7ff',
+      textDim: '#a5b4fc'
     }
   },
-  matcha: {
-    id: 'matcha',
-    name: 'Matcha',
+  pastelSky: {
+    id: 'pastelSky',
+    name: 'Pastel Sky',
+    unlockRewardId: 'love_6_month',
     colors: {
-      bgGradient: 'linear-gradient(to top, #d4fc79 0%, #96e6a1 100%)',
-      cardBg: 'rgba(255, 255, 255, 0.6)',
-      text: '#064e3b',
-      textDim: 'rgba(6, 78, 59, 0.5)'
+      bgGradient: 'linear-gradient(to top, #7dd3fc 0%, #e0f2fe 100%)',
+      cardBg: 'rgba(255, 255, 255, 0.4)',
+      text: '#0c4a6e',
+      textDim: '#0369a1'
+    }
+  },
+  eternal: {
+    id: 'eternal',
+    name: 'Eternal Gold',
+    unlockRewardId: 'love_1_year',
+    colors: {
+      bgGradient: 'linear-gradient(to bottom right, #713f12, #451a03)',
+      cardBg: 'rgba(253, 224, 71, 0.1)',
+      text: '#fefce8',
+      textDim: '#fef08a'
     }
   }
 };

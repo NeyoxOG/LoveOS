@@ -1,3 +1,4 @@
+
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -91,10 +92,14 @@
 
         .btn-action {
             width: 100%; text-align: center; color: #007aff; padding: 16px; cursor: pointer; font-size: 16px; background: var(--bg-card); border:none;
+            transition: opacity 0.2s;
         }
         .btn-destructive { color: #ff3b30; }
+        .btn-action:disabled { opacity: 0.3; cursor: not-allowed; color: #888; }
 
         .hidden { display: none; }
+        
+        .dev-badge { float:right; font-size:10px; background:#333; padding:2px 6px; border-radius:4px; color:#aaa; margin-top:2px; }
 
     </style>
 </head>
@@ -154,11 +159,11 @@
         <button class="btn-action btn-destructive" onclick="resetData()">Lokale Daten löschen</button>
     </div>
 
-    <div id="devSection" class="hidden">
-        <h2>Developer</h2>
+    <div id="devSection">
+        <h2>Developer <span class="dev-badge">ADMIN ONLY</span></h2>
         <div class="card-group">
-            <button class="btn-action" onclick="devUnlockRewards()">All Rewards Unlock</button>
-            <button class="btn-action btn-destructive" onclick="devResetLuna()">Reset Luna</button>
+            <button class="btn-action dev-btn" onclick="devUnlockRewards()">All Rewards Unlock</button>
+            <button class="btn-action btn-destructive dev-btn" onclick="devResetLuna()">Reset Luna</button>
         </div>
     </div>
 

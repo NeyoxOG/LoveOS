@@ -1,3 +1,4 @@
+
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -38,6 +39,7 @@
             backdrop-filter: blur(20px);
             border-bottom: 1px solid var(--border);
             z-index: 50;
+            flex-shrink: 0;
         }
         .title { font-size: 17px; font-weight: 600; text-align: center; }
 
@@ -45,22 +47,27 @@
         .content {
             flex: 1;
             overflow-y: auto;
+            overflow-x: hidden;
             padding: 20px;
-            padding-bottom: 80px;
+            padding-bottom: 100px; /* Space for bottom safe area */
             display: flex;
             flex-direction: column;
             gap: 24px;
         }
 
-        /* Today Card */
+        /* Today Card - Responsive Fixes */
         .today-card {
             background: linear-gradient(135deg, #1c1c1e 0%, #2c2c2e 100%);
             border-radius: 24px;
-            padding: 24px;
+            padding: 30px 20px;
             display: flex; flex-direction: column; align-items: center; text-align: center;
             border: 1px solid var(--border);
             box-shadow: 0 10px 30px rgba(0,0,0,0.3);
             position: relative; overflow: hidden;
+            width: 100%;
+            max-width: 400px;
+            margin: 0 auto;
+            transition: transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1), box-shadow 0.3s;
         }
         
         .shine {
@@ -68,33 +75,73 @@
             background: linear-gradient(to right, transparent, rgba(255,255,255,0.1), transparent);
             transform: skewX(-20deg);
             animation: shine 3s infinite;
+            pointer-events: none;
         }
         @keyframes shine { 0% { left: -100%; } 100% { left: 200%; } }
+
+        /* Claim Animation Classes */
+        .today-card.claiming {
+            transform: scale(1.05);
+            box-shadow: 0 0 50px rgba(251, 191, 36, 0.3);
+            border-color: rgba(251, 191, 36, 0.5);
+        }
+        .today-card.claiming .today-icon {
+            animation: flyUp 0.6s ease-out forwards;
+        }
+        @keyframes flyUp {
+            0% { transform: translateY(0) scale(1); opacity: 1; }
+            50% { transform: translateY(-20px) scale(1.2); opacity: 1; }
+            100% { transform: translateY(-50px) scale(0); opacity: 0; }
+        }
 
         .today-icon {
             font-size: 64px; margin-bottom: 16px;
             filter: drop-shadow(0 0 20px rgba(251, 191, 36, 0.4));
+            transition: transform 0.3s;
         }
         .today-title { font-size: 24px; font-weight: 800; margin-bottom: 4px; color: #fff; }
-        .today-subtitle { font-size: 14px; color: var(--text-dim); margin-bottom: 24px; max-width: 80%; }
+        .today-subtitle { font-size: 14px; color: var(--text-dim); margin-bottom: 24px; max-width: 90%; line-height: 1.4; }
         
         .claim-btn {
-            background: #fff; color: #000; border: none; padding: 14px 32px; border-radius: 30px;
+            background: #fff; color: #000; border: none; padding: 16px 32px; border-radius: 30px;
             font-size: 16px; font-weight: 700; cursor: pointer;
             box-shadow: 0 4px 15px rgba(255,255,255,0.2);
-            transition: transform 0.2s, box-shadow 0.2s;
+            transition: transform 0.2s, box-shadow 0.2s, opacity 0.3s, background 0.3s;
             position: relative; z-index: 10;
+            width: 100%;
+            max-width: 200px;
+            -webkit-tap-highlight-color: transparent;
         }
         .claim-btn:active { transform: scale(0.95); }
-        .claim-btn.disabled { background: rgba(255,255,255,0.1); color: rgba(255,255,255,0.4); box-shadow: none; pointer-events: none; }
+        .claim-btn.disabled { 
+            background: rgba(255,255,255,0.1); 
+            color: rgba(255,255,255,0.4); 
+            box-shadow: none; 
+            pointer-events: none; 
+            cursor: default;
+        }
 
         .streak-row {
-            display: flex; gap: 6px; margin-bottom: 16px;
+            display: flex; gap: 6px; margin-bottom: 16px; align-items: center;
         }
+        .streak-fire { font-size: 14px; margin-right: 4px; filter: drop-shadow(0 0 5px #ef4444); }
         .streak-dot {
             width: 8px; height: 8px; border-radius: 50%; background: rgba(255,255,255,0.1);
+            transition: background 0.3s;
         }
         .streak-dot.active { background: #fbbf24; box-shadow: 0 0 5px #fbbf24; }
+
+        /* Couple Bonus Badge */
+        .couple-bonus {
+            margin-top: 16px;
+            background: linear-gradient(90deg, #ec4899, #8b5cf6);
+            padding: 6px 12px; border-radius: 20px;
+            font-size: 11px; font-weight: 700; color: #fff;
+            box-shadow: 0 4px 10px rgba(236, 72, 153, 0.4);
+            display: none; animation: pulse 2s infinite;
+        }
+        .couple-bonus.active { display: inline-block; }
+        @keyframes pulse { 0% { transform: scale(1); } 50% { transform: scale(1.05); } 100% { transform: scale(1); } }
 
         /* Inbox */
         .section-title { font-size: 13px; text-transform: uppercase; color: var(--text-dim); letter-spacing: 1px; margin-bottom: 10px; padding-left: 4px; }
@@ -163,9 +210,18 @@
 
         @keyframes bounce { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-10px); } }
 
-        /* Dev Tools */
-        .dev-tools { margin-top: 40px; padding: 20px; border-top: 1px solid var(--border); display: none; }
-        .dev-btn { background: #333; color: #fff; border: none; padding: 8px; border-radius: 8px; font-size: 12px; margin-right: 8px; cursor: pointer; }
+        /* Dev Tools - Visible but disabled */
+        .dev-tools { margin-top: 40px; padding: 20px; border-top: 1px solid var(--border); display: block; }
+        .dev-header { display:flex; justify-content:space-between; align-items:center; margin-bottom:10px; }
+        .dev-badge { background:#333; color:#aaa; font-size:10px; padding:2px 6px; border-radius:4px; text-transform:uppercase; font-weight:bold; }
+        
+        .dev-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+        .dev-btn { 
+            background: #333; color: #fff; border: none; padding: 10px 16px; 
+            border-radius: 12px; font-size: 12px; cursor: pointer; flex: 1;
+            transition: opacity 0.2s;
+        }
+        .dev-btn:disabled { opacity: 0.4; cursor: not-allowed; }
 
     </style>
 </head>
@@ -178,15 +234,20 @@
     <div class="content">
         
         <!-- Today -->
-        <div class="today-card">
+        <div class="today-card" id="todayCard">
             <div class="shine"></div>
             <div class="streak-row" id="streakRow">
-                <!-- Dots -->
+                <span class="streak-fire">🔥</span>
+                <!-- Dots populated by JS -->
             </div>
+            
             <div class="today-icon" id="todayIcon">🎁</div>
             <div class="today-title" id="todayTitle">Tagesbelohnung</div>
             <div class="today-subtitle" id="todaySub">Hol dir deine tägliche Überraschung ab!</div>
+            
             <button class="claim-btn" id="claimBtn" onclick="doClaim()">Heute abholen</button>
+            
+            <div class="couple-bonus" id="coupleBonus">Couple Bonus aktiv 💗</div>
         </div>
 
         <!-- Inbox -->
@@ -207,9 +268,15 @@
 
         <!-- Dev -->
         <div class="dev-tools" id="devTools">
-            <div class="section-title">Developer</div>
-            <button class="dev-btn" onclick="devReset()">Reset Daily</button>
-            <button class="dev-btn" onclick="devReroll()">Force Reroll</button>
+            <div class="dev-header">
+                <div class="section-title" style="margin:0">Developer Options</div>
+                <div class="dev-badge">Admin Only</div>
+            </div>
+            <div class="dev-actions">
+                <button class="dev-btn" onclick="devReset()">Reset Status</button>
+                <button class="dev-btn" onclick="devStreakReset()">Reset Streak</button>
+                <button class="dev-btn" onclick="devReroll()">Force Reroll</button>
+            </div>
         </div>
 
     </div>

@@ -1,3 +1,4 @@
+
 /**
  * Daily App Logic
  */
@@ -13,7 +14,7 @@ let user = null;
 let state = null;
 let offer = null; // Today's pending offer
 
-// Simple Seeded Random (matches utils/data.ts implementation logic via parent bridge conceptually, but implemented here for display logic)
+// Simple Seeded Random
 const seededRandom = (seed) => {
     let hash = 0;
     for (let i = 0; i < seed.length; i++) {
@@ -25,31 +26,30 @@ const seededRandom = (seed) => {
     return x - Math.floor(x);
 };
 
-// --- Mock Data Access (Since we are in iframe, we read directly from LS) ---
-// Note: In a real "bridge" scenario we might ask parent for this, but direct LS read is fine for same-origin.
-
 function init() {
     const sessionStr = localStorage.getItem(KEYS.SESSION);
     if (!sessionStr) return;
     user = JSON.parse(sessionStr);
 
-    if (user.role === 'admin') {
-        document.getElementById('devTools').style.display = 'block';
-    }
-
+    initDevTools();
     loadData();
     renderUI();
+}
+
+function initDevTools() {
+    const devTools = document.getElementById('devTools');
+    const isAdmin = user.role === 'admin' || user.role === 'developer';
+    
+    // Always visible, but buttons disabled if not admin
+    devTools.querySelectorAll('button').forEach(btn => {
+        btn.disabled = !isAdmin;
+    });
 }
 
 function loadData() {
     // 1. Get State
     const stateKey = `${KEYS.DAILY_STATE}${user.id}_daily_state`;
     const rawState = localStorage.getItem(stateKey);
-    
-    // We rely on the parent app (App.tsx / data.ts) having initialized the seed on load?
-    // Or we handle initialization here if missing.
-    // Let's implement robust load here too.
-    
     const todayISO = new Date().toISOString().split('T')[0];
     
     if (rawState) {
@@ -66,64 +66,130 @@ function loadData() {
         localStorage.setItem(stateKey, JSON.stringify(state));
     }
 
-    // Refresh Seed if new day (Safety, though parent does it too)
+    // Refresh Seed if new day
     const expectedSeed = `${user.id}_${todayISO}`;
     if (state.todaySeed !== expectedSeed) {
         state.todaySeed = expectedSeed;
         state.openedToday = false;
+        
+        // Streak Check Logic on new day open (before claim)
+        if (state.lastClaimDateISO) {
+            const lastDate = new Date(state.lastClaimDateISO);
+            const today = new Date(todayISO);
+            const diffTime = Math.abs(today.getTime() - lastDate.getTime());
+            const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+            
+            // If missed yesterday (diff > 1), reset streak
+            if (diffDays > 1) {
+                state.streak = 0;
+            }
+        } else {
+            state.streak = 0;
+        }
+        
         localStorage.setItem(stateKey, JSON.stringify(state));
     }
 
-    // 2. Determine Offer
-    // We need the offers list. We can fetch it from parent if exposed, or duplicate small logic.
-    // Ideally duplicate logic for independence in iframe.
-    // We'll define a subset or fetch via a hack if parent exposes constants.
-    // For simplicity, let's look at `DAILY_OFFERS` in constants.ts. 
-    // Since we can't import TS easily in vanilla JS here without build step, we will assume 
-    // the parent has put the offer in state? No, state only stores seed.
-    // We need to generate it.
-    
-    // Let's rely on a window.parent.FIAOS call if possible, or just reimplement `getDailyOffer` here with a local pool.
-    // To be safe and self-contained, I'll include the pool here.
     offer = getLocalDailyOffer(state.todaySeed);
 }
 
 function renderUI() {
+    const todayISO = new Date().toISOString().split('T')[0];
+
     // 1. Today Card
     if (state.openedToday) {
-        document.getElementById('todayTitle').innerText = "Schon abgeholt";
-        document.getElementById('todaySub').innerText = "Komm morgen wieder!";
-        document.getElementById('todayIcon').innerText = "✅";
-        document.getElementById('claimBtn').innerText = "Erledigt";
-        document.getElementById('claimBtn').classList.add('disabled');
+        setCardState('claimed');
     } else {
-        // Show teaser based on rarity? Or mystery?
-        // Let's show mystery box
-        document.getElementById('todayTitle').innerText = "Tagesbelohnung";
-        document.getElementById('todaySub').innerText = "Tippe, um deine Überraschung zu sehen.";
-        document.getElementById('todayIcon').innerText = "🎁";
-        document.getElementById('claimBtn').innerText = "Heute abholen";
-        document.getElementById('claimBtn').classList.remove('disabled');
-        
-        // Rarity hint glow?
-        const rarity = offer.rarity;
-        const card = document.querySelector('.today-card');
-        if (rarity === 'epic') card.style.boxShadow = "0 0 30px rgba(168, 85, 247, 0.4)";
-        else if (rarity === 'rare') card.style.boxShadow = "0 0 20px rgba(59, 130, 246, 0.3)";
-        else card.style.boxShadow = "0 10px 30px rgba(0,0,0,0.3)";
+        setCardState('available');
     }
 
     // 2. Streak
     const row = document.getElementById('streakRow');
+    // Keep the fire icon
+    const fire = row.querySelector('.streak-fire');
     row.innerHTML = '';
-    // Show 7 dots
+    row.appendChild(fire);
+    
+    const displayStreak = state.streak % 7; // Cycle of 7
     for (let i = 0; i < 7; i++) {
         const d = document.createElement('div');
-        d.className = `streak-dot ${i < (state.streak % 7) ? 'active' : ''}`;
+        d.className = `streak-dot ${i < displayStreak ? 'active' : ''}`;
         row.appendChild(d);
     }
+    
+    // Add number if high streak
+    if (state.streak > 0) {
+        const num = document.createElement('span');
+        num.style.fontSize = '12px';
+        num.style.marginLeft = '4px';
+        num.style.opacity = '0.7';
+        num.innerText = state.streak;
+        row.appendChild(num);
+    }
 
-    // 3. Inbox
+    // 3. Couple Bonus Check
+    checkCoupleBonus(todayISO);
+
+    // 4. Inbox
+    renderInbox();
+
+    // 5. History
+    renderHistory();
+}
+
+function setCardState(status) {
+    const title = document.getElementById('todayTitle');
+    const sub = document.getElementById('todaySub');
+    const icon = document.getElementById('todayIcon');
+    const btn = document.getElementById('claimBtn');
+    const card = document.getElementById('todayCard');
+
+    if (status === 'claimed') {
+        title.innerText = "Abgeholt ✅";
+        sub.innerText = "Komm morgen wieder!";
+        icon.innerText = offer.icon; // Show what was claimed
+        btn.innerText = "Erledigt";
+        btn.classList.add('disabled');
+        card.style.boxShadow = "none";
+    } else {
+        title.innerText = "Tagesbelohnung";
+        sub.innerText = "Tippe, um deine Überraschung zu sehen.";
+        icon.innerText = "🎁";
+        btn.innerText = "Heute abholen";
+        btn.classList.remove('disabled');
+        
+        // Rarity hint
+        const rarity = offer.rarity;
+        if (rarity === 'epic') card.style.boxShadow = "0 0 30px rgba(168, 85, 247, 0.4)";
+        else if (rarity === 'rare') card.style.boxShadow = "0 0 20px rgba(59, 130, 246, 0.3)";
+        else card.style.boxShadow = "0 10px 30px rgba(0,0,0,0.3)";
+    }
+}
+
+function checkCoupleBonus(todayISO) {
+    if (user.role === 'guest') return;
+
+    const sharedKey = `fiaos_shared_daily_couple_${todayISO}`;
+    const claims = JSON.parse(localStorage.getItem(sharedKey) || '[]');
+    
+    // If both 'fia' and 'collin' are in claims
+    const bonusActive = claims.includes('fia') && claims.includes('collin');
+    const badge = document.getElementById('coupleBonus');
+    
+    if (bonusActive) {
+        badge.classList.add('active');
+        badge.innerText = "Couple Bonus aktiv 💗";
+    } else if (claims.length > 0 && !claims.includes(user.id)) {
+        // Partner has claimed, waiting for you
+        badge.classList.add('active');
+        badge.style.background = 'rgba(255,255,255,0.1)';
+        badge.innerText = "Partner wartet auf dich... ⏳";
+    } else {
+        badge.classList.remove('active');
+    }
+}
+
+function renderInbox() {
     const inboxKey = `${KEYS.DAILY_INBOX}${user.id}_daily_inbox`;
     const inbox = JSON.parse(localStorage.getItem(inboxKey) || '[]');
     const inboxEl = document.getElementById('inboxList');
@@ -145,8 +211,9 @@ function renderUI() {
             inboxEl.appendChild(div);
         });
     }
+}
 
-    // 4. History
+function renderHistory() {
     const histKey = `${KEYS.DAILY_HISTORY}${user.id}_daily_history`;
     const history = JSON.parse(localStorage.getItem(histKey) || '[]');
     const histGrid = document.getElementById('historyGrid');
@@ -175,21 +242,43 @@ function getColor(rarity) {
 window.doClaim = () => {
     if (state.openedToday) return;
 
-    // Use Bridge to verify/process claim logic (optional, but good practice)
-    // Here we duplicate 'utils/data.ts' claim logic because we can't import it easily.
-    // We update state locally.
-    
+    const card = document.getElementById('todayCard');
+    const icon = document.getElementById('todayIcon');
+    const btn = document.getElementById('claimBtn');
+
+    // Start Animation
+    card.classList.add('claiming');
+    icon.innerText = offer.icon; // Reveal icon early for animation
+    btn.classList.add('disabled');
+    btn.innerText = "Öffnen...";
+
+    // Delay for effect
+    setTimeout(() => {
+        processClaim();
+        
+        // Cleanup Animation classes after modal shows
+        setTimeout(() => {
+            card.classList.remove('claiming');
+            fireConfetti();
+            showModal(offer);
+            renderUI(); // Update UI to claimed state
+        }, 600);
+        
+    }, 800);
+};
+
+function processClaim() {
     const todayISO = new Date().toISOString().split('T')[0];
     
-    // Update State
-    // Streak logic
+    // Update Streak Logic
     if (state.lastClaimDateISO) {
         const lastDate = new Date(state.lastClaimDateISO);
         const today = new Date(todayISO);
         const diffTime = Math.abs(today.getTime() - lastDate.getTime());
         const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+        
         if (diffDays === 1) state.streak++;
-        else if (diffDays > 1) state.streak = 1;
+        else if (diffDays > 1) state.streak = 1; // Reset if missed
     } else {
         state.streak = 1;
     }
@@ -200,7 +289,7 @@ window.doClaim = () => {
     
     localStorage.setItem(`${KEYS.DAILY_STATE}${user.id}_daily_state`, JSON.stringify(state));
 
-    // History
+    // Add History
     const histKey = `${KEYS.DAILY_HISTORY}${user.id}_daily_history`;
     let history = JSON.parse(localStorage.getItem(histKey) || '[]');
     history.unshift({
@@ -214,10 +303,10 @@ window.doClaim = () => {
     });
     localStorage.setItem(histKey, JSON.stringify(history));
 
-    // Execute Payloads via Bridge
+    // Bridge Calls
     executePayload(offer);
 
-    // Couple Bonus Check (Local write)
+    // Couple Bonus Update
     if (user.role !== 'guest') {
         const sharedKey = `fiaos_shared_daily_couple_${todayISO}`;
         let claims = JSON.parse(localStorage.getItem(sharedKey) || '[]');
@@ -226,21 +315,18 @@ window.doClaim = () => {
             localStorage.setItem(sharedKey, JSON.stringify(claims));
         }
         
-        // If bonus triggered? The data.ts logic handles the inbox drop when *loading* usually, 
-        // but here we are acting. Let's do it here to be instant.
         if (claims.includes('fia') && claims.includes('collin')) {
-             // Drop for current user immediately
+             // Bonus Triggered!
              addInboxItem({
                 type: 'reward', title: 'Couple Bonus 💞', body: 'Ihr habt beide gesammelt!', icon: '💞'
              });
+             // Also unlock streak bonus if not already
+             if (window.parent.FIAOS) {
+                 window.parent.FIAOS.bridgeUnlockReward({ rewardId: 'reward.streak3' }); // Small extra
+             }
         }
     }
-
-    // UI Feedback
-    fireConfetti();
-    showModal(offer);
-    renderUI();
-};
+}
 
 function executePayload(offer) {
     const bridge = window.parent.FIAOS;
@@ -256,8 +342,7 @@ function executePayload(offer) {
         bridge.bridgeUnlockApp({ appId: offer.payload.appId });
     }
     
-    // Check Daily Rewards (Streak based)
-    // Simple check
+    // Milestones
     if (state.totalClaims === 1) bridge.bridgeUnlockReward({ rewardId: 'daily.first' });
     if (state.totalClaims === 10) bridge.bridgeUnlockReward({ rewardId: 'daily.total10' });
     if (state.streak === 3) bridge.bridgeUnlockReward({ rewardId: 'daily.streak3' });
@@ -297,7 +382,7 @@ function fireConfetti() {
     container.innerHTML = '';
     const colors = ['#fbbf24', '#ec4899', '#fff', '#60a5fa'];
     
-    for (let i = 0; i < 30; i++) {
+    for (let i = 0; i < 40; i++) {
         const c = document.createElement('div');
         c.className = 'confetti';
         c.style.left = Math.random() * 100 + 'vw';
@@ -312,8 +397,6 @@ function fireConfetti() {
 // --- Local Offer Pool (Copy of constants) ---
 function getLocalDailyOffer(seed) {
     const rand = seededRandom(seed);
-    
-    // Pool Data (Simplified Copy)
     const offers = [
         { id: 't1', type: 'text', rarity: 'common', title: 'Erinnerung', subtitle: 'Nur für dich', icon: '💌', payload: 'Ich bin stolz auf dich. Jeden Tag.' },
         { id: 't2', type: 'text', rarity: 'common', title: 'Moment der Ruhe', subtitle: 'Atme durch', icon: '🌬️', payload: 'Nimm dir 10 Sekunden. Augen zu. Denk an uns.' },
@@ -322,15 +405,12 @@ function getLocalDailyOffer(seed) {
         { id: 'r1', type: 'reward', rarity: 'rare', title: 'Bonus Punkte', subtitle: 'Belohnung', icon: '🏆', payload: { rewardId: 'reward.streak3' } },
         { id: 'e1', type: 'theme', rarity: 'epic', title: 'Theme: Soft Pink', subtitle: 'Design Unlock', icon: '🎨', payload: { themeId: 'roseGlass' } }
     ];
-    
     let rarity = 'common';
     if (rand > 0.95) rarity = 'epic';
     else if (rand > 0.70) rarity = 'rare';
     
     const pool = offers.filter(o => o.rarity === rarity);
-    // If pool empty (e.g. mock data missing epic), fallback
     if (pool.length === 0) return offers[0];
-    
     const index = Math.floor(seededRandom(seed + "_idx") * pool.length);
     return pool[index];
 }
@@ -338,6 +418,14 @@ function getLocalDailyOffer(seed) {
 // --- Dev ---
 window.devReset = () => {
     localStorage.removeItem(`${KEYS.DAILY_STATE}${user.id}_daily_state`);
+    location.reload();
+};
+
+window.devStreakReset = () => {
+    const k = `${KEYS.DAILY_STATE}${user.id}_daily_state`;
+    const s = JSON.parse(localStorage.getItem(k));
+    s.streak = 0;
+    localStorage.setItem(k, JSON.stringify(s));
     location.reload();
 };
 

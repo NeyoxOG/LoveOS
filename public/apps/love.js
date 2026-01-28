@@ -1,3 +1,4 @@
+
 /**
  * Love App Logic
  */
@@ -114,8 +115,6 @@ function getNextAnniversary(now) {
         target.setMonth(target.getMonth() + 1);
     }
     
-    // Handle edge case where target < START_DATE (should not happen given main if check)
-    // But if we are *at* start date?
     return target;
 }
 
@@ -138,9 +137,6 @@ function renderStats(d, w, m, y) {
 
     // Badges Update
     const cont = document.getElementById('badgesContainer');
-    // Simple render logic: avoid re-creating DOM every sec
-    // Just create once? No, simple string check or similar
-    // Let's just do it simple.
     let html = '<div class="badge active">Start 🚀</div>';
     if (m >= 1) html += `<div class="badge active">1 Monat</div>`;
     if (m >= 6) html += `<div class="badge active">6 Monate</div>`;
@@ -170,21 +166,39 @@ function renderCountdown(now, target) {
 function checkMilestones() {
     if (!currentStats || user.role === 'guest') return;
 
-    // Check Month
-    if (currentStats.totalMonths > loveState.lastSeenMonthIndex) {
-        showMilestone('Monats-Jubiläum', `Wir sind jetzt ${currentStats.totalMonths} Monate zusammen! 💞`, () => {
-            loveState.lastSeenMonthIndex = currentStats.totalMonths;
+    const m = currentStats.totalMonths;
+    const y = currentStats.years;
+
+    // Trigger Unlocks (Idempotent call via Bridge)
+    // 1 Month -> Soft Rose
+    if (m >= 1) unlock('love_1_month');
+    // 3 Months -> Midnight Love
+    if (m >= 3) unlock('love_3_month');
+    // 6 Months -> Pastel Sky
+    if (m >= 6) unlock('love_6_month');
+    // 1 Year -> Eternal
+    if (y >= 1) unlock('love_1_year');
+
+    // Show Notification only if new threshold crossed locally
+    if (m > loveState.lastSeenMonthIndex) {
+        showMilestone('Monats-Jubiläum', `Wir sind jetzt ${m} Monate zusammen! 💞`, () => {
+            loveState.lastSeenMonthIndex = m;
             saveData();
         });
-        return; // One at a time
+        return; 
     }
 
-    // Check Year
-    if (currentStats.years > loveState.lastSeenYear) {
-        showMilestone('Jahres-Jubiläum', `Ein ganzes Jahr mehr! ${currentStats.years} Jahre Unendlichkeit. 💍`, () => {
-            loveState.lastSeenYear = currentStats.years;
+    if (y > loveState.lastSeenYear) {
+        showMilestone('Jahres-Jubiläum', `Ein ganzes Jahr mehr! ${y} Jahre Unendlichkeit. 💍`, () => {
+            loveState.lastSeenYear = y;
             saveData();
         });
+    }
+}
+
+function unlock(rewardId) {
+    if (window.parent.FIAOS) {
+        window.parent.FIAOS.bridgeUnlockReward({ rewardId });
     }
 }
 
@@ -193,14 +207,12 @@ function showMilestone(title, text, onCloseCallback) {
     document.getElementById('mText').innerText = text;
     document.getElementById('milestoneModal').classList.add('active');
     
-    // Override close function to save state
     window.closeModal = () => {
         document.getElementById('milestoneModal').classList.remove('active');
         if (onCloseCallback) onCloseCallback();
     };
 }
 
-// Default close (overridden if milestone active)
 window.closeModal = () => {
     document.getElementById('milestoneModal').classList.remove('active');
 };

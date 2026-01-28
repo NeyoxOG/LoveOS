@@ -1,3 +1,4 @@
+
 import React, { useState, useRef, useEffect } from 'react';
 import { Session, AppItem } from '../types';
 import { APPS } from '../constants';
@@ -25,41 +26,30 @@ const HomeScreen: React.FC<HomeScreenProps> = ({
   onOpenAccountSheet
 }) => {
   const [activeTab, setActiveTab] = useState<'home' | 'apps' | 'achievements' | 'profile'>('home');
-  const [daysUntilValentine, setDaysUntilValentine] = useState(0);
   const [visibleApps, setVisibleApps] = useState<AppItem[]>(APPS);
   const appsRef = useRef<HTMLDivElement>(null);
 
-  // Calculate days until next Valentine & Load App Visibility
+  // Load App Visibility & Badges
   useEffect(() => {
-    // Valentine Timer
-    const now = new Date();
-    let year = now.getFullYear();
-    const valentineDate = new Date(year, 1, 14); 
-
-    if (now > valentineDate && (now.getDate() !== 14 || now.getMonth() !== 1)) {
-        year++;
-        valentineDate.setFullYear(year);
-    }
-    
-    const diff = valentineDate.getTime() - now.getTime();
-    setDaysUntilValentine(Math.ceil(diff / (1000 * 60 * 60 * 24)));
-
-    // Visibility Logic & Daily Badge
     const config = loadAdminConfig();
     const dailyState = loadDailyState(session.userId);
     
+    // Admin check strict:
+    const isAdmin = session.role === 'admin' || session.role === 'developer';
+
     const filtered = APPS.map(app => {
+        // Daily Badge
         if (app.id === 'daily') {
             return { ...app, badge: dailyState.openedToday ? undefined : '1' };
         }
         return app;
     }).filter(app => {
-        // Admin App Check
+        // 1. Hide Admin app if not admin
         if (app.id === 'admin') {
-            return session.role === 'admin' || session.role === 'developer';
+            return isAdmin;
         }
-        // General Visibility Check
-        if (config.appVisibility[app.id] === false) {
+        // 2. Hide apps based on Admin Config (Settings is always visible)
+        if (app.id !== 'settings' && config.appVisibility[app.id] === false) {
              return false;
         }
         return true;
@@ -87,7 +77,7 @@ const HomeScreen: React.FC<HomeScreenProps> = ({
   const handleWidgetClick = () => {
     // Quickstart Logic
     const lastAppId = loadLastApp(session);
-    // Ensure last app is visible
+    // Ensure last app is allowed/visible
     const appToOpen = visibleApps.find(a => a.id === lastAppId) || visibleApps.find(a => a.id === 'luna');
     
     if (appToOpen) {
@@ -197,14 +187,9 @@ const HomeScreen: React.FC<HomeScreenProps> = ({
                   {/* Valentine Specific Styles */}
                   {isValentine && (
                     <>
-                      {/* Grey Shimmer Overlay */}
                       <div className="absolute inset-0 bg-white/5 z-0" />
                       <div className="absolute inset-0 bg-gradient-to-tr from-transparent via-white/10 to-transparent skew-x-12 animate-shimmer pointer-events-none" />
-                      
-                      {/* Subtle Pulse Glow */}
                       <div className="absolute inset-0 bg-pink-500/10 animate-[pulse_6s_ease-in-out_infinite]" />
-                      
-                      {/* Badge */}
                       <div className="absolute bottom-0 inset-x-0 bg-black/40 backdrop-blur-sm text-[8px] font-bold text-center text-white/80 py-0.5 z-20">
                         ABGESCHLOSSEN
                       </div>

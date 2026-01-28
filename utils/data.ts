@@ -1,5 +1,6 @@
-import { UserRewardsData, Reward, UserProfile, UserPrefs, Session, AdminConfig, UserIndex, UserIndexItem, GameStats, GlobalArcadeData, LeaderboardEntry, DailyState, DailyHistoryEntry } from '../types';
-import { REWARD_CATALOG, VALENTINE_REWARDS, THEMES, APPS, DAILY_OFFERS } from '../constants';
+
+import { UserRewardsData, Reward, UserProfile, UserPrefs, Session, AdminConfig, UserIndex, UserIndexItem, DailyState } from '../types';
+import { REWARD_CATALOG, VALENTINE_REWARDS, THEMES } from '../constants';
 
 const INITIAL_REWARDS_DATA: UserRewardsData = {
   version: 2,
@@ -46,32 +47,22 @@ const INITIAL_ADMIN_CONFIG: AdminConfig = {
     daily: true,
     love: true
   },
-  roleOverrides: {
-    "fia": "user",
-    "collin": "admin"
-  },
-  userBadges: {
-    "collin": ["developer"]
+  userStatus: {
+    "fia": { role: "user", banned: false },
+    "collin": { role: "admin", banned: false },
+    "guest": { role: "guest", banned: false }
   },
   maintenanceMode: false,
   lastEditedBy: "system",
   updatedAt: Date.now()
 };
 
-// --- Games Defaults ---
-const INITIAL_GAME_STATS: GameStats = {
-  stack: { best: 0, last: 0, plays: 0 },
-  reaction: { best: 0, last: 0, plays: 0, bestCombo: 0 },
-  fillbox: { best: 0, last: 0, plays: 0 },
-  puzzle: { bestTimeMs: null, lastTimeMs: null, plays: 0, bestMoves: null }
-};
+// --- Helpers ---
 
-const INITIAL_GLOBAL_ARCADE: GlobalArcadeData = {
-  stack: [],
-  reaction: [],
-  fillbox: [],
-  puzzle: []
-};
+const userKey = (userId: string, suffix: string) => {
+    const prefix = userId === 'guest' ? 'fiaos_guest_' : 'fiaos_user_';
+    return `${prefix}${userId}_${suffix}`;
+}
 
 // --- Rewards ---
 
@@ -79,382 +70,208 @@ export const getRewardCatalog = (): Reward[] => {
   return REWARD_CATALOG;
 };
 
+export const saveUserRewards = (userId: string, data: UserRewardsData): void => {
+  try {
+    localStorage.setItem(`fiaos_rewards_${userId}`, JSON.stringify(data));
+  } catch (error) {
+    console.error("Failed to save rewards", error);
+  }
+};
+
 export const loadUserRewards = (userId: string): UserRewardsData => {
   try {
     const key = `fiaos_rewards_${userId}`;
     const stored = localStorage.getItem(key);
     if (!stored) {
-      saveUserRewards(userId, INITIAL_REWARDS_DATA);
-      return INITIAL_REWARDS_DATA;
+      const initial = JSON.parse(JSON.stringify(INITIAL_REWARDS_DATA));
+      saveUserRewards(userId, initial);
+      return initial;
     }
     const data = JSON.parse(stored) as UserRewardsData;
     if (!data.valentine) {
-      data.valentine = INITIAL_REWARDS_DATA.valentine;
+      data.valentine = JSON.parse(JSON.stringify(INITIAL_REWARDS_DATA.valentine));
       data.version = 2;
       saveUserRewards(userId, data);
     }
     return data;
-  } catch (error) {
-    console.error("Failed to load user rewards", error);
-    return INITIAL_REWARDS_DATA;
+  } catch (e) {
+    console.error("Failed to load rewards", e);
+    return JSON.parse(JSON.stringify(INITIAL_REWARDS_DATA));
   }
 };
 
-export const saveUserRewards = (userId: string, data: UserRewardsData): void => {
-  try {
-    const key = `fiaos_rewards_${userId}`;
-    localStorage.setItem(key, JSON.stringify(data));
-  } catch (error) {
-    console.error("Failed to save user rewards", error);
+export const unlockRewardLogic = (currentRewards: UserRewardsData, rewardId: string) => {
+  const data = JSON.parse(JSON.stringify(currentRewards)); // Deep clone
+  let wasUnlocked = false;
+
+  // Check if it's a valentine reward
+  if (rewardId.startsWith('valentine.')) {
+     if (!data.valentine.unlocked[rewardId]) {
+        data.valentine.unlocked[rewardId] = true;
+        wasUnlocked = true;
+     }
+  } else {
+     // Regular reward
+     if (!data.rewards[rewardId]) {
+        data.rewards[rewardId] = { unlocked: true, unlockedAt: Date.now() };
+        wasUnlocked = true;
+     } else if (!data.rewards[rewardId].unlocked) {
+        data.rewards[rewardId].unlocked = true;
+        data.rewards[rewardId].unlockedAt = Date.now();
+        wasUnlocked = true;
+     }
   }
-};
 
-export const unlockRewardLogic = (data: UserRewardsData, rewardId: string): { updatedData: UserRewardsData, wasUnlocked: boolean } => {
-  if (data.rewards[rewardId]?.unlocked) {
-    return { updatedData: data, wasUnlocked: false };
-  }
-
-  const updatedData = {
-    ...data,
-    rewards: {
-      ...data.rewards,
-      [rewardId]: {
-        unlocked: true,
-        unlockedAt: Date.now()
-      }
-    },
-    meta: {
-      ...data.meta,
-      points: data.meta.points + 10
-    }
-  };
-
-  return { updatedData, wasUnlocked: true };
+  return { updatedData: data, wasUnlocked };
 };
 
 export const setRewardsLastSeen = (userId: string, data: UserRewardsData): UserRewardsData => {
-  const updatedData = {
-    ...data,
-    meta: {
-      ...data.meta,
-      lastSeenAt: Date.now()
-    }
-  };
-  saveUserRewards(userId, updatedData);
-  return updatedData;
+    const updated = { ...data, meta: { ...data.meta, lastSeenAt: Date.now() } };
+    saveUserRewards(userId, updated);
+    return updated;
 };
 
-// --- Games Logic ---
-
-export const loadUserGames = (userId: string): GameStats => {
-  const key = `fiaos_user_${userId}_games`;
-  const stored = localStorage.getItem(key);
-  if (!stored) return INITIAL_GAME_STATS;
-  return { ...INITIAL_GAME_STATS, ...JSON.parse(stored) }; 
-};
-
-export const saveUserGames = (userId: string, data: GameStats) => {
-  const key = `fiaos_user_${userId}_games`;
-  localStorage.setItem(key, JSON.stringify(data));
-};
-
-export const loadGlobalArcade = (): GlobalArcadeData => {
-  const key = 'fiaos_global_arcade';
-  const stored = localStorage.getItem(key);
-  if (!stored) return INITIAL_GLOBAL_ARCADE;
-  return JSON.parse(stored);
-};
-
-export const updateGlobalLeaderboard = (game: keyof GlobalArcadeData, entry: LeaderboardEntry) => {
-  const arcade = loadGlobalArcade();
-  const list = arcade[game] || [];
-  list.push(entry);
-  if (game === 'puzzle') {
-     list.sort((a, b) => a.score - b.score);
-  } else {
-     list.sort((a, b) => b.score - a.score);
-  }
-  arcade[game] = list.slice(0, 10);
-  localStorage.setItem('fiaos_global_arcade', JSON.stringify(arcade));
-};
-
-// --- Daily Logic ---
-
-const seededRandom = (seed: string) => {
-    let hash = 0;
-    for (let i = 0; i < seed.length; i++) {
-        const char = seed.charCodeAt(i);
-        hash = ((hash << 5) - hash) + char;
-        hash = hash & hash;
-    }
-    const x = Math.sin(hash) * 10000;
-    return x - Math.floor(x);
-};
-
-export const loadDailyState = (userId: string): DailyState => {
-    const key = `fiaos_user_${userId}_daily_state`;
-    const stored = localStorage.getItem(key);
-    const todayISO = new Date().toISOString().split('T')[0];
-    
-    let state: DailyState;
-    if (stored) {
-        state = JSON.parse(stored);
-    } else {
-        state = {
-            lastClaimDateISO: null,
-            streak: 0,
-            totalClaims: 0,
-            todaySeed: "",
-            openedToday: false,
-            lastOpenAt: 0
-        };
-    }
-
-    const expectedSeed = `${userId}_${todayISO}`;
-    if (state.todaySeed !== expectedSeed) {
-        state.todaySeed = expectedSeed;
-        state.openedToday = false;
-        saveDailyState(userId, state);
-    }
-    
-    return state;
-};
-
-export const saveDailyState = (userId: string, state: DailyState) => {
-    const key = `fiaos_user_${userId}_daily_state`;
-    localStorage.setItem(key, JSON.stringify(state));
-};
-
-export const getDailyOffer = (seed: string) => {
-    const rand = seededRandom(seed);
-    let rarity = 'common';
-    if (rand > 0.95) rarity = 'epic';
-    else if (rand > 0.70) rarity = 'rare';
-    
-    const pool = DAILY_OFFERS.filter(o => o.rarity === rarity);
-    const index = Math.floor(seededRandom(seed + "_idx") * pool.length);
-    return pool[index] || pool[0];
-};
-
-export const claimDaily = (userId: string) => {
-    const state = loadDailyState(userId);
-    if (state.openedToday) return null;
-
-    const todayISO = new Date().toISOString().split('T')[0];
-    const offer = getDailyOffer(state.todaySeed);
-
-    if (state.lastClaimDateISO) {
-        const lastDate = new Date(state.lastClaimDateISO);
-        const today = new Date(todayISO);
-        const diffTime = Math.abs(today.getTime() - lastDate.getTime());
-        const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-
-        if (diffDays === 1) {
-            state.streak++;
-        } else if (diffDays > 1) {
-            state.streak = 1;
-        }
-    } else {
-        state.streak = 1;
-    }
-
-    state.openedToday = true;
-    state.lastClaimDateISO = todayISO;
-    state.totalClaims++;
-    state.lastOpenAt = Date.now();
-    
-    saveDailyState(userId, state);
-
-    const historyKey = `fiaos_user_${userId}_daily_history`;
-    let history: DailyHistoryEntry[] = JSON.parse(localStorage.getItem(historyKey) || '[]');
-    history.unshift({
-        dateISO: todayISO,
-        claimedAt: Date.now(),
-        offerId: offer.id,
-        type: offer.type,
-        title: offer.title,
-        icon: offer.icon,
-        rarity: offer.rarity
+export const debugUnlockValentine = (currentRewards: UserRewardsData): UserRewardsData => {
+    const data = JSON.parse(JSON.stringify(currentRewards));
+    VALENTINE_REWARDS.forEach(r => {
+        data.valentine.unlocked[r.id] = true;
     });
-    if (history.length > 20) history.pop();
-    localStorage.setItem(historyKey, JSON.stringify(history));
-
-    checkCoupleBonus(userId, todayISO);
-
-    return offer;
+    return data;
 };
 
-const checkCoupleBonus = (userId: string, dateISO: string) => {
-    if (userId !== 'fia' && userId !== 'collin') return;
-    
-    const sharedKey = `fiaos_shared_daily_couple_${dateISO}`;
-    let claims: string[] = JSON.parse(localStorage.getItem(sharedKey) || '[]');
-    
-    if (!claims.includes(userId)) {
-        claims.push(userId);
-        localStorage.setItem(sharedKey, JSON.stringify(claims));
-    }
-
-    if (claims.includes('fia') && claims.includes('collin')) {
-        ['fia', 'collin'].forEach(uid => {
-            addInboxItem(uid, {
-                type: 'reward',
-                title: 'Couple Bonus 💞',
-                body: 'Ihr habt beide euer Daily abgeholt! Hier ist ein kleines Extra.',
-                icon: '💞',
-                lockedByRewardId: null
-            });
-        });
-    }
+export const debugResetValentine = (currentRewards: UserRewardsData): UserRewardsData => {
+    const data = JSON.parse(JSON.stringify(currentRewards));
+    data.valentine.unlocked = {};
+    return data;
 };
 
-export const addInboxItem = (userId: string, item: Partial<any>) => {
-    const key = `fiaos_user_${userId}_daily_inbox`;
-    let inbox = JSON.parse(localStorage.getItem(key) || '[]');
-    const isDupe = inbox.some((i: any) => i.title === item.title && (Date.now() - i.createdAt < 86400000));
-    if (isDupe) return;
-
-    inbox.unshift({
-        id: crypto.randomUUID(),
-        createdAt: Date.now(),
-        claimed: false,
-        claimedAt: null,
-        ...item
-    });
-    localStorage.setItem(key, JSON.stringify(inbox));
-};
-
-// --- Profile & Preferences ---
-
-export const getUserKey = (session: Session, type: 'profile' | 'prefs' | 'lastApp') => {
-  const prefix = session.role === 'guest' ? 'fiaos_guest' : 'fiaos_user';
-  return `${prefix}_${session.userId}_${type}`;
-};
+// --- Profile & Prefs ---
 
 export const loadUserProfile = (session: Session): UserProfile => {
-  const key = getUserKey(session, 'profile');
-  const stored = localStorage.getItem(key);
-  if (stored) return JSON.parse(stored);
-  
-  return {
-    userId: session.userId,
-    role: session.role,
-    displayName: session.name,
-    avatar: { type: 'emoji', value: session.name.charAt(0) },
-    createdAt: Date.now(),
-    updatedAt: Date.now()
-  };
+    const key = userKey(session.userId, 'profile');
+    try {
+        const stored = localStorage.getItem(key);
+        if (stored) return JSON.parse(stored);
+    } catch(e) {}
+
+    // Default
+    return {
+        userId: session.userId,
+        role: session.role,
+        displayName: session.name,
+        avatar: { type: 'emoji', value: session.name.charAt(0) },
+        createdAt: Date.now(),
+        updatedAt: Date.now()
+    };
 };
 
 export const loadUserPrefs = (session: Session): UserPrefs => {
-  const key = getUserKey(session, 'prefs');
-  const stored = localStorage.getItem(key);
-  if (stored) return JSON.parse(stored);
+    const key = userKey(session.userId, 'prefs');
+    try {
+        const stored = localStorage.getItem(key);
+        if (stored) return JSON.parse(stored);
+    } catch(e) {}
 
-  return {
-    theme: 'roseGlass',
-    accent: '#818cf8',
-    wallpaper: 'gradient_1',
-    reduceMotion: false,
-    uiDensity: 'cozy'
-  };
+    return {
+        theme: 'roseGlass',
+        accent: '#818cf8',
+        wallpaper: 'gradient_1',
+        reduceMotion: false,
+        uiDensity: 'cozy',
+        quickstartMode: 'lastApp',
+        quickstartApp: ''
+    };
+};
+
+export const applyTheme = (prefs: UserPrefs) => {
+    const theme = THEMES[prefs.theme] || THEMES['roseGlass'];
+    const root = document.documentElement;
+    
+    if (theme) {
+        root.style.setProperty('--bg-gradient', theme.colors.bgGradient);
+        root.style.setProperty('--card-bg', theme.colors.cardBg);
+        root.style.setProperty('--text-primary', theme.colors.text);
+        root.style.setProperty('--text-dim', theme.colors.textDim);
+    }
 };
 
 export const saveLastApp = (session: Session, appId: string) => {
-  const key = getUserKey(session, 'lastApp');
-  localStorage.setItem(key, appId);
+    try {
+        localStorage.setItem(`fiaos_last_app_${session.userId}`, appId);
+    } catch(e) {}
 };
 
-export const loadLastApp = (session: Session): string => {
-  const key = getUserKey(session, 'lastApp');
-  return localStorage.getItem(key) || 'luna';
+export const loadLastApp = (session: Session): string | null => {
+    try {
+        return localStorage.getItem(`fiaos_last_app_${session.userId}`);
+    } catch(e) { return null; }
 };
 
-// --- Admin & Global Data ---
+// --- Admin ---
 
 export const loadAdminConfig = (): AdminConfig => {
-    const raw = localStorage.getItem('fiaos_global_admin_config');
-    if (!raw) {
-        saveAdminConfig(INITIAL_ADMIN_CONFIG);
-        return INITIAL_ADMIN_CONFIG;
-    }
-    const stored = JSON.parse(raw);
-    // Merge to ensure new keys in INITIAL_ADMIN_CONFIG (like 'love') appear in existing localStorage
-    return {
-        ...INITIAL_ADMIN_CONFIG,
-        ...stored,
-        appVisibility: {
-            ...INITIAL_ADMIN_CONFIG.appVisibility,
-            ...stored.appVisibility
+    try {
+        const stored = localStorage.getItem('fiaos_global_admin_config');
+        if (stored) {
+            const config = JSON.parse(stored);
+            // Migration: Ensure userStatus exists if upgrading from v1
+            if (!config.userStatus) {
+                config.userStatus = INITIAL_ADMIN_CONFIG.userStatus;
+                // Migrate roleOverrides to userStatus
+                if (config.roleOverrides) {
+                    for (const [uid, role] of Object.entries(config.roleOverrides)) {
+                        if (!config.userStatus[uid]) config.userStatus[uid] = { role: 'user', banned: false };
+                        config.userStatus[uid].role = role as any;
+                    }
+                }
+            }
+            return config;
         }
-    };
-};
-
-export const saveAdminConfig = (config: AdminConfig) => {
-    localStorage.setItem('fiaos_global_admin_config', JSON.stringify(config));
+    } catch(e) {}
+    return INITIAL_ADMIN_CONFIG;
 };
 
 export const updateUserIndex = (session: Session, profile: UserProfile) => {
-    const raw = localStorage.getItem('fiaos_global_user_index');
-    let index: UserIndex = raw ? JSON.parse(raw) : { users: [] };
-    
-    const existingIdx = index.users.findIndex(u => u.userId === session.userId);
-    const item: UserIndexItem = {
-        userId: session.userId,
-        displayName: profile.displayName,
-        role: session.role,
-        avatar: profile.avatar,
-        lastSeen: Date.now()
-    };
-    
-    if (existingIdx >= 0) {
-        index.users[existingIdx] = item;
-    } else {
-        index.users.push(item);
-    }
-    
-    localStorage.setItem('fiaos_global_user_index', JSON.stringify(index));
+    try {
+        const key = 'fiaos_global_user_index';
+        const raw = localStorage.getItem(key);
+        let index: UserIndex = raw ? JSON.parse(raw) : { users: [] };
+        
+        const existingIdx = index.users.findIndex(u => u.userId === session.userId);
+        const item: UserIndexItem = {
+            userId: session.userId,
+            displayName: profile.displayName,
+            role: session.role,
+            avatar: profile.avatar,
+            lastSeen: Date.now()
+        };
+        
+        if (existingIdx >= 0) {
+            index.users[existingIdx] = item;
+        } else {
+            index.users.push(item);
+        }
+        
+        localStorage.setItem(key, JSON.stringify(index));
+    } catch(e) {}
 };
 
-// --- Theme Application ---
+// --- Daily ---
 
-export const applyTheme = (prefs: UserPrefs) => {
-  const root = document.documentElement;
-  root.style.setProperty('--accent', prefs.accent);
-  
-  if (prefs.theme === 'cloud' || prefs.theme === 'matcha') {
-      root.style.setProperty('--text-primary', '#1e293b');
-      root.classList.add('light-mode');
-  } else {
-      root.style.setProperty('--text-primary', '#fff');
-      root.classList.remove('light-mode');
-  }
-
-  document.body.className = `theme-${prefs.theme} wallpaper-${prefs.wallpaper} ${prefs.reduceMotion ? 'motion-reduce' : ''}`;
-};
-
-// --- Debug Helpers ---
-
-export const debugUnlockValentine = (data: UserRewardsData): UserRewardsData => {
-  const updated = { ...data };
-  updated.valentine = {
-    total: 6,
-    unlocked: {},
-    completedAt: Date.now()
-  };
-  VALENTINE_REWARDS.forEach(r => {
-    updated.valentine.unlocked[r.id] = true;
-  });
-  return updated;
-};
-
-export const debugResetValentine = (data: UserRewardsData): UserRewardsData => {
-  return {
-    ...data,
-    valentine: {
-      total: 6,
-      unlocked: {},
-      completedAt: null
-    }
-  };
+export const loadDailyState = (userId: string): DailyState => {
+     try {
+        const key = `${userKey(userId, 'daily_state')}`;
+        const stored = localStorage.getItem(key);
+        if (stored) return JSON.parse(stored);
+     } catch(e) {}
+     
+     const todayISO = new Date().toISOString().split('T')[0];
+     return {
+         lastClaimDateISO: null,
+         streak: 0,
+         totalClaims: 0,
+         todaySeed: `${userId}_${todayISO}`,
+         openedToday: false,
+         lastOpenAt: 0
+     };
 };

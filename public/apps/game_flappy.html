@@ -1,0 +1,109 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Flappy Love</title>
+    <style>
+        body { margin:0; padding:0; background:#000; color:#fff; font-family:-apple-system, sans-serif; overflow:hidden; user-select:none; touch-action:none; display:flex; flex-direction:column; height:100vh; }
+        
+        /* Atmospheric Background */
+        .bg-sky {
+            position: absolute; inset: 0; pointer-events: none; z-index: 0;
+            background: linear-gradient(to bottom, #3b82f6, #93c5fd);
+        }
+        .bg-clouds {
+            position: absolute; inset: 0; pointer-events: none; z-index: 1;
+            opacity: 0.3;
+            background-image: radial-gradient(white 2px, transparent 2px), radial-gradient(white 1px, transparent 1px);
+            background-size: 50px 50px;
+        }
+
+        .top-ui { 
+            position:absolute; top:0; left:0; right:0; padding:20px; 
+            display:flex; justify-content:space-between; z-index:10; pointer-events:none; 
+        }
+        .score-box { font-size:48px; font-weight:800; text-shadow:0 4px 10px rgba(0,0,0,0.2); }
+        .score-box small { font-size:16px; opacity:0.8; font-weight:600; display:block; text-shadow:0 1px 2px rgba(0,0,0,0.2); text-align: right;}
+
+        .game-area { 
+            flex:1; position:relative; overflow:hidden; 
+            display: flex; justify-content: center; align-items: center;
+        }
+        
+        canvas { 
+            z-index: 5;
+            display: block;
+        }
+
+        .btn-close { 
+            position:absolute; top:16px; left:16px; 
+            background:rgba(0,0,0,0.2); width:40px; height:40px; 
+            border-radius:50%; border:none; color:white; font-size:20px; 
+            cursor:pointer; z-index:30; pointer-events:auto; 
+            display:flex; justify-content:center; align-items:center;
+            backdrop-filter: blur(4px);
+        }
+
+        .overlay {
+            position:absolute; inset:0; background:rgba(0,0,0,0.6); backdrop-filter:blur(8px);
+            display:none; flex-direction:column; justify-content:center; align-items:center; 
+            z-index:100; text-align:center;
+        }
+        .overlay.active { display:flex; }
+        
+        .overlay h1 { font-size:40px; margin:0 0 10px 0; color: #fff; text-shadow: 0 4px 10px rgba(236, 72, 153, 0.5); }
+        .overlay p { color:#fff; opacity:0.8; margin-bottom:30px; font-weight: 500; }
+        
+        .btn-start { 
+            background:#ec4899; color:white; border:none; 
+            padding:14px 40px; border-radius:30px; 
+            font-size:18px; font-weight:700; cursor:pointer;
+            box-shadow: 0 4px 15px rgba(236, 72, 153, 0.4);
+            transition: transform 0.2s;
+        }
+        .btn-start:active { transform: scale(0.95); }
+        
+        .btn-exit { 
+            background:transparent; border:1px solid rgba(255,255,255,0.4); 
+            color: white; margin-top:16px; padding:10px 30px; 
+            border-radius:20px; font-size:14px; cursor:pointer; 
+        }
+
+    </style>
+</head>
+<body>
+    <div class="bg-sky"></div>
+    <div class="bg-clouds"></div>
+    
+    <button class="btn-close" onclick="window.history.back()">✕</button>
+    
+    <div class="top-ui">
+        <div></div> 
+        <div style="text-align:right">
+            <div class="score-box" id="scoreEl">0</div>
+            <small id="bestEl">Best: 0</small>
+        </div>
+    </div>
+
+    <div class="game-area" id="gameArea">
+        <canvas id="gameCanvas"></canvas>
+    </div>
+
+    <div class="overlay active" id="startScreen">
+        <h1>Flappy Love</h1>
+        <p>Tap to Fly 🐦</p>
+        <button class="btn-start" onclick="startGame()">Start</button>
+    </div>
+
+    <div class="overlay" id="endScreen">
+        <h1 style="color:#fff">Ouch!</h1>
+        <p>Score: <span id="finalScore">0</span></p>
+        <button class="btn-start" onclick="startGame()">Nochmal</button>
+        <button class="btn-exit" onclick="window.history.back()">Exit</button>
+    </div>
+
+    <script src="game_flappy.js"></script>
+</body>
+</html>
