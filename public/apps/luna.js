@@ -1,152 +1,464 @@
 
 /**
- * Luna v2 Logic (Cloud Enabled)
+ * Luna 3D Logic
  */
 
 const KEYS = { SESSION: 'fiaos_session' };
-const COOLDOWNS = { feed: 300000, play: 120000, care: 600000, sleep: 1800000, love: 45000 };
 
 let user = null;
-let state = null;
 let cloud = null;
+let state = {
+    hunger: 50,
+    love: 50,
+    energy: 80,
+    isSleeping: false
+};
+
+// Three.js Globals
+let scene, camera, renderer;
+let lunaGroup, headGroup, bodyGroup, legs = [];
+let particles = [];
+let clock = new THREE.Clock();
+let raycaster = new THREE.Raycaster();
+let mouse = new THREE.Vector2();
+
+// Animation State
+let jumpTime = 0;
+let isJumping = false;
+let floatOffset = 0;
 
 function init() {
     const sessionStr = localStorage.getItem(KEYS.SESSION);
-    if (!sessionStr) return;
-    user = JSON.parse(sessionStr);
+    if (sessionStr) user = JSON.parse(sessionStr);
 
     if (window.parent.FIAOS && window.parent.FIAOS.cloud) {
         cloud = window.parent.FIAOS.cloud;
     }
 
     loadState();
-    setInterval(tick, 1000);
-    setInterval(saveState, 5000);
+    init3D();
+    animate();
+    
+    // Listeners
+    window.addEventListener('resize', onWindowResize, false);
+    document.addEventListener('mousemove', onMouseMove, false);
+    document.addEventListener('touchmove', onTouchMove, { passive: false });
 }
 
 async function loadState() {
-    state = await cloud.loadLuna();
-    if (!state) state = { stats: { hunger: 50, energy: 50, hygiene: 50, fun: 50, love: 50 }, mood: 'happy', lastActions: {}, streak: {count:0}, history: [] };
-    
-    // Safety check for history
-    if (!Array.isArray(state.history)) state.history = [];
-    
-    const today = new Date().toISOString().split('T')[0];
-    if (!state.daily) state.daily = {};
-    if (state.daily.dayKey !== today) {
-        if (!state.daily.fedToday) state.stats.love = Math.max(0, state.stats.love - 20);
-        state.daily.fedToday = false;
-        state.daily.dayKey = today;
+    if (cloud) {
+        const remote = await cloud.loadLuna();
+        if (remote && remote.stats) {
+            state.hunger = remote.stats.hunger || 50;
+            state.love = remote.stats.love || 50;
+            state.energy = remote.stats.energy || 80;
+        }
     }
-    render();
+    updateUI();
 }
 
 async function saveState() {
-    if (state) await cloud.updateLuna(state);
-}
-
-function tick() {
-    if (!state) return;
-    state.stats.hunger = Math.max(0, state.stats.hunger - 0.003);
-    state.stats.energy = Math.max(0, state.stats.energy - 0.002);
-    updateMood();
-    render();
-}
-
-function updateMood() {
-    let m = 'happy';
-    if (state.stats.hunger < 30) m = 'hungry';
-    else if (state.stats.energy < 20) m = 'tired';
-    else if (state.stats.love > 80) m = 'loved';
-    state.mood = m;
-}
-
-function performAction(type) {
-    if (!state) return;
-    const now = Date.now();
-    if (now - (state.lastActions[type] || 0) < COOLDOWNS[type]) { showToast("Luna braucht eine Pause..."); return; }
-
-    showOverlay(type, () => {
-        state.lastActions[type] = now;
-        if (type === 'feed') { state.stats.hunger += 30; state.stats.love += 5; state.daily.fedToday = true; }
-        if (type === 'play') { state.stats.fun += 25; state.stats.energy -= 10; }
-        if (type === 'care') { state.stats.hygiene += 40; state.stats.love += 3; }
-        if (type === 'sleep') { state.stats.energy = 100; state.stats.hunger -= 10; }
-        if (type === 'love') { state.stats.love += 15; }
-        
-        // Clamp stats
-        ['hunger', 'energy', 'hygiene', 'fun', 'love'].forEach(k => {
-            if (state.stats[k] > 100) state.stats[k] = 100;
+    if (cloud) {
+        await cloud.updateLuna({
+            stats: { 
+                hunger: state.hunger, 
+                love: state.love, 
+                energy: state.energy 
+            }
         });
-
-        // Use Cloud history add
-        cloud.addLunaHistory({ by: user.name, text: type, ts: now });
-        setTimeout(loadState, 500); // Reload to get updated history
-    });
-}
-
-function render() {
-    if (!state) return;
-    
-    // Update Pet Classes
-    const visual = document.getElementById('petVisual');
-    visual.className = `pet-container mood-${state.mood}`;
-    
-    // Update Text
-    const label = document.getElementById('moodLabel');
-    if (state.mood === 'hungry') label.innerText = "Luna hat Hunger 🍎";
-    else if (state.mood === 'tired') label.innerText = "Luna ist müde 😴";
-    else if (state.mood === 'loved') label.innerText = "Luna fühlt sich geliebt 💖";
-    else label.innerText = "Luna schwebt glücklich ☁️";
-
-    // Update Bars
-    const updateBar = (id, val) => {
-        const el = document.getElementById(id);
-        if (el) el.style.width = `${Math.max(5, val)}%`;
-    };
-    updateBar('bar-hunger', state.stats.hunger);
-    updateBar('bar-energy', state.stats.energy);
-    updateBar('bar-love', state.stats.love);
-
-    // Timeline Fix
-    const list = document.getElementById('timelineList');
-    if (state.history && state.history.length > 0) {
-        list.innerHTML = state.history.slice(0, 15).map(h => {
-            const date = new Date(h.ts);
-            const timeStr = !isNaN(date.getTime()) ? date.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}) : 'Just now';
-            const isMe = h.by === user.name;
-            const actionMap = { 'feed': 'gefüttert 🍎', 'play': 'gespielt 🪁', 'care': 'gepflegt 🧼', 'sleep': 'schlafen gelegt 🌙', 'love': 'geliebt 💗' };
-            
-            return `<div class="event ${isMe ? 'me' : ''}"><div class="bubble"><b>${h.by}</b> hat Luna ${actionMap[h.text] || h.text} <div class="ts">${timeStr}</div></div></div>`;
-        }).join('');
-    } else {
-        list.innerHTML = '<div style="text-align:center; opacity:0.5; margin-top:20px;">Noch keine Einträge</div>';
     }
 }
 
-function showOverlay(type, cb) {
-    const ov = document.getElementById('actionOverlay');
-    const emojis = { feed: '🍎', play: '🪁', care: '🧼', sleep: '🌙', love: '💗' };
-    const texts = { feed: 'Lecker!', play: 'Juhu!', care: 'Frisch!', sleep: 'Gute Nacht', love: 'Danke!' };
+// --- 3D Scene Setup ---
+
+function init3D() {
+    const container = document.getElementById('scene-container');
+
+    // Scene
+    scene = new THREE.Scene();
+    // fog to blend floor
+    scene.fog = new THREE.FogExp2(0x1e1b4b, 0.02);
+
+    // Camera
+    camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 100);
+    camera.position.set(0, 2, 8);
+    camera.lookAt(0, 0.5, 0);
+
+    // Renderer
+    renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+    renderer.setSize(window.innerWidth, window.innerHeight);
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    renderer.shadowMap.enabled = true;
+    container.appendChild(renderer.domElement);
+
+    // Lights
+    const ambientLight = new THREE.AmbientLight(0xffffff, 0.6);
+    scene.add(ambientLight);
+
+    const dirLight = new THREE.DirectionalLight(0xffd700, 0.8); // Gold sunlight
+    dirLight.position.set(5, 10, 7);
+    dirLight.castShadow = true;
+    scene.add(dirLight);
     
-    document.getElementById('sceneEmoji').innerText = emojis[type] || '✨';
-    document.getElementById('sceneText').innerText = texts[type] || 'Yay!';
-    
-    ov.classList.add('active');
-    setTimeout(() => { ov.classList.remove('active'); cb(); }, 1500);
+    const purpleLight = new THREE.PointLight(0x8b5cf6, 0.5);
+    purpleLight.position.set(-5, 2, -5);
+    scene.add(purpleLight);
+
+    // Floor (Invisible catcher for shadows)
+    const floorGeo = new THREE.PlaneGeometry(50, 50);
+    const floorMat = new THREE.ShadowMaterial({ opacity: 0.3 });
+    const floor = new THREE.Mesh(floorGeo, floorMat);
+    floor.rotation.x = -Math.PI / 2;
+    floor.position.y = -1.5;
+    floor.receiveShadow = true;
+    scene.add(floor);
+
+    // --- Create Luna ---
+    createLuna();
 }
 
-function showToast(msg) {
-    const t = document.getElementById('toast');
-    t.innerText = msg;
-    t.classList.add('visible');
-    setTimeout(() => t.classList.remove('visible'), 2000);
+function createLuna() {
+    lunaGroup = new THREE.Group();
+    
+    // Materials
+    const woolMat = new THREE.MeshStandardMaterial({ 
+        color: 0xffffff, 
+        roughness: 0.8,
+        emissive: 0x222222
+    });
+    const skinMat = new THREE.MeshStandardMaterial({ color: 0x1e1b4b, roughness: 0.5 }); // Dark blue face
+    const blushMat = new THREE.MeshBasicMaterial({ color: 0xf43f5e });
+
+    // Body (Cloud of Spheres)
+    bodyGroup = new THREE.Group();
+    const sphereGeo = new THREE.SphereGeometry(0.6, 16, 16);
+    
+    // Main body clumps
+    const positions = [
+        [0, 0, 0, 1],
+        [0.6, 0.2, 0.2, 0.8],
+        [-0.6, 0.1, -0.2, 0.85],
+        [0, 0.5, 0.3, 0.7],
+        [0, -0.4, -0.3, 0.7],
+        [0.4, -0.3, 0.4, 0.6],
+        [-0.5, 0.4, 0, 0.6]
+    ];
+
+    positions.forEach(pos => {
+        const mesh = new THREE.Mesh(sphereGeo, woolMat);
+        mesh.position.set(pos[0], pos[1], pos[2]);
+        mesh.scale.setScalar(pos[3]);
+        mesh.castShadow = true;
+        mesh.receiveShadow = true;
+        bodyGroup.add(mesh);
+    });
+    lunaGroup.add(bodyGroup);
+
+    // Head
+    headGroup = new THREE.Group();
+    headGroup.position.set(0, 0.3, 0.8);
+    
+    const faceMesh = new THREE.Mesh(new THREE.SphereGeometry(0.5, 32, 32), skinMat);
+    faceMesh.castShadow = true;
+    headGroup.add(faceMesh);
+
+    // Eyes (White dots)
+    const eyeGeo = new THREE.SphereGeometry(0.05, 8, 8);
+    const eyeMat = new THREE.MeshBasicMaterial({ color: 0xffffff });
+    const leftEye = new THREE.Mesh(eyeGeo, eyeMat);
+    leftEye.position.set(0.15, 0.1, 0.45);
+    const rightEye = new THREE.Mesh(eyeGeo, eyeMat);
+    rightEye.position.set(-0.15, 0.1, 0.45);
+    headGroup.add(leftEye);
+    headGroup.add(rightEye);
+
+    // Blush
+    const blushGeo = new THREE.CircleGeometry(0.08, 16);
+    const leftBlush = new THREE.Mesh(blushGeo, blushMat);
+    leftBlush.position.set(0.25, -0.05, 0.42);
+    leftBlush.rotation.y = 0.5;
+    const rightBlush = new THREE.Mesh(blushGeo, blushMat);
+    rightBlush.position.set(-0.25, -0.05, 0.42);
+    rightBlush.rotation.y = -0.5;
+    headGroup.add(leftBlush);
+    headGroup.add(rightBlush);
+
+    lunaGroup.add(headGroup);
+
+    // Legs (Floating Rayman Style)
+    const legGeo = new THREE.CylinderGeometry(0.1, 0.1, 0.6, 8);
+    const legPositions = [
+        [0.4, -1, 0.4],
+        [-0.4, -1, 0.4],
+        [0.4, -1, -0.4],
+        [-0.4, -1, -0.4]
+    ];
+
+    legPositions.forEach(pos => {
+        const leg = new THREE.Mesh(legGeo, skinMat);
+        leg.position.set(pos[0], pos[1], pos[2]);
+        leg.castShadow = true;
+        lunaGroup.add(leg);
+        legs.push(leg);
+    });
+
+    scene.add(lunaGroup);
 }
 
-window.switchTab = (idx) => {
-    document.querySelectorAll('.tab-btn').forEach((b,i) => b.classList.toggle('active', i===idx));
-    document.querySelectorAll('.view').forEach((v,i) => v.classList.toggle('active', i===idx));
-    document.getElementById('tabIndicator').style.transform = `translateX(${idx*100}%)`;
+// --- Animation Loop ---
+
+function animate() {
+    requestAnimationFrame(animate);
+    
+    const delta = clock.getDelta();
+    const time = clock.getElapsedTime();
+
+    if (lunaGroup) {
+        // Floating (breathing)
+        if (!state.isSleeping) {
+            floatOffset = Math.sin(time * 2) * 0.05;
+            lunaGroup.position.y = floatOffset;
+            
+            // Subtle rotation
+            lunaGroup.rotation.y = Math.sin(time * 0.5) * 0.1;
+            
+            // Leg swing
+            legs.forEach((leg, i) => {
+                leg.position.y = -1 + Math.sin(time * 4 + i) * 0.1;
+                leg.rotation.x = Math.sin(time * 4 + i) * 0.2;
+            });
+        } else {
+            // Sleeping pose
+            lunaGroup.position.y = -0.5;
+            lunaGroup.rotation.z = 0.1; // tilt
+            lunaGroup.rotation.x = 0.2; // nod
+        }
+
+        // Jump Logic
+        if (isJumping) {
+            jumpTime += delta * 5;
+            const jumpHeight = Math.sin(jumpTime) * 1.5;
+            lunaGroup.position.y += Math.max(0, jumpHeight);
+            if (jumpTime > Math.PI) {
+                isJumping = false;
+                jumpTime = 0;
+            }
+        }
+    }
+
+    // Particles
+    updateParticles();
+
+    renderer.render(scene, camera);
+}
+
+// --- Interaction ---
+
+function onMouseMove(event) {
+    if (state.isSleeping) return;
+    
+    // Normalize mouse
+    mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
+    mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
+
+    checkPetting();
+    
+    // Head tracking (Subtle)
+    if (headGroup) {
+        const targetX = mouse.x * 0.5;
+        const targetY = mouse.y * 0.5;
+        headGroup.rotation.y += (targetX - headGroup.rotation.y) * 0.1;
+        headGroup.rotation.x += (targetY - headGroup.rotation.x) * 0.1;
+    }
+}
+
+function onTouchMove(event) {
+    if (event.touches.length > 0) {
+        const touch = event.touches[0];
+        mouse.x = (touch.clientX / window.innerWidth) * 2 - 1;
+        mouse.y = -(touch.clientY / window.innerHeight) * 2 + 1;
+        checkPetting();
+    }
+}
+
+// "Petting" via Raycasting
+let lastPetTime = 0;
+function checkPetting() {
+    raycaster.setFromCamera(mouse, camera);
+    const intersects = raycaster.intersectObjects(bodyGroup.children);
+
+    if (intersects.length > 0) {
+        const now = Date.now();
+        if (now - lastPetTime > 100) { // Limit rate
+            spawnHeart(intersects[0].point);
+            state.love = Math.min(100, state.love + 0.5);
+            lastPetTime = now;
+            updateUI();
+            
+            // Random jump if loved enough
+            if (Math.random() > 0.95 && !isJumping) {
+                showBubble("Yay! 💗");
+                isJumping = true;
+            }
+        }
+    }
+}
+
+// --- Drag and Drop Logic ---
+
+let draggedItem = null;
+const dragProxy = document.getElementById('dragProxy');
+
+window.startDrag = (e, itemType) => {
+    e.preventDefault();
+    draggedItem = itemType;
+    
+    const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+    const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+    
+    dragProxy.innerText = getItemEmoji(itemType);
+    dragProxy.style.display = 'flex';
+    updateDragProxy(clientX, clientY);
+    
+    document.addEventListener('mousemove', onDragMove);
+    document.addEventListener('touchmove', onDragMove, {passive:false});
+    document.addEventListener('mouseup', onDragEnd);
+    document.addEventListener('touchend', onDragEnd);
 };
+
+function onDragMove(e) {
+    e.preventDefault();
+    const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+    const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+    updateDragProxy(clientX, clientY);
+}
+
+function updateDragProxy(x, y) {
+    dragProxy.style.left = (x - 30) + 'px';
+    dragProxy.style.top = (y - 30) + 'px';
+}
+
+function onDragEnd(e) {
+    // Check if dropped near center (approx where Luna is)
+    const clientX = e.changedTouches ? e.changedTouches[0].clientX : e.clientX;
+    const clientY = e.changedTouches ? e.changedTouches[0].clientY : e.clientY;
+    
+    const width = window.innerWidth;
+    const height = window.innerHeight;
+    
+    // Simple box check for center screen
+    if (clientX > width * 0.3 && clientX < width * 0.7 && clientY > height * 0.2 && clientY < height * 0.7) {
+        performAction(draggedItem);
+    }
+
+    dragProxy.style.display = 'none';
+    draggedItem = null;
+    
+    document.removeEventListener('mousemove', onDragMove);
+    document.removeEventListener('touchmove', onDragMove);
+    document.removeEventListener('mouseup', onDragEnd);
+    document.removeEventListener('touchend', onDragEnd);
+}
+
+function performAction(item) {
+    if (state.isSleeping && item !== 'star') { // Only star wakes up? Or just shake
+        showBubble("Zzz...");
+        return;
+    }
+
+    if (item === 'apple') {
+        state.hunger = Math.min(100, state.hunger + 20);
+        showBubble("Mjam! 🍎");
+        isJumping = true;
+    }
+    if (item === 'star') {
+        state.energy = Math.min(100, state.energy + 20);
+        showBubble("Power! ⚡");
+        // Flash effect
+        scene.background = new THREE.Color(0x333333);
+        setTimeout(() => scene.background = null, 100);
+    }
+    if (item === 'water') {
+        showBubble("Erfrischend 💧");
+        state.hunger = Math.min(100, state.hunger + 5);
+    }
+    
+    updateUI();
+    saveState();
+}
+
+window.toggleSleep = () => {
+    state.isSleeping = !state.isSleeping;
+    if (state.isSleeping) {
+        showBubble("Gute Nacht 🌙");
+        state.energy = 100; // instant recharge logic for demo
+    } else {
+        showBubble("Guten Morgen! ☀️");
+    }
+    updateUI();
+    saveState();
+};
+
+function getItemEmoji(type) {
+    if(type==='apple') return '🍎';
+    if(type==='star') return '🌟';
+    if(type==='water') return '💧';
+    return '📦';
+}
+
+// --- Particles (Hearts) ---
+
+function spawnHeart(pos) {
+    const div = document.createElement('div');
+    div.innerText = '💗';
+    div.style.position = 'absolute';
+    div.style.fontSize = '24px';
+    div.style.pointerEvents = 'none';
+    
+    // Project 3D pos to 2D screen
+    const vec = pos.clone();
+    vec.project(camera);
+    const x = (vec.x * .5 + .5) * window.innerWidth;
+    const y = (-(vec.y * .5) + .5) * window.innerHeight;
+    
+    div.style.left = x + 'px';
+    div.style.top = y + 'px';
+    div.style.transition = 'transform 1s, opacity 1s';
+    
+    document.body.appendChild(div);
+    
+    // Animate CSS
+    setTimeout(() => {
+        div.style.transform = `translate(${Math.random()*40-20}px, -100px) scale(1.5)`;
+        div.style.opacity = '0';
+    }, 50);
+    
+    setTimeout(() => div.remove(), 1000);
+}
+
+function updateParticles() {
+    // Placeholder if we wanted 3D particles in scene
+}
+
+// --- UI Helpers ---
+
+function updateUI() {
+    document.getElementById('bar-love').style.width = state.love + '%';
+    document.getElementById('bar-hunger').style.width = state.hunger + '%';
+    document.getElementById('status-text').innerText = state.isSleeping ? 'Schläft 🌙' : 'Wach ☀️';
+}
+
+function showBubble(text) {
+    const b = document.getElementById('speech-bubble');
+    b.innerText = text;
+    b.classList.add('show');
+    setTimeout(() => b.classList.remove('show'), 2000);
+}
+
+function onWindowResize() {
+    camera.aspect = window.innerWidth / window.innerHeight;
+    camera.updateProjectionMatrix();
+    renderer.setSize(window.innerWidth, window.innerHeight);
+}
 
 init();

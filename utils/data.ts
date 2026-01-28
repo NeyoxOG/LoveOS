@@ -50,7 +50,7 @@ const INITIAL_ADMIN_CONFIG: AdminConfig = {
     love: true,
     rewards_app: true,
     story: true,
-    bucket: true
+    bucket: true // Ensure explicitly true
   },
   userStatus: {
     "fia": { role: "user", banned: false },
@@ -229,12 +229,10 @@ export const loadAdminConfig = (): AdminConfig => {
             const config = JSON.parse(stored);
             if (!config.userStatus) {
                 config.userStatus = INITIAL_ADMIN_CONFIG.userStatus;
-                if (config.roleOverrides) {
-                    for (const [uid, role] of Object.entries(config.roleOverrides)) {
-                        if (!config.userStatus[uid]) config.userStatus[uid] = { role: 'user', banned: false };
-                        config.userStatus[uid].role = role as any;
-                    }
-                }
+            }
+            // Ensure newly added apps (like bucket) are visible if undefined in old config
+            if (config.appVisibility) {
+                if (config.appVisibility.bucket === undefined) config.appVisibility.bucket = true;
             }
             return config;
         }

@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { User, Session, AppItem, ToastState, OverlayState, UserRewardsData, UserProfile, UserPrefs, AdminConfig, Reward } from './types';
 import { NOISE_BG, REWARD_CATALOG, THEMES, VALENTINE_REWARDS, USERS } from './constants';
@@ -30,6 +31,7 @@ declare global {
         bridgeUnlockTheme: (data: { themeId: string }) => void;
         bridgeUnlockApp: (data: { appId: string }) => void;
         bridgeLunaBoost: (data: any) => void;
+        openRewards: (tab: string) => void;
         playSound: (type: string) => void;
         cloud: typeof cloud; 
     };
@@ -97,7 +99,7 @@ const App: React.FC = () => {
         }
         setUserPrefs(prefs);
         applyTheme(prefs);
-        if (prefs.wallpaper === 'custom') {
+        if (prefs.theme === 'custom') {
              const bg = localStorage.getItem('fiaos_wallpaper_custom');
              setCustomBg(bg);
         } else {
@@ -152,14 +154,22 @@ const App: React.FC = () => {
         bridgeUnlockTheme: ({ themeId }) => handleUnlockTheme(themeId),
         bridgeUnlockApp: ({ appId }) => console.log('Unlock App:', appId), // Placeholder
         bridgeLunaBoost: (data) => console.log('Luna Boost:', data),
+        openRewards: (tab) => {
+            setRewardsTab(tab);
+            setOpenedApp(null); // Close current app to show rewards
+            setIsRewardsOpen(true);
+        },
         playSound: (type) => playSound(type as any),
         cloud: cloud
     };
 
     window.FIAOS_APPLY_PREFS = (newPrefs) => {
-        setUserPrefs(newPrefs);
-        applyTheme(newPrefs);
-        if (newPrefs.wallpaper === 'custom') {
+        // Create new object to force state update
+        const updated = { ...newPrefs };
+        setUserPrefs(updated);
+        applyTheme(updated);
+        
+        if (updated.theme === 'custom') {
              setCustomBg(localStorage.getItem('fiaos_wallpaper_custom'));
         } else {
              setCustomBg(null);
@@ -247,10 +257,8 @@ const App: React.FC = () => {
         }
         
         // Show Overlay
-        // Find reward meta
         let meta = REWARD_CATALOG.find(r => r.id === rewardId);
         if (!meta) meta = VALENTINE_REWARDS.find(r => r.id === rewardId);
-        // Fallback for game specific ones not in constants sometimes
         if (!meta) meta = { id: rewardId, title: 'Erfolg freigeschaltet!', icon: '🏆', description: 'Du hast einen neuen Meilenstein erreicht.' };
 
         setNewlyUnlockedReward(meta);
@@ -280,6 +288,30 @@ const App: React.FC = () => {
       handleUnlockReward('reward.welcome');
   };
 
+  const handleAppClick = (app: AppItem) => {
+      if (adminConfig && adminConfig.appVisibility[app.id] === false && app.id !== 'settings') {
+         if (session?.role !== 'admin' && session?.role !== 'developer') {
+             setToast({ id: Date.now(), message: 'Diese App ist deaktiviert 🔒' });
+             return;
+         }
+      }
+
+      saveLastApp(session!, app.id);
+      
+      if (app.id === 'achievements') {
+          setRewardsTab('general'); // Explicitly route to general
+          setIsRewardsOpen(true);
+      } 
+      else if (app.id === 'rewards.firstAppOpen') {
+          handleUnlockReward('reward.firstAppOpen');
+      }
+      else {
+          setOpenedApp({ id: app.id, name: app.name });
+      }
+      
+      playSound('open');
+  };
+
   // --- Rendering ---
 
   if (isVerifying) return <div className="bg-black w-full h-full" />;
@@ -293,23 +325,23 @@ const App: React.FC = () => {
       return <MaintenanceScreen onBypass={() => setBypassMaintenance(true)} />;
   }
 
-  // Determine Background Style
-  const getBackgroundStyle = () => {
-     if (customBg) {
-         return { backgroundImage: `url(${customBg})`, backgroundSize: 'cover', backgroundPosition: 'center' };
-     }
-     // Theme variables are set on <html>, but we can also use standard classes
-     return {}; // Relies on CSS variables --bg-gradient set by applyTheme
-  };
+  // --- Theme Background Logic ---
+  // Using React state directly for instant feedback
+  const activeThemeId = userPrefs?.theme || 'roseGlass';
+  const activeThemeDef = THEMES[activeThemeId] || THEMES['roseGlass'];
+  
+  const bgStyle = customBg 
+    ? { backgroundImage: `url(${customBg})`, backgroundSize: 'cover', backgroundPosition: 'center' }
+    : { background: activeThemeDef.colors.bgGradient };
 
   return (
     <div 
         className="fixed inset-0 overflow-hidden font-sans text-white select-none transition-colors duration-700"
-        style={getBackgroundStyle()}
+        style={bgStyle}
     >
-      {/* Dynamic Background Element (Gradient) if no custom bg */}
+      {/* Background Gradient / Image */}
       {!customBg && (
-         <div className="absolute inset-0 bg-[image:var(--bg-gradient)] transition-[background] duration-1000 z-0" />
+         <div className="absolute inset-0 bg-[image:var(--bg-gradient)] transition-[background] duration-500 z-0" />
       )}
       
       {/* Noise Overlay */}
@@ -324,18 +356,7 @@ const App: React.FC = () => {
                 <HomeScreen 
                     session={session}
                     onLogout={handleLogout}
-                    onAppClick={(app) => {
-                        if (app.status === 'lockedHint' && app.id !== 'valentine') { // Valentine is exception if unlocked via date?
-                            // Check logic or toast
-                            setToast({ id: Date.now(), message: 'Noch nicht verfügbar 🔒' });
-                            return;
-                        }
-                        if (app.id === 'rewards.firstAppOpen') handleUnlockReward('reward.firstAppOpen');
-                        
-                        setOpenedApp({ id: app.id, name: app.name });
-                        saveLastApp(session, app.id);
-                        playSound('open');
-                    }}
+                    onAppClick={handleAppClick}
                     onShowToast={(msg) => setToast({ id: Date.now(), message: msg })}
                     onOpenOverlay={(t, c) => setOverlay({ isOpen: true, title: t, content: c })}
                     onOpenRewards={(tab) => {
@@ -367,7 +388,6 @@ const App: React.FC = () => {
                     onLogout={handleLogout}
                     onOpenSettings={(tab) => {
                         setOpenedApp({ id: 'settings', name: 'Einstellungen' });
-                        // Could pass tab param via URL hash or bridge if needed
                     }}
                 />
 
