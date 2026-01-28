@@ -1,12 +1,21 @@
 
 import { defineConfig } from 'vite';
+import react from '@vitejs/plugin-react';
 
 export default defineConfig({
-  // Base '/' ensures absolute paths work correctly on custom domains or root deployments
+  plugins: [react()],
   base: '/',
   build: {
     outDir: 'dist',
     emptyOutDir: true,
-    sourcemap: false, // Disables source maps for production to save space/security
+    sourcemap: false,
+    rollupOptions: {
+      output: {
+        manualChunks: {
+          vendor: ['react', 'react-dom', 'framer-motion'],
+          firebase: ['firebase/app', 'firebase/auth', 'firebase/firestore', 'firebase/analytics']
+        }
+      }
+    }
   }
 });
