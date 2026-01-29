@@ -105,6 +105,64 @@ const COLLECTIONS = [
     }
 ];
 
+const DEFAULT_ADMIN_CONFIG = {
+    appVisibility: {
+        love: true,
+        story: true,
+        daily: true,
+        bucket: true,
+        rewards_app: true,
+        messages: true,
+        valentine: true,
+        luna: true,
+        vault: true,
+        diary: true,
+        games: true,
+        achievements: true,
+        settings: true,
+        admin: true
+    },
+    userStatus: {
+        fia: { role: 'user', banned: false },
+        collin: { role: 'admin', banned: false },
+        guest: { role: 'guest', banned: false }
+    },
+    maintenanceMode: false,
+    lastEditedBy: 'system',
+    updatedAt: Date.now(),
+    forceLogoutAt: 0
+};
+
+const DEFAULT_APP_CATALOG = [
+    { id: 'love', name: 'Love', icon: '💞', status: 'available' },
+    { id: 'story', name: 'Story of Love', icon: '🎞️', status: 'available' },
+    { id: 'daily', name: 'Daily', icon: '✨', status: 'available' },
+    { id: 'bucket', name: 'Ziele', icon: '📍', status: 'available' },
+    { id: 'rewards_app', name: 'Belohnungen', icon: '🎁', status: 'available' },
+    { id: 'messages', name: 'Nachrichten', icon: '💬', status: 'available' },
+    { id: 'valentine', name: 'Valentinstag', icon: '💘', status: 'available' },
+    { id: 'luna', name: 'Luna', icon: '🐑', status: 'available' },
+    { id: 'vault', name: 'Message Vault', icon: '💌', status: 'available' },
+    { id: 'diary', name: 'Tagebuch', icon: '📔', status: 'available' },
+    { id: 'games', name: 'Arcade', icon: '🕹️', status: 'available' },
+    { id: 'achievements', name: 'Erfolge', icon: '🏆', status: 'available' },
+    { id: 'settings', name: 'Einstellungen', icon: '⚙️', status: 'available' },
+    { id: 'admin', name: 'Admin Center', icon: '🛠️', status: 'available' }
+];
+
+const STATE_SEEDS = [
+    {
+        module: 'admin_config',
+        profileKey: 'system',
+        payload: DEFAULT_ADMIN_CONFIG
+    },
+    {
+        module: 'app_catalog',
+        profileKey: 'system',
+        payload: { apps: DEFAULT_APP_CATALOG }
+    }
+];
+
 // --- Env Loader ---
 
 const loadEnv = () => {
@@ -160,6 +218,28 @@ const api = async (method, path, body = null) => {
         throw new Error(`API Error [${res.status}] ${path}: ${JSON.stringify(json)}`);
     }
     return json;
+};
+
+const upsertState = async (module, profileKey, payload) => {
+    const docId = `state_${module}_${profileKey}`.replace(/[^a-zA-Z0-9_]/g, '_');
+    const data = {
+        module,
+        profileKey,
+        payload: JSON.stringify(payload),
+        updatedAt: new Date().toISOString()
+    };
+
+    const res = await api('POST', `/databases/${DB_ID}/collections/states/documents`, {
+        documentId: docId,
+        ...data
+    });
+
+    if (res.error === 'conflict') {
+        await api('PATCH', `/databases/${DB_ID}/collections/states/documents/${docId}`, data);
+        return { action: 'updated', docId };
+    }
+
+    return { action: 'created', docId };
 };
 
 // --- Execution ---
@@ -230,6 +310,12 @@ const setup = async () => {
                 }
             }
         }
+    }
+
+    // 3. Seed initial states (admin config + app catalog)
+    for (const seed of STATE_SEEDS) {
+        const result = await upsertState(seed.module, seed.profileKey, seed.payload);
+        console.log(`   -> State ${seed.module}:${seed.profileKey} ${result.action}.`);
     }
 
     console.log(`✅ Appwrite Schema Synced`);
