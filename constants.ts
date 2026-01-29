@@ -156,8 +156,8 @@ export const THEMES: Record<string, ThemeDef> = {
     id: 'roseGlass',
     name: 'Rose Glass',
     colors: {
-      bgGradient: 'radial-gradient(circle at top, rgba(236, 72, 153, 0.25), transparent 55%), linear-gradient(145deg, #1b0f2f 0%, #0a0615 55%, #05030d 100%)',
-      cardBg: 'rgba(255, 255, 255, 0.11)',
+      bgGradient: 'radial-gradient(circle at top, rgba(244, 114, 182, 0.3), transparent 55%), radial-gradient(circle at 20% 20%, rgba(248, 113, 113, 0.18), transparent 45%), linear-gradient(145deg, #1b0f2f 0%, #0b0618 55%, #06030f 100%)',
+      cardBg: 'rgba(255, 255, 255, 0.13)',
       text: '#fdf2f8',
       textDim: 'rgba(252, 231, 243, 0.6)'
     }
@@ -167,10 +167,10 @@ export const THEMES: Record<string, ThemeDef> = {
     name: 'Aurora Drift',
     unlockRewardId: 'reward.welcomeTheme',
     colors: {
-      bgGradient: 'radial-gradient(circle at top right, rgba(56, 189, 248, 0.45), transparent 60%), radial-gradient(circle at left, rgba(14, 165, 233, 0.25), transparent 50%), linear-gradient(140deg, #0b1023 0%, #111827 45%, #0f172a 100%)',
-      cardBg: 'rgba(148, 163, 184, 0.14)',
-      text: '#e2e8f0',
-      textDim: 'rgba(226, 232, 240, 0.7)'
+      bgGradient: 'radial-gradient(circle at 80% 10%, rgba(56, 189, 248, 0.45), transparent 60%), radial-gradient(circle at 10% 20%, rgba(34, 211, 238, 0.25), transparent 50%), linear-gradient(140deg, #0b1023 0%, #0f172a 50%, #0a0f1f 100%)',
+      cardBg: 'rgba(148, 163, 184, 0.16)',
+      text: '#e6f0ff',
+      textDim: 'rgba(226, 232, 240, 0.75)'
     }
   },
   softRose: {
@@ -178,10 +178,10 @@ export const THEMES: Record<string, ThemeDef> = {
     name: 'Soft Rose',
     unlockRewardId: 'love_1_month',
     colors: {
-      bgGradient: 'radial-gradient(circle at top, rgba(251, 113, 133, 0.45), transparent 60%), linear-gradient(150deg, #831843 0%, #be123c 50%, #4c0519 100%)',
-      cardBg: 'rgba(255, 228, 230, 0.18)',
-      text: '#fff1f2',
-      textDim: 'rgba(255, 228, 230, 0.75)'
+      bgGradient: 'radial-gradient(circle at top, rgba(251, 113, 133, 0.5), transparent 60%), radial-gradient(circle at 80% 20%, rgba(244, 63, 94, 0.25), transparent 45%), linear-gradient(150deg, #6f0f34 0%, #be123c 55%, #3b0514 100%)',
+      cardBg: 'rgba(255, 228, 230, 0.2)',
+      text: '#fff5f7',
+      textDim: 'rgba(255, 228, 230, 0.78)'
     }
   },
   midnightLove: {
@@ -189,10 +189,10 @@ export const THEMES: Record<string, ThemeDef> = {
     name: 'Midnight Love',
     unlockRewardId: 'love_3_month',
     colors: {
-      bgGradient: 'radial-gradient(circle at top, rgba(99, 102, 241, 0.4), transparent 60%), linear-gradient(180deg, #0b1020 0%, #1e1b4b 50%, #2e1065 100%)',
-      cardBg: 'rgba(129, 140, 248, 0.16)',
-      text: '#eef2ff',
-      textDim: 'rgba(199, 210, 254, 0.78)'
+      bgGradient: 'radial-gradient(circle at 30% 10%, rgba(129, 140, 248, 0.45), transparent 60%), radial-gradient(circle at 80% 60%, rgba(79, 70, 229, 0.25), transparent 55%), linear-gradient(180deg, #0a0f1f 0%, #1a1440 55%, #220b4c 100%)',
+      cardBg: 'rgba(129, 140, 248, 0.18)',
+      text: '#f2f5ff',
+      textDim: 'rgba(199, 210, 254, 0.8)'
     }
   },
   pastelSky: {
@@ -200,10 +200,10 @@ export const THEMES: Record<string, ThemeDef> = {
     name: 'Pastel Sky',
     unlockRewardId: 'love_6_month',
     colors: {
-      bgGradient: 'linear-gradient(150deg, #bae6fd 0%, #fef3c7 45%, #fbcfe8 100%)',
-      cardBg: 'rgba(255, 255, 255, 0.55)',
-      text: '#0f172a',
-      textDim: 'rgba(30, 41, 59, 0.7)'
+      bgGradient: 'radial-gradient(circle at 20% 20%, rgba(186, 230, 253, 0.8), transparent 55%), radial-gradient(circle at 80% 20%, rgba(252, 211, 77, 0.35), transparent 50%), linear-gradient(150deg, #bde7ff 0%, #fde68a 45%, #fbcfe8 100%)',
+      cardBg: 'rgba(255, 255, 255, 0.6)',
+      text: '#0b1220',
+      textDim: 'rgba(30, 41, 59, 0.72)'
     }
   },
   eternal: {
@@ -211,10 +211,10 @@ export const THEMES: Record<string, ThemeDef> = {
     name: 'Eternal Gold',
     unlockRewardId: 'love_1_year',
     colors: {
-      bgGradient: 'radial-gradient(circle at top, rgba(251, 191, 36, 0.45), transparent 60%), linear-gradient(150deg, #92400e 0%, #713f12 45%, #3f1a06 100%)',
-      cardBg: 'rgba(253, 224, 71, 0.2)',
-      text: '#fffbeb',
-      textDim: 'rgba(254, 240, 138, 0.85)'
+      bgGradient: 'radial-gradient(circle at 20% 10%, rgba(251, 191, 36, 0.5), transparent 60%), radial-gradient(circle at 80% 60%, rgba(245, 158, 11, 0.35), transparent 55%), linear-gradient(150deg, #8b3f0b 0%, #6b2f0a 45%, #2f1204 100%)',
+      cardBg: 'rgba(253, 224, 71, 0.24)',
+      text: '#fff7db',
+      textDim: 'rgba(254, 240, 138, 0.88)'
     }
   },
   royal: {
@@ -222,10 +222,10 @@ export const THEMES: Record<string, ThemeDef> = {
     name: 'Royal Gold',
     unlockRewardId: 'daily.points100',
     colors: {
-      bgGradient: 'radial-gradient(circle at top right, rgba(253, 224, 71, 0.35), transparent 60%), linear-gradient(135deg, #3b0764 0%, #7c2d12 50%, #451a03 100%)',
-      cardBg: 'rgba(251, 191, 36, 0.2)',
-      text: '#fef3c7',
-      textDim: 'rgba(253, 230, 138, 0.85)'
+      bgGradient: 'radial-gradient(circle at 80% 10%, rgba(253, 224, 71, 0.4), transparent 60%), radial-gradient(circle at 20% 70%, rgba(168, 85, 247, 0.25), transparent 55%), linear-gradient(135deg, #2c0b4b 0%, #7c2d12 50%, #3a1302 100%)',
+      cardBg: 'rgba(251, 191, 36, 0.22)',
+      text: '#fff1c2',
+      textDim: 'rgba(253, 230, 138, 0.88)'
     }
   },
   custom: {
