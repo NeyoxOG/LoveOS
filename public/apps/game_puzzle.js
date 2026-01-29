@@ -8,7 +8,9 @@ let isPlaying = false;
 
 function init() {
     const sessionStr = localStorage.getItem(KEYS.SESSION);
-    if (sessionStr) user = JSON.parse(sessionStr);
+    if (!sessionStr) return;
+    user = JSON.parse(sessionStr);
+    user.id = user.id || user.userId;
 
     render();
 }

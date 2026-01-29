@@ -70,6 +70,16 @@ const App: React.FC = () => {
   const [customBg, setCustomBg] = useState<string | null>(null);
   const [bypassMaintenance, setBypassMaintenance] = useState(false);
 
+  const handleLogout = useCallback(() => {
+    clearSession();
+    setSession(null);
+    setOpenedApp(null);
+    setUserProfile(null);
+    setUserPrefs(null);
+    setBypassMaintenance(false);
+    playSound('close');
+  }, []);
+
   // --- Effects ---
 
   // 1. Global Cloud Config Listener (Priority 1)
@@ -166,6 +176,17 @@ const App: React.FC = () => {
 
   }, [session, adminConfig]); // Re-run if session OR admin config changes
 
+  // 3b. Maintenance-triggered global logout
+  useEffect(() => {
+    if (!session || !adminConfig) return;
+    if (adminConfig.forceLogoutAt && session.lastLoginAt < adminConfig.forceLogoutAt) {
+        handleLogout();
+    }
+    if (adminConfig.forceLogoutAtByUser?.[session.userId] && session.lastLoginAt < adminConfig.forceLogoutAtByUser[session.userId]) {
+        handleLogout();
+    }
+  }, [adminConfig, session]);
+
   // 4. Global Bridge
   useEffect(() => {
     window.FIAOS = {
@@ -255,16 +276,6 @@ const App: React.FC = () => {
 
     setTimeout(() => handleUnlockReward('reward.firstLogin'), 2000);
     return true;
-  };
-
-  const handleLogout = () => {
-    clearSession();
-    setSession(null);
-    setOpenedApp(null);
-    setUserProfile(null);
-    setUserPrefs(null);
-    setBypassMaintenance(false);
-    playSound('close');
   };
 
   const handleUnlockReward = async (rewardId: string) => {

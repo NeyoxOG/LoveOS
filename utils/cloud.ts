@@ -24,7 +24,58 @@ const DEFAULT_ADMIN_CONFIG: AdminConfig = {
   },
   maintenanceMode: false,
   lastEditedBy: "system",
-  updatedAt: Date.now()
+  updatedAt: Date.now(),
+  forceLogoutAt: 0,
+  forceLogoutAtByUser: {}
+};
+
+const normalizeAdminConfig = (config?: AdminConfig | null): AdminConfig => {
+    const safeConfig = config || {};
+    return {
+        ...DEFAULT_ADMIN_CONFIG,
+        ...safeConfig,
+        appVisibility: {
+            ...DEFAULT_ADMIN_CONFIG.appVisibility,
+            ...(safeConfig.appVisibility || {})
+        },
+        userStatus: {
+            ...DEFAULT_ADMIN_CONFIG.userStatus,
+            ...(safeConfig.userStatus || {})
+        },
+        maintenanceMode: safeConfig.maintenanceMode ?? DEFAULT_ADMIN_CONFIG.maintenanceMode,
+        lastEditedBy: safeConfig.lastEditedBy || DEFAULT_ADMIN_CONFIG.lastEditedBy,
+        updatedAt: safeConfig.updatedAt || DEFAULT_ADMIN_CONFIG.updatedAt,
+        forceLogoutAt: safeConfig.forceLogoutAt ?? DEFAULT_ADMIN_CONFIG.forceLogoutAt,
+        forceLogoutAtByUser: {
+            ...DEFAULT_ADMIN_CONFIG.forceLogoutAtByUser,
+            ...(safeConfig.forceLogoutAtByUser || {})
+        }
+    };
+};
+
+type RewardClaimsData = {
+    redeemed: Record<string, number>;
+};
+
+const splitRewardsData = (data: UserRewardsData) => {
+    const achievements = {
+        version: data.version,
+        rewards: data.rewards,
+        valentine: data.valentine,
+        meta: data.meta
+    };
+    const claims: RewardClaimsData = {
+        redeemed: data.redeemed || {}
+    };
+    return { achievements, claims };
+};
+
+const mergeRewardsData = (achievements: UserRewardsData | null, claims: RewardClaimsData | null) => {
+    if (!achievements) return null;
+    return {
+        ...achievements,
+        redeemed: claims?.redeemed || {}
+    };
 };
 
 // --- Helpers ---
@@ -201,29 +252,33 @@ export const cloud = {
         }
 
         if (config) {
-            localStorage.setItem(cacheKey, JSON.stringify(config));
-            return config;
+            const normalized = normalizeAdminConfig(config);
+            localStorage.setItem(cacheKey, JSON.stringify(normalized));
+            return normalized;
         }
 
         // Fallback
-        return JSON.parse(localStorage.getItem(cacheKey) || JSON.stringify(DEFAULT_ADMIN_CONFIG));
+        const cached = JSON.parse(localStorage.getItem(cacheKey) || 'null');
+        return normalizeAdminConfig(cached || DEFAULT_ADMIN_CONFIG);
     },
 
     async saveAdminConfig(config: AdminConfig) {
-        localStorage.setItem('fiaos_global_admin_config', JSON.stringify(config));
-        await docHelper.setState('admin_config', 'system', config);
+        const normalized = normalizeAdminConfig(config);
+        localStorage.setItem('fiaos_global_admin_config', JSON.stringify(normalized));
+        await docHelper.setState('admin_config', 'system', normalized);
     },
 
     listenToAdminConfig(callback: (config: AdminConfig) => void) {
         // Initial Local Load
         const local = localStorage.getItem('fiaos_global_admin_config');
-        callback(local ? JSON.parse(local) : DEFAULT_ADMIN_CONFIG);
+        const localConfig = local ? JSON.parse(local) : DEFAULT_ADMIN_CONFIG;
+        callback(normalizeAdminConfig(localConfig));
 
         if (isGuest()) return () => {};
 
         // Fetch Fresh
         this.loadAdminConfig().then(cfg => {
-            if (cfg) callback(cfg);
+            if (cfg) callback(normalizeAdminConfig(cfg));
         });
 
         try {
@@ -233,7 +288,7 @@ export const cloud = {
                     
                     const payload = (response.payload as any);
                     if (payload.module === 'admin_config' && payload.profileKey === 'system') {
-                        const data = JSON.parse(payload.payload);
+                        const data = normalizeAdminConfig(JSON.parse(payload.payload));
                         callback(data);
                         localStorage.setItem('fiaos_global_admin_config', JSON.stringify(data));
                     }
@@ -247,6 +302,8 @@ export const cloud = {
 
     async adminForceLogout(targetUid: string) {
         const config = await this.loadAdminConfig() || DEFAULT_ADMIN_CONFIG;
+        if (!config.forceLogoutAtByUser) config.forceLogoutAtByUser = {};
+        config.forceLogoutAtByUser[targetUid] = Date.now();
         config.updatedAt = Date.now();
         await this.saveAdminConfig(config);
         return true;
@@ -254,6 +311,8 @@ export const cloud = {
 
     async adminResetUser(targetUid: string) {
         try {
+            await docHelper.setState('achievements', targetUid, null);
+            await docHelper.setState('reward_claims', targetUid, null);
             await docHelper.setState('rewards', targetUid, null);
             await docHelper.setState('prefs', targetUid, null);
             await docHelper.setState('daily', targetUid, null);
@@ -280,13 +339,24 @@ export const cloud = {
         const cacheKey = uid === 'guest' ? 'fiaos_rewards_guest' : `fiaos_rewards_${uid}`; // Legacy key match for seamless transition
         
         let data = null;
+        let claims: RewardClaimsData | null = null;
         if (!isGuest()) {
-            data = await docHelper.getState('rewards', uid);
+            data = await docHelper.getState('achievements', uid);
+            claims = await docHelper.getState('reward_claims', uid);
+            if (!data) {
+                data = await docHelper.getState('rewards', uid);
+            }
         }
 
         if (data) {
-            localStorage.setItem(cacheKey, JSON.stringify(data));
-            return data;
+            if (!claims && (data as UserRewardsData).redeemed) {
+                claims = { redeemed: (data as UserRewardsData).redeemed || {} };
+            }
+            const merged = mergeRewardsData(data as UserRewardsData, claims);
+            if (merged) {
+                localStorage.setItem(cacheKey, JSON.stringify(merged));
+                return merged;
+            }
         }
 
         return JSON.parse(localStorage.getItem(cacheKey) || 'null');
@@ -297,7 +367,9 @@ export const cloud = {
         const cacheKey = uid === 'guest' ? 'fiaos_rewards_guest' : `fiaos_rewards_${uid}`;
         
         localStorage.setItem(cacheKey, JSON.stringify(data));
-        await docHelper.setState('rewards', uid, data);
+        const { achievements, claims } = splitRewardsData(data);
+        await docHelper.setState('achievements', uid, achievements);
+        await docHelper.setState('reward_claims', uid, claims);
     },
 
     // --- Prefs (Offline First) ---
@@ -649,6 +721,23 @@ export const cloud = {
                 date: d.updatedAt
             }));
         } catch { return []; }
+    },
+
+    listenToLeaderboards(gameIds: string[], callback: (gameId: string) => void) {
+        if (isGuest()) return () => {};
+        try {
+            const unsub = client.subscribe(`databases.${DB_ID}.collections.${COL_GAMES}.documents`, res => {
+                if (res.events.some(e => e.includes('databases.*.collections.*.documents.*.'))) {
+                    const payload = res.payload as any;
+                    if (payload?.gameId && gameIds.includes(payload.gameId)) {
+                        callback(payload.gameId);
+                    }
+                }
+            });
+            return unsub;
+        } catch {
+            return () => {};
+        }
     },
     
     // --- Profile ---
