@@ -12,74 +12,72 @@
     <!-- Fonts -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=SF+Pro+Display:wght@100;300;400;500;600;700&family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet">
     
     <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+      tailwind.config = {
+        theme: {
+          extend: {
+            fontFamily: {
+              sans: ['"SF Pro Display"', 'Inter', 'system-ui', 'sans-serif'],
+            },
+            colors: {
+              glass: "rgba(255, 255, 255, 0.1)",
+              glassBorder: "rgba(255, 255, 255, 0.15)",
+            }
+          }
+        }
+      }
+    </script>
     <style>
       :root {
-        --glass-border: rgba(255, 255, 255, 0.08);
-        --glass-bg: rgba(20, 20, 20, 0.6);
+        --glass-border: rgba(255, 255, 255, 0.1);
+        --glass-bg: rgba(30, 30, 30, 0.6);
         --glass-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.3);
-        --font-main: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+        --safe-top: env(safe-area-inset-top);
+        --safe-bottom: env(safe-area-inset-bottom);
       }
 
       body {
-        font-family: var(--font-main);
-        -webkit-tap-highlight-color: transparent;
-        overscroll-behavior: none;
-        background-color: black;
+        background-color: #000;
         color: white;
+        overflow: hidden; /* Prevent body scroll */
+        -webkit-tap-highlight-color: transparent;
+        touch-action: pan-x pan-y;
+        overscroll-behavior: none; /* Critical for App feel */
+      }
+
+      #root {
+        height: 100dvh; /* Dynamic viewport height fix */
+        width: 100vw;
+        overflow: hidden;
       }
 
       /* Premium Scrollbar */
-      ::-webkit-scrollbar {
-        width: 6px;
-        height: 6px;
-      }
-      ::-webkit-scrollbar-track {
-        background: transparent;
-      }
-      ::-webkit-scrollbar-thumb {
-        background: rgba(255, 255, 255, 0.15);
-        border-radius: 10px;
-      }
-      ::-webkit-scrollbar-thumb:hover {
-        background: rgba(255, 255, 255, 0.3);
-      }
+      ::-webkit-scrollbar { width: 4px; }
+      ::-webkit-scrollbar-track { background: transparent; }
+      ::-webkit-scrollbar-thumb { background: rgba(255, 255, 255, 0.2); border-radius: 10px; }
       
-      .no-scrollbar::-webkit-scrollbar {
-        display: none;
-      }
-      .no-scrollbar {
-        -ms-overflow-style: none;
-        scrollbar-width: none;
-      }
+      .no-scrollbar::-webkit-scrollbar { display: none; }
+      .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
 
-      /* Squircle Utility */
+      /* Utilities */
+      .backdrop-blur-xl { -webkit-backdrop-filter: blur(24px); backdrop-filter: blur(24px); }
+      .backdrop-blur-md { -webkit-backdrop-filter: blur(12px); backdrop-filter: blur(12px); }
+      
       .squircle {
-        mask-image: url("data:image/svg+xml,%3Csvg width='200' height='200' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M100,0 C20,0 0,20 0,100 C0,180 20,200 100,200 C180,200 200,180 200,100 C200,20 180,0 100,0 Z'/%3E%3C/svg%3E");
-        -webkit-mask-image: url("data:image/svg+xml,%3Csvg width='200' height='200' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M100,0 C20,0 0,20 0,100 C0,180 20,200 100,200 C180,200 200,180 200,100 C200,20 180,0 100,0 Z'/%3E%3C/svg%3E");
-        mask-size: 100% 100%;
-        -webkit-mask-size: 100% 100%;
-        mask-repeat: no-repeat;
-        -webkit-mask-repeat: no-repeat;
+        clip-path: url(#squircleClip); 
+        /* Fallback for better performance if SVG clip is heavy: border-radius */
+        border-radius: 22%; 
       }
 
-      /* Aurora Theme Animation */
-      [data-theme="aurora"] body {
-        background-size: 200% 200% !important;
-        animation: auroraMove 20s ease infinite;
+      /* Animations */
+      @keyframes float {
+        0%, 100% { transform: translateY(0); }
+        50% { transform: translateY(-5px); }
       }
-      [data-theme="aurora"] #root > div > div:first-child {
-        background-size: 200% 200% !important;
-        animation: auroraMove 20s ease infinite;
-      }
-
-      @keyframes auroraMove {
-        0% { background-position: 0% 50%; }
-        50% { background-position: 100% 50%; }
-        100% { background-position: 0% 50%; }
-      }
+      .animate-float { animation: float 6s ease-in-out infinite; }
     </style>
   <script type="importmap">
 {
@@ -99,8 +97,9 @@
 }
 </script>
 </head>
-  <body class="bg-black text-white overflow-hidden select-none">
-    <div id="root" class="h-[100dvh] w-full"></div>
+  <body>
+    <div id="root"></div>
     <script type="module" src="/index.tsx"></script>
   </body>
 </html>
+    

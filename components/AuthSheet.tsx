@@ -2,7 +2,7 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { User } from '../types';
-import { Lock, ArrowRight, X } from 'lucide-react';
+import { Lock, ArrowRight } from 'lucide-react';
 
 interface AuthSheetProps {
   user: User | null;
@@ -31,9 +31,7 @@ const AuthSheet: React.FC<AuthSheetProps> = ({ user, isOpen, onClose, onLogin })
     setIsSubmitting(true);
     setError(false);
 
-    // Simulate small network delay for better UX even on local
-    await new Promise(resolve => setTimeout(resolve, 300));
-
+    // Sofortiger Login-Versuch (Kein Cloud-Wait)
     const success = await onLogin(password);
 
     setIsSubmitting(false);
@@ -41,6 +39,7 @@ const AuthSheet: React.FC<AuthSheetProps> = ({ user, isOpen, onClose, onLogin })
         onClose();
     } else {
         setError(true);
+        // Shake animation reset
         setTimeout(() => setError(false), 500);
     }
   };
@@ -64,7 +63,7 @@ const AuthSheet: React.FC<AuthSheetProps> = ({ user, isOpen, onClose, onLogin })
             animate={{ y: 0 }}
             exit={{ y: "100%" }}
             transition={{ type: "spring", damping: 25, stiffness: 300 }}
-            className="absolute bottom-0 left-0 right-0 z-50 bg-[#1c1c1e]/90 backdrop-blur-xl border-t border-white/10 rounded-t-[2.5rem] p-8 pb-12 shadow-2xl"
+            className="absolute bottom-0 left-0 right-0 z-50 bg-[#1c1c1e]/95 backdrop-blur-xl border-t border-white/10 rounded-t-[2.5rem] p-8 pb-12 shadow-2xl"
           >
             <div className="flex flex-col items-center">
               {/* Handle bar */}
@@ -94,7 +93,7 @@ const AuthSheet: React.FC<AuthSheetProps> = ({ user, isOpen, onClose, onLogin })
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
                     placeholder={user.role === 'guest' ? 'Kein Passwort nötig' : 'Passwort'}
-                    className={`w-full bg-black/20 border ${error ? 'border-red-500/50' : 'border-white/10'} rounded-2xl py-4 pl-12 pr-4 text-white placeholder-white/30 focus:outline-none focus:border-indigo-500/50 focus:bg-black/40 transition-all text-lg`}
+                    className={`w-full bg-black/30 border ${error ? 'border-red-500/50' : 'border-white/10'} rounded-2xl py-4 pl-12 pr-4 text-white placeholder-white/30 focus:outline-none focus:border-indigo-500/50 focus:bg-black/50 transition-all text-lg`}
                     autoFocus
                   />
                 </div>
@@ -119,16 +118,9 @@ const AuthSheet: React.FC<AuthSheetProps> = ({ user, isOpen, onClose, onLogin })
                   </button>
                   <button
                     type="submit"
-                    disabled={isSubmitting}
                     className="flex-1 py-4 rounded-2xl bg-indigo-600 text-white font-medium hover:bg-indigo-500 active:scale-95 transition-all shadow-lg shadow-indigo-500/20 flex items-center justify-center gap-2"
                   >
-                    {isSubmitting ? (
-                        <span className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                    ) : (
-                        <>
-                            Anmelden <ArrowRight className="w-4 h-4" />
-                        </>
-                    )}
+                    Anmelden <ArrowRight className="w-4 h-4" />
                   </button>
                 </div>
               </motion.form>
