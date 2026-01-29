@@ -1,59 +1,106 @@
 
-# Appwrite Setup für FiaOS
+# 🛠️ FiaOS - Backend & Database Setup
 
-FiaOS benötigt eine Appwrite-Instanz, um Daten (Zustände, Nachrichten, Spiele, etc.) zu speichern. Um die Einrichtung zu vereinfachen, steht ein automatisiertes Setup-Script bereit.
+FiaOS benötigt eine **Appwrite**-Instanz als Backend für Authentifizierung, Datenbank (Zustände, Highscores, Tagebuch) und Echtzeit-Events.
 
-## 1. Voraussetzungen
+Folge dieser Anleitung, um das System betriebsbereit zu machen.
 
-1.  **Node.js 18+** installiert.
-2.  Ein aktiver **Appwrite Server** (z.B. Appwrite Cloud oder Self-Hosted).
-3.  Ein neues Projekt im Appwrite Dashboard (z.B. "FiaOS").
+---
 
-## 2. API Key erstellen
+## 1. Appwrite Projekt erstellen
 
-1.  Gehe im Appwrite Dashboard zu deinem Projekt.
-2.  Navigiere zu **Overview > API Keys**.
-3.  Erstelle einen neuen Key mit dem Namen "FiaOS Admin".
-4.  Wähle folgende Scopes (mindestens):
+1.  Gehe zu deiner Appwrite Konsole (Cloud oder Self-Hosted).
+2.  Erstelle ein neues Projekt (z.B. **"FiaOS"**).
+3.  Kopiere die **Project ID** aus den Einstellungen.
+
+---
+
+## 2. API Key für das Setup-Script
+
+Das Setup-Script benötigt Administrator-Rechte, um die Datenbank-Struktur automatisch anzulegen.
+
+1.  Navigiere im Appwrite Dashboard zu **Overview > API Keys**.
+2.  Erstelle einen Key namens **"FiaOS Admin Setup"**.
+3.  Wähle folgende Scopes:
     *   `databases.read`, `databases.write`
     *   `collections.read`, `collections.write`
     *   `documents.read`, `documents.write`
-    *   `indexes.read`, `indexes.write`
     *   `attributes.read`, `attributes.write`
-5.  Kopiere das **API Secret**.
+    *   `indexes.read`, `indexes.write`
+4.  Kopiere das **API Secret**.
 
-## 3. Konfiguration
+---
 
-Erstelle oder bearbeite die `.env` Datei im Root-Verzeichnis des Projekts:
+## 3. Umgebungsvariablen (.env)
+
+Erstelle eine Datei namens `.env` im Hauptverzeichnis des Projekts und füge deine Daten ein:
 
 ```env
+# Client & Script Config
 VITE_APPWRITE_ENDPOINT=https://cloud.appwrite.io/v1
-VITE_APPWRITE_PROJECT_ID=[DEINE_PROJECT_ID]
-VITE_APPWRITE_API_KEY=[DEIN_API_KEY_VON_OBEN]
+VITE_APPWRITE_PROJECT_ID=deine_project_id_hier
+
+# Nur für das Setup-Script (wird nicht im Frontend gebuildet)
+VITE_APPWRITE_API_KEY=dein_api_key_secret_hier
 ```
 
-## 4. Setup ausführen
+---
 
-Führe folgenden Befehl aus, um die Datenbank, Collections, Attribute und Indizes automatisch anzulegen und initiale Daten zu seeden:
+## 4. Automatische Datenbank-Installation
+
+Führe das Setup-Script aus. Es erstellt die Datenbank `fiaos`, alle notwendigen Collections (Tabellen), Attribute und Indizes.
 
 ```bash
 npm run db:setup
 ```
 
-Das Script führt folgende Schritte aus:
-1.  Erstellt die Datenbank `fiaos`.
-2.  Erstellt Collections: `states`, `diary`, `messages`, `games`, `vault`.
-3.  Konfiguriert Attribute und Indizes.
-4.  Erstellt initiale Daten (Admin Config, Luna Stats).
+✅ **Erwarteter Output:**
+> "🚀 Checking Appwrite Schema..."
+> "Database created."
+> "Collection states created..."
+> "✅ Appwrite Setup & Seeding Complete!"
 
-## 5. Berechtigungen (Permissions)
+---
 
-Das Setup-Script konfiguriert die Collections standardmäßig mit `role:any` für CRUD-Operationen, um den MVP-Betrieb ohne komplexe serverseitige Logik zu ermöglichen.
+## 5. 🔐 Benutzerkonten erstellen (WICHTIG)
 
-Für eine erhöhte Sicherheit in Produktion wird empfohlen, die Permissions im Appwrite Dashboard einzuschränken (z.B. nur `users` oder spezifische Teams).
+Da Passwörter aus dem Quellcode entfernt wurden, musst du die Benutzer manuell in Appwrite anlegen. Das Frontend erwartet spezifische E-Mail-Adressen, um die Benutzer (Fia, Collin) zuzuordnen.
 
-## Manuelle Kontrolle
+Gehe im Appwrite Dashboard zu **Authentication > Users** und erstelle folgende Accounts:
 
-Falls das Script fehlschlägt, kannst du die Struktur manuell prüfen:
-*   Datenbank ID: `fiaos`
-*   Collections müssen exakt wie in `scripts/setupAppwrite.js` definiert sein.
+### Benutzer 1: Fia
+*   **Name:** Fia
+*   **Email:** `fia@fiaos.app`
+*   **Passwort:** (Wähle ein sicheres Passwort)
+*   **User ID:** (Automatisch generiert lassen oder `fia` setzen, falls möglich)
+
+### Benutzer 2: Collin (Admin)
+*   **Name:** Collin
+*   **Email:** `collin@fiaos.app`
+*   **Passwort:** (Wähle ein sicheres Passwort)
+
+> **Hinweis:** Der "Gast"-Benutzer benötigt keinen Account, da er lokal läuft.
+
+---
+
+## 6. Frontend Starten
+
+Nachdem die Datenbank steht und die User angelegt sind, starte die App:
+
+```bash
+npm run dev
+```
+
+Logge dich im Login-Screen mit den eben erstellten Passwörtern ein.
+
+---
+
+## ⚠️ Sicherheitshinweis für Produktion
+
+Das Setup-Script konfiguriert die Datenbank-Rechte aktuell auf `role:any` (Jeder kann lesen/schreiben), um die Entwicklung zu erleichtern.
+
+Für einen echten Einsatz im Web solltest du im Appwrite Dashboard unter **Databases > fiaos > [Collection] > Settings > Permissions**:
+1.  `role:any` entfernen.
+2.  `role:users` (eingeloggte Benutzer) oder spezifische User-IDs hinzufügen.
+
+ Viel Spaß mit FiaOS! 💞
