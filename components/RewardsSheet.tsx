@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { X, Lock, Check, Sparkles, Heart, Clock, Palette, Star } from 'lucide-react';
+import { X, Lock, Check, Sparkles, Palette, Star } from 'lucide-react';
 import { UserRewardsData, Reward } from '../types';
 import { REWARD_CATALOG, VALENTINE_REWARDS, THEMES } from '../constants';
 
@@ -57,17 +57,18 @@ const RewardsSheet: React.FC<RewardsSheetProps> = ({ isOpen, onClose, rewardsDat
             animate={{ y: 0 }}
             exit={{ y: "100%" }}
             transition={{ type: "spring", damping: 25, stiffness: 300 }}
-            className="absolute inset-x-0 bottom-0 top-16 z-[90] bg-[#121214] rounded-t-[2.5rem] overflow-hidden flex flex-col shadow-2xl border-t border-white/10"
+            className="absolute inset-x-0 bottom-0 top-16 z-[90] bg-[#0f0f14] rounded-t-[2.8rem] overflow-hidden flex flex-col shadow-2xl border-t border-white/10"
           >
             {/* Header */}
-            <div className="px-6 pt-6 pb-4 bg-gradient-to-b from-[#1c1c1e] to-[#121214]">
+            <div className="px-6 pt-6 pb-5 bg-gradient-to-b from-[#1c1c22] via-[#121214] to-[#0f0f14]">
                <div className="absolute top-3 left-1/2 -translate-x-1/2 w-12 h-1.5 bg-white/10 rounded-full" />
                
-               <div className="flex items-center justify-between mb-6 mt-2">
+               <div className="flex items-center justify-between mb-5 mt-2">
                  <div>
                    <h2 className="text-2xl font-black text-white tracking-tight flex items-center gap-2">
-                     Erfolge <span className="text-yellow-400 text-lg">🏆</span>
+                     Belohnungen <span className="text-yellow-400 text-lg">🏆</span>
                    </h2>
+                   <p className="text-xs text-white/50">Sammle neue Themes, Stories und Erinnerungen.</p>
                  </div>
                  <button onClick={onClose} className="p-2 bg-white/5 rounded-full hover:bg-white/10">
                    <X className="w-5 h-5 text-white" />
@@ -75,7 +76,7 @@ const RewardsSheet: React.FC<RewardsSheetProps> = ({ isOpen, onClose, rewardsDat
                </div>
 
                {/* Custom Tabs */}
-               <div className="flex p-1 bg-black/40 rounded-xl mb-4 relative overflow-hidden">
+               <div className="flex p-1 bg-black/40 rounded-xl mb-5 relative overflow-hidden">
                   {['general', 'love', 'valentine'].map((tab) => (
                       <button
                         key={tab}
@@ -92,11 +93,11 @@ const RewardsSheet: React.FC<RewardsSheetProps> = ({ isOpen, onClose, rewardsDat
                </div>
 
                {/* Progress Bar */}
-               <div className="flex items-center gap-3 text-xs font-bold text-white/40 mb-1">
+               <div className="flex items-center gap-3 text-xs font-bold text-white/40 mb-2">
                    <span>Fortschritt</span>
                    <span className="text-white">{Math.round(progress)}%</span>
                </div>
-               <div className="h-2 bg-white/5 rounded-full overflow-hidden">
+               <div className="h-2.5 bg-white/5 rounded-full overflow-hidden">
                    <motion.div 
                      initial={{ width: 0 }} 
                      animate={{ width: `${progress}%` }} 
@@ -107,7 +108,39 @@ const RewardsSheet: React.FC<RewardsSheetProps> = ({ isOpen, onClose, rewardsDat
             </div>
 
             {/* List */}
-            <div className="flex-1 overflow-y-auto p-4 space-y-3 bg-[#121214]">
+            <div className="flex-1 overflow-y-auto p-4 space-y-4 bg-[#0f0f14]">
+              {activeTab !== 'valentine' && (
+                <div className="rounded-[1.5rem] border border-white/10 bg-white/5 p-4">
+                  <div className="flex items-center justify-between mb-3">
+                    <div>
+                      <p className="text-xs uppercase tracking-[0.3em] text-white/40">Themes</p>
+                      <h3 className="text-base font-semibold text-white">Freischaltungen</h3>
+                    </div>
+                    <Palette className="w-5 h-5 text-white/50" />
+                  </div>
+                  <div className="flex gap-3 overflow-x-auto pb-2">
+                    {Object.values(THEMES).map((theme) => {
+                      if (!theme.unlockRewardId) return null;
+                      const isUnlocked = rewardsData.rewards?.[theme.unlockRewardId]?.unlocked || rewardsData.valentine?.unlocked?.[theme.unlockRewardId];
+                      return (
+                        <div
+                          key={theme.id}
+                          className={`flex-shrink-0 w-28 rounded-2xl border ${isUnlocked ? 'border-white/20' : 'border-white/5 opacity-60'}`}
+                        >
+                          <div
+                            className="h-20 rounded-2xl"
+                            style={{ background: theme.colors.bgGradient }}
+                          />
+                          <div className="px-2 py-2">
+                            <p className="text-xs font-semibold text-white truncate">{theme.name}</p>
+                            <p className="text-[10px] text-white/40">{isUnlocked ? 'Freigeschaltet' : 'Gesperrt'}</p>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
               {filteredRewards.map((reward, i) => {
                   let isUnlocked = false;
                   if (activeTab === 'valentine') isUnlocked = rewardsData.valentine.unlocked[reward.id] ?? false;
@@ -126,7 +159,7 @@ const RewardsSheet: React.FC<RewardsSheetProps> = ({ isOpen, onClose, rewardsDat
                         ${isUnlocked 
                             ? isEpic 
                                 ? 'bg-gradient-to-br from-purple-900/30 to-indigo-900/30 border-purple-500/30' 
-                                : 'bg-[#1c1c1e] border-white/10' 
+                                : 'bg-white/5 border-white/10' 
                             : 'bg-black/20 border-white/5 opacity-60 grayscale'}
                       `}
                     >

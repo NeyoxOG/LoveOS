@@ -7,16 +7,18 @@
     <title>AdminOS v2</title>
     <style>
         :root {
-            --bg-dark: #000000;
-            --bg-card: rgba(28, 28, 30, 0.6);
-            --bg-card-hover: rgba(44, 44, 46, 0.8);
-            --primary: #0a84ff;
-            --danger: #ff453a;
-            --success: #30d158;
-            --warning: #ffd60a;
-            --text: #ffffff;
-            --text-sec: rgba(235, 235, 245, 0.6);
-            --border: rgba(255, 255, 255, 0.1);
+            --bg-dark: #040408;
+            --bg-card: rgba(24, 24, 32, 0.7);
+            --bg-card-hover: rgba(40, 40, 58, 0.9);
+            --primary: #7c3aed;
+            --primary-soft: rgba(124, 58, 237, 0.18);
+            --danger: #f87171;
+            --success: #34d399;
+            --warning: #fbbf24;
+            --text: #f8fafc;
+            --text-sec: rgba(226, 232, 240, 0.65);
+            --border: rgba(255, 255, 255, 0.08);
+            --glass: rgba(15, 15, 25, 0.65);
         }
 
         * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
@@ -24,7 +26,7 @@
         body {
             margin: 0; padding: 0;
             font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", Roboto, sans-serif;
-            background: radial-gradient(circle at top left, #1c1c1e 0%, #000 100%);
+            background: radial-gradient(circle at top left, #1f1147 0%, #090112 55%, #050007 100%);
             color: var(--text);
             height: 100vh;
             display: flex; flex-direction: column;
@@ -36,15 +38,16 @@
             padding: 20px 24px;
             padding-top: calc(20px + env(safe-area-inset-top));
             display: flex; justify-content: space-between; align-items: center;
-            background: rgba(0,0,0,0.3); backdrop-filter: blur(20px);
+            background: rgba(10, 10, 18, 0.6); backdrop-filter: blur(24px);
             border-bottom: 1px solid var(--border);
             z-index: 50;
         }
         .header h1 { font-size: 24px; font-weight: 800; margin: 0; letter-spacing: -0.5px; }
+        .header span { display: block; font-size: 12px; color: var(--text-sec); font-weight: 500; margin-top: 2px; }
         .cloud-status { 
             font-size: 11px; font-weight: 600; text-transform: uppercase; 
             display: flex; align-items: center; gap: 6px; 
-            background: rgba(255,255,255,0.1); padding: 4px 10px; border-radius: 20px;
+            background: rgba(255,255,255,0.08); padding: 6px 12px; border-radius: 999px;
         }
         .dot { width: 8px; height: 8px; border-radius: 50%; background: #666; transition: background 0.3s, box-shadow 0.3s; }
         .dot.online { background: var(--success); box-shadow: 0 0 10px var(--success); }
@@ -69,26 +72,30 @@
 
         /* Cards & Grids */
         .card {
-            background: var(--bg-card); border-radius: 20px; padding: 20px;
+            background: var(--glass); border-radius: 20px; padding: 20px;
             border: 1px solid var(--border); margin-bottom: 16px;
-            backdrop-filter: blur(10px);
+            backdrop-filter: blur(16px);
+            box-shadow: 0 12px 30px rgba(4, 4, 12, 0.4);
         }
         
-        .dashboard-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+        .dashboard-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 16px; }
         .stat-card {
-            background: var(--bg-card); border-radius: 20px; padding: 20px;
+            background: var(--glass); border-radius: 20px; padding: 20px;
             display: flex; flex-direction: column; justify-content: space-between;
             border: 1px solid var(--border); min-height: 120px;
+            box-shadow: inset 0 0 0 1px rgba(255,255,255,0.02);
         }
         .stat-icon { font-size: 24px; margin-bottom: 10px; }
         .stat-val { font-size: 28px; font-weight: 700; line-height: 1.1; }
         .stat-label { font-size: 13px; color: var(--text-sec); margin-top: 4px; }
+        .stat-sub { font-size: 11px; color: rgba(226, 232, 240, 0.45); margin-top: 6px; }
 
         /* Maintenance Toggle Special */
         .maint-card {
-            background: linear-gradient(135deg, #1c1c1e, #2c2c2e);
+            background: linear-gradient(135deg, rgba(124, 58, 237, 0.2), rgba(15, 15, 25, 0.9));
             border-radius: 20px; padding: 20px; border: 1px solid var(--border);
             display: flex; justify-content: space-between; align-items: center;
+            box-shadow: 0 16px 32px rgba(124, 58, 237, 0.12);
         }
         .maint-info h3 { margin: 0 0 4px 0; font-size: 17px; }
         .maint-info p { margin: 0; font-size: 13px; color: var(--text-sec); }
@@ -96,11 +103,11 @@
         /* App Grid */
         .apps-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(100px, 1fr)); gap: 12px; }
         .app-toggle {
-            background: var(--bg-card); border-radius: 16px; padding: 16px;
+            background: var(--glass); border-radius: 16px; padding: 16px;
             display: flex; flex-direction: column; align-items: center; gap: 8px;
             border: 2px solid transparent; cursor: pointer; transition: all 0.2s;
         }
-        .app-toggle.active { background: rgba(10, 132, 255, 0.15); border-color: var(--primary); }
+        .app-toggle.active { background: var(--primary-soft); border-color: var(--primary); }
         .app-toggle.disabled { opacity: 0.5; filter: grayscale(1); }
         .app-icon { font-size: 32px; }
         .app-name { font-size: 12px; font-weight: 600; text-align: center; }
@@ -108,7 +115,7 @@
         /* Users List */
         .user-row {
             display: flex; align-items: center; gap: 16px; padding: 16px;
-            background: var(--bg-card); border-radius: 16px; margin-bottom: 12px;
+            background: var(--glass); border-radius: 16px; margin-bottom: 12px;
             cursor: pointer; border: 1px solid var(--border);
             transition: background 0.2s;
         }
@@ -124,7 +131,7 @@
 
         /* Rewards Search & List */
         .search-bar {
-            width: 100%; background: #2c2c2e; border: 1px solid var(--border);
+            width: 100%; background: rgba(15, 15, 25, 0.7); border: 1px solid var(--border);
             padding: 12px 16px; border-radius: 12px; color: #fff; font-size: 16px;
             margin-bottom: 20px; outline: none; transition: border-color 0.2s;
         }
@@ -132,7 +139,7 @@
 
         .reward-item {
             display: flex; justify-content: space-between; align-items: center;
-            padding: 14px 16px; background: var(--bg-card); border-bottom: 1px solid rgba(255,255,255,0.05);
+            padding: 14px 16px; background: var(--glass); border-bottom: 1px solid rgba(255,255,255,0.05);
         }
         .reward-item:first-child { border-top-left-radius: 16px; border-top-right-radius: 16px; }
         .reward-item:last-child { border-bottom-left-radius: 16px; border-bottom-right-radius: 16px; border-bottom: none; }
@@ -143,7 +150,7 @@
         /* Navigation (Dock) */
         .admin-dock {
             position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%);
-            background: rgba(28, 28, 30, 0.9); backdrop-filter: blur(20px);
+            background: rgba(12, 12, 20, 0.9); backdrop-filter: blur(24px);
             border: 1px solid var(--border); border-radius: 30px;
             padding: 6px; display: flex; gap: 4px; box-shadow: 0 10px 40px rgba(0,0,0,0.5);
             z-index: 100;
@@ -191,10 +198,11 @@
         .sheet-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px; }
         .close-btn { background: rgba(255,255,255,0.1); border: none; width: 32px; height: 32px; border-radius: 50%; color: #fff; cursor: pointer; }
 
-        .btn-danger { width: 100%; padding: 14px; background: rgba(255, 69, 58, 0.15); color: var(--danger); border: 1px solid rgba(255, 69, 58, 0.3); border-radius: 12px; font-weight: 700; margin-top: 12px; cursor: pointer; }
-        .btn-action { width: 100%; padding: 14px; background: rgba(255,255,255,0.1); color: #fff; border: none; border-radius: 12px; font-weight: 600; margin-top: 8px; cursor: pointer; }
+        .btn-danger { width: 100%; padding: 14px; background: rgba(248, 113, 113, 0.15); color: var(--danger); border: 1px solid rgba(248, 113, 113, 0.35); border-radius: 12px; font-weight: 700; margin-top: 12px; cursor: pointer; }
+        .btn-action { width: 100%; padding: 14px; background: rgba(124, 58, 237, 0.2); color: #fff; border: 1px solid rgba(124, 58, 237, 0.4); border-radius: 12px; font-weight: 600; margin-top: 8px; cursor: pointer; }
+        .btn-action.primary { background: var(--primary); color: #fff; border: none; }
 
-        .input-row { display: flex; align-items: center; gap: 10px; padding: 10px; background: #2c2c2e; border-radius: 12px; margin-bottom: 10px; }
+        .input-row { display: flex; align-items: center; gap: 10px; padding: 10px; background: rgba(15, 15, 25, 0.7); border-radius: 12px; margin-bottom: 10px; }
         .input-row input { background: transparent; border: none; color: #fff; flex: 1; text-align: right; font-size: 16px; font-weight: 600; outline: none; }
 
         .spinner { width: 20px; height: 20px; border: 2px solid rgba(255,255,255,0.3); border-top-color: #fff; border-radius: 50%; animation: spin 1s infinite linear; }
@@ -205,7 +213,10 @@
 <body>
 
     <div class="header">
-        <h1>Control Center</h1>
+        <div>
+            <h1>Control Center</h1>
+            <span>Admin Übersicht & Live-Steuerung</span>
+        </div>
         <div class="cloud-status">
             <div class="dot" id="cloudDot"></div>
             <span id="cloudText">Checking...</span>
@@ -219,7 +230,7 @@
             <div class="maint-card">
                 <div class="maint-info">
                     <h3>Wartungsmodus</h3>
-                    <p>Sperrt Zugriff für alle User (außer Admin)</p>
+                    <p>Loggt alle Geräte aus & zeigt den Wartungsscreen</p>
                 </div>
                 <div class="toggle" id="maintToggle" onclick="toggleMaintenance()"></div>
             </div>
@@ -254,11 +265,23 @@
                     <div class="stat-val" id="statUptime">0h</div>
                     <div class="stat-label">Session Time</div>
                 </div>
+                <div class="stat-card">
+                    <div class="stat-icon">🛠️</div>
+                    <div class="stat-val" id="statUpdated">—</div>
+                    <div class="stat-label">Letzte Änderung</div>
+                    <div class="stat-sub" id="statEditedBy">—</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-icon">🚪</div>
+                    <div class="stat-val" id="statLogoutAt">—</div>
+                    <div class="stat-label">Letzter Logout</div>
+                    <div class="stat-sub">Maintenance/Signal</div>
+                </div>
             </div>
 
             <div class="section-label">Quick Actions</div>
             <div class="card">
-                <button class="btn-action" onclick="forceSync()">Force Cloud Sync ☁️</button>
+                <button class="btn-action primary" onclick="forceSync()">Force Cloud Sync ☁️</button>
             </div>
         </div>
 

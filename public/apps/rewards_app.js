@@ -19,10 +19,28 @@ let cloud = null;
 let rewardsData = null;
 let catalog = [];
 
+const DEFAULT_REWARDS_STRUCT = {
+    version: 2,
+    rewards: {
+        "reward.welcome": { unlocked: true, unlockedAt: Date.now() }
+    },
+    valentine: {
+        total: 6,
+        unlocked: {},
+        completedAt: null
+    },
+    redeemed: {},
+    meta: {
+        lastSeenAt: Date.now(),
+        points: 0
+    }
+};
+
 function init() {
     const sessionStr = localStorage.getItem(KEYS.SESSION);
     if (!sessionStr) return;
     user = JSON.parse(sessionStr);
+    user.id = user.id || user.userId;
 
     if (window.parent.FIAOS && window.parent.FIAOS.cloud) {
         cloud = window.parent.FIAOS.cloud;
@@ -68,10 +86,20 @@ function init() {
 }
 
 async function loadData() {
+    const cacheKey = user.role === 'guest' ? 'fiaos_rewards_guest' : `fiaos_rewards_${user.id}`;
     if (cloud) {
         rewardsData = await cloud.loadRewards();
-    } else {
-        rewardsData = JSON.parse(localStorage.getItem(user.role === 'guest' ? 'fiaos_rewards_guest' : `fiaos_rewards_${user.id}`));
+    }
+    if (!rewardsData) {
+        rewardsData = JSON.parse(localStorage.getItem(cacheKey) || 'null');
+    }
+    if (!rewardsData) {
+        rewardsData = JSON.parse(JSON.stringify(DEFAULT_REWARDS_STRUCT));
+        if (cloud && user.role !== 'guest') {
+            await cloud.saveRewards(rewardsData);
+        } else {
+            localStorage.setItem(cacheKey, JSON.stringify(rewardsData));
+        }
     }
     
     // Points (from meta or daily state)
