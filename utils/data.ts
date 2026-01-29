@@ -59,7 +59,28 @@ const INITIAL_ADMIN_CONFIG: AdminConfig = {
   },
   maintenanceMode: false,
   lastEditedBy: "system",
-  updatedAt: Date.now()
+  updatedAt: Date.now(),
+  forceLogoutAt: 0
+};
+
+const normalizeAdminConfigLocal = (config?: AdminConfig | null): AdminConfig => {
+    const safeConfig = config || {};
+    return {
+        ...INITIAL_ADMIN_CONFIG,
+        ...safeConfig,
+        appVisibility: {
+            ...INITIAL_ADMIN_CONFIG.appVisibility,
+            ...(safeConfig.appVisibility || {})
+        },
+        userStatus: {
+            ...INITIAL_ADMIN_CONFIG.userStatus,
+            ...(safeConfig.userStatus || {})
+        },
+        maintenanceMode: safeConfig.maintenanceMode ?? INITIAL_ADMIN_CONFIG.maintenanceMode,
+        lastEditedBy: safeConfig.lastEditedBy || INITIAL_ADMIN_CONFIG.lastEditedBy,
+        updatedAt: safeConfig.updatedAt || INITIAL_ADMIN_CONFIG.updatedAt,
+        forceLogoutAt: safeConfig.forceLogoutAt ?? INITIAL_ADMIN_CONFIG.forceLogoutAt
+    };
 };
 
 // --- Helpers ---
@@ -227,20 +248,10 @@ export const loadAdminConfig = (): AdminConfig => {
         const stored = localStorage.getItem('fiaos_global_admin_config');
         if (stored) {
             const config = JSON.parse(stored);
-            if (!config.userStatus) {
-                config.userStatus = INITIAL_ADMIN_CONFIG.userStatus;
-            }
-            // Ensure newly added apps (like bucket) are visible if undefined in old config
-            if (config.appVisibility) {
-                if (config.appVisibility.bucket === undefined) config.appVisibility.bucket = true;
-                // FORCE LUNA & BUCKET VISIBILITY TO FIX STALE STATE
-                config.appVisibility.luna = true;
-                config.appVisibility.bucket = true;
-            }
-            return config;
+            return normalizeAdminConfigLocal(config);
         }
     } catch(e) {}
-    return INITIAL_ADMIN_CONFIG;
+    return normalizeAdminConfigLocal(INITIAL_ADMIN_CONFIG);
 };
 
 export const updateUserIndex = (session: Session, profile: UserProfile) => {
