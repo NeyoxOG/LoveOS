@@ -190,7 +190,6 @@ const API_KEY = process.env.VITE_APPWRITE_API_KEY;
 if (!PROJECT_ID || !API_KEY) {
     console.warn("⚠️  Setup Skipped: Missing VITE_APPWRITE_PROJECT_ID or VITE_APPWRITE_API_KEY.");
     console.warn("   (This is normal in production or if you haven't set up the .env file yet)");
-    // Exit with success code (0) so chained commands (like 'vite') still run
     process.exit(0);
 }
 
@@ -213,7 +212,6 @@ const api = async (method, path, body = null) => {
     const json = await res.json();
 
     if (!res.ok) {
-        // Ignore "already exists" errors (409)
         if (res.status === 409) return { error: 'conflict', ...json };
         throw new Error(`API Error [${res.status}] ${path}: ${JSON.stringify(json)}`);
     }
@@ -248,7 +246,6 @@ const setup = async () => {
     console.log(`🚀 Checking Appwrite Schema...`);
 
     // 1. Create Database
-    // console.log(`\n📦 Checking Database: ${DB_ID}`);
     const dbRes = await api('POST', '/databases', {
         databaseId: DB_ID,
         name: 'FiaOS Database'
@@ -257,8 +254,6 @@ const setup = async () => {
 
     // 2. Process Collections
     for (const col of COLLECTIONS) {
-        // console.log(`\n📂 Processing Collection: ${col.id} (${col.name})`);
-        
         // Create Collection
         const colRes = await api('POST', `/databases/${DB_ID}/collections`, {
             collectionId: col.id,
@@ -287,16 +282,13 @@ const setup = async () => {
             
             if (attrRes.error !== 'conflict') {
                 console.log(`      - Attribute ${attr.key}: Created`);
-                // Wait a bit to ensure attribute is ready before indexing (Appwrite async nature)
                 await new Promise(r => setTimeout(r, 500));
             }
         }
 
         // Create Indexes
         if (col.indexes) {
-            // Wait for attributes to be "available"
             await new Promise(r => setTimeout(r, 2000));
-
             for (const idx of col.indexes) {
                 const idxRes = await api('POST', `/databases/${DB_ID}/collections/${col.id}/indexes`, {
                     key: idx.key,

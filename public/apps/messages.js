@@ -50,14 +50,13 @@ function renderMessages(messages) {
 
     sorted.forEach(msg => {
         const div = document.createElement('div');
-        const isMe = msg.senderId === user.id;
+        // Fix: user.userId
+        const isMe = msg.senderId === user.userId;
         div.className = `message ${isMe ? 'me' : 'other'}`;
         
         let timeStr = '';
         if (msg.createdAt) {
-            // Handle Firestore Timestamp or Date
-            const ms = msg.createdAt.seconds ? msg.createdAt.seconds * 1000 : msg.createdAt;
-            const d = new Date(ms);
+            const d = new Date(msg.createdAt);
             timeStr = d.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
         }
 
@@ -68,7 +67,6 @@ function renderMessages(messages) {
         list.appendChild(div);
     });
 
-    // Auto Scroll to bottom
     list.scrollTop = list.scrollHeight;
 }
 

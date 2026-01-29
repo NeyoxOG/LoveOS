@@ -6,7 +6,6 @@
 const KEYS = { SESSION: 'fiaos_session' };
 
 let user = null;
-let globalStats = null;
 let cloud = null;
 let leaderboardUnsub = null;
 
@@ -31,7 +30,8 @@ async function loadLeaderboard(gameId) {
 
 function renderUI() {
     // Local bests from cache for instant feedback
-    const key = `fiaos_user_${user.id}_games`;
+    const uid = user.userId;
+    const key = `fiaos_user_${uid}_games`;
     const data = JSON.parse(localStorage.getItem(key) || '{}');
     
     updateBadge('stack', data.stack?.best);
@@ -122,19 +122,35 @@ function unsubscribeLeaderboards() {
 }
 
 window.switchTab = async (id, idx) => {
-    document.querySelectorAll('[id^="tab-"]').forEach(el => el.classList.add('hidden'));
-    document.getElementById(`tab-${id}`).classList.remove('hidden');
+    currentTab = id;
+    
+    // Toggle Content Visibility
+    document.getElementById('tab-games').classList.toggle('hidden', id !== 'games');
+    document.getElementById('tab-stats').classList.toggle('hidden', id !== 'stats');
+    
+    // Move Indicator
     document.getElementById('segIndicator').style.transform = `translateX(${idx * 100}%)`;
     
+    // Toggle Active State on Buttons
+    const btns = document.querySelectorAll('.segment-btn');
+    btns.forEach(b => b.classList.remove('active'));
+    btns[idx].classList.add('active');
+
     if (id === 'stats') {
         subscribeLeaderboards();
         await loadLeaderboards();
     } else {
         unsubscribeLeaderboards();
     }
-};
+    lb.innerHTML = html;
+}
 
 window.playGame = (gameId) => { window.location.href = `game_${gameId}.html`; };
 window.refreshLeaderboard = () => loadLeaderboards();
+
+// Global Escape Listener
+window.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') window.history.back();
+});
 
 init();

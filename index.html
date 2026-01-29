@@ -8,38 +8,76 @@
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <link rel="manifest" href="/manifest.json">
     <title>FiaOS</title>
+    
+    <!-- Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=SF+Pro+Display:wght@100;300;400;500;600;700&family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet">
+    
     <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+      tailwind.config = {
+        theme: {
+          extend: {
+            fontFamily: {
+              sans: ['"SF Pro Display"', 'Inter', 'system-ui', 'sans-serif'],
+            },
+            colors: {
+              glass: "rgba(255, 255, 255, 0.1)",
+              glassBorder: "rgba(255, 255, 255, 0.15)",
+            }
+          }
+        }
+      }
+    </script>
     <style>
-      /* Custom scrollbar hiding for clean UI */
-      .no-scrollbar::-webkit-scrollbar {
-        display: none;
+      :root {
+        --glass-border: rgba(255, 255, 255, 0.1);
+        --glass-bg: rgba(30, 30, 30, 0.6);
+        --glass-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.3);
+        --safe-top: env(safe-area-inset-top);
+        --safe-bottom: env(safe-area-inset-bottom);
       }
-      .no-scrollbar {
-        -ms-overflow-style: none;
-        scrollbar-width: none;
-      }
+
       body {
+        background-color: #000;
+        color: white;
+        overflow: hidden; /* Prevent body scroll */
         -webkit-tap-highlight-color: transparent;
-        overscroll-behavior: none;
-        background-color: black;
+        touch-action: pan-x pan-y;
+        overscroll-behavior: none; /* Critical for App feel */
       }
 
-      /* Aurora Theme Animation */
-      [data-theme="aurora"] body {
-        background-size: 200% 200% !important;
-        animation: auroraMove 20s ease infinite;
-      }
-      [data-theme="aurora"] #root > div > div:first-child {
-        /* Target the background div in App.tsx */
-        background-size: 200% 200% !important;
-        animation: auroraMove 20s ease infinite;
+      #root {
+        height: 100dvh; /* Dynamic viewport height fix */
+        width: 100vw;
+        overflow: hidden;
       }
 
-      @keyframes auroraMove {
-        0% { background-position: 0% 50%; }
-        50% { background-position: 100% 50%; }
-        100% { background-position: 0% 50%; }
+      /* Premium Scrollbar */
+      ::-webkit-scrollbar { width: 4px; }
+      ::-webkit-scrollbar-track { background: transparent; }
+      ::-webkit-scrollbar-thumb { background: rgba(255, 255, 255, 0.2); border-radius: 10px; }
+      
+      .no-scrollbar::-webkit-scrollbar { display: none; }
+      .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+
+      /* Utilities */
+      .backdrop-blur-xl { -webkit-backdrop-filter: blur(24px); backdrop-filter: blur(24px); }
+      .backdrop-blur-md { -webkit-backdrop-filter: blur(12px); backdrop-filter: blur(12px); }
+      
+      .squircle {
+        clip-path: url(#squircleClip); 
+        /* Fallback for better performance if SVG clip is heavy: border-radius */
+        border-radius: 22%; 
       }
+
+      /* Animations */
+      @keyframes float {
+        0%, 100% { transform: translateY(0); }
+        50% { transform: translateY(-5px); }
+      }
+      .animate-float { animation: float 6s ease-in-out infinite; }
     </style>
   <script type="importmap">
 {
@@ -52,15 +90,16 @@
     "vite": "https://esm.sh/vite@^7.3.1",
     "@vitejs/plugin-react": "https://esm.sh/@vitejs/plugin-react@^5.1.2",
     "path": "https://esm.sh/path@^0.12.7",
-    "appwrite": "https://esm.sh/appwrite@^21.5.0",
+    "appwrite": "https://esm.sh/appwrite@^14.0.0",
     "url": "https://esm.sh/url@^0.11.4",
     "fs": "https://esm.sh/fs@^0.0.1-security"
   }
 }
 </script>
 </head>
-  <body class="bg-black text-white overflow-hidden select-none">
-    <div id="root" class="h-[100dvh] w-full"></div>
+  <body>
+    <div id="root"></div>
     <script type="module" src="/index.tsx"></script>
   </body>
 </html>
+    

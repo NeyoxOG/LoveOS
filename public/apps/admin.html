@@ -4,7 +4,8 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>AdminOS v2</title>
+    <title>Admin</title>
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
     <style>
         :root {
             --bg-dark: #040408;
@@ -21,8 +22,6 @@
             --glass: rgba(15, 15, 25, 0.65);
         }
 
-        * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
-
         body {
             margin: 0; padding: 0;
             font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", Roboto, sans-serif;
@@ -30,13 +29,19 @@
             color: var(--text);
             height: 100vh;
             display: flex; flex-direction: column;
-            overflow: hidden; user-select: none;
+            user-select: none;
         }
 
-        /* Header */
+        /* CRT Scanline Effect */
+        body::after {
+            content: " ";
+            display: block; position: absolute; inset: 0;
+            background: linear-gradient(rgba(18, 16, 16, 0) 50%, rgba(0, 0, 0, 0.25) 50%), linear-gradient(90deg, rgba(255, 0, 0, 0.06), rgba(0, 255, 0, 0.02), rgba(0, 0, 255, 0.06));
+            z-index: 999; background-size: 100% 2px, 3px 100%; pointer-events: none;
+        }
+
         .header {
-            padding: 20px 24px;
-            padding-top: calc(20px + env(safe-area-inset-top));
+            padding: 16px 20px; border-bottom: 1px solid var(--border);
             display: flex; justify-content: space-between; align-items: center;
             background: rgba(10, 10, 18, 0.6); backdrop-filter: blur(24px);
             border-bottom: 1px solid var(--border);
@@ -49,28 +54,18 @@
             display: flex; align-items: center; gap: 6px; 
             background: rgba(255,255,255,0.08); padding: 6px 12px; border-radius: 999px;
         }
-        .dot { width: 8px; height: 8px; border-radius: 50%; background: #666; transition: background 0.3s, box-shadow 0.3s; }
-        .dot.online { background: var(--success); box-shadow: 0 0 10px var(--success); }
-        .dot.offline { background: var(--danger); }
+        .brand { font-weight: 700; letter-spacing: -1px; display: flex; align-items: center; gap: 8px; color: var(--text); }
+        .brand span { color: var(--primary); }
+        .status { font-size: 10px; background: rgba(0, 255, 157, 0.1); color: var(--primary); padding: 4px 8px; border-radius: 4px; text-transform: uppercase; }
+        .status.offline { color: var(--danger); background: rgba(255, 0, 85, 0.1); }
 
-        /* Main Scroll Area */
         .content {
-            flex: 1; overflow-y: auto; padding: 20px; padding-bottom: 100px;
-            scroll-behavior: smooth;
+            flex: 1; overflow-y: auto; padding: 20px;
+            display: flex; flex-direction: column; gap: 24px;
         }
 
-        /* Sections */
-        .view-section { display: none; animation: fadeIn 0.3s ease; }
-        .view-section.active { display: block; }
-        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
-
-        .section-label { 
-            font-size: 13px; color: var(--text-sec); text-transform: uppercase; 
-            letter-spacing: 1px; margin: 24px 0 12px 4px; font-weight: 600; 
-        }
-        .section-label:first-child { margin-top: 0; }
-
-        /* Cards & Grids */
+        /* Widgets */
+        .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
         .card {
             background: var(--glass); border-radius: 20px; padding: 20px;
             border: 1px solid var(--border); margin-bottom: 16px;
@@ -144,8 +139,8 @@
         .reward-item:first-child { border-top-left-radius: 16px; border-top-right-radius: 16px; }
         .reward-item:last-child { border-bottom-left-radius: 16px; border-bottom-right-radius: 16px; border-bottom: none; }
         
-        .reward-left { display: flex; align-items: center; gap: 12px; }
-        .reward-icon { width: 32px; height: 32px; background: rgba(255,255,255,0.1); border-radius: 8px; display: flex; justify-content: center; align-items: center; }
+        .label { font-size: 10px; text-transform: uppercase; color: var(--text-dim); margin-bottom: 8px; letter-spacing: 1px; }
+        .value { font-size: 24px; font-weight: 700; color: #fff; }
         
         /* Navigation (Dock) */
         .admin-dock {
@@ -161,37 +156,25 @@
             font-size: 24px; cursor: pointer; display: flex; justify-content: center; align-items: center;
             transition: all 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275);
         }
-        .dock-btn.active { background: #fff; color: #000; transform: translateY(-5px); box-shadow: 0 5px 15px rgba(255,255,255,0.2); }
-
-        /* Toggle Switch */
-        .toggle {
-            width: 50px; height: 30px; background: #39393d; border-radius: 15px;
-            position: relative; transition: 0.3s; cursor: pointer;
+        .switch {
+            width: 36px; height: 20px; background: #333; border-radius: 10px; position: relative; cursor: pointer;
         }
-        .toggle::after {
-            content: ''; position: absolute; top: 2px; left: 2px;
-            width: 26px; height: 26px; background: #fff; border-radius: 50%;
-            box-shadow: 0 2px 5px rgba(0,0,0,0.2); transition: 0.3s;
+        .switch::after {
+            content: ''; position: absolute; top: 2px; left: 2px; width: 16px; height: 16px;
+            background: #fff; border-radius: 50%; transition: transform 0.2s;
         }
-        .toggle.active { background: var(--success); }
-        .toggle.active::after { transform: translateX(20px); }
+        .switch.active { background: var(--primary); }
+        .switch.active::after { transform: translateX(16px); }
 
-        /* Range Slider for Luna */
-        .slider-group { margin-bottom: 16px; }
-        .slider-label { display: flex; justify-content: space-between; font-size: 13px; margin-bottom: 6px; color: var(--text-sec); font-weight: 600; }
-        .slider-input { width: 100%; -webkit-appearance: none; height: 6px; background: #333; border-radius: 3px; outline: none; }
-        .slider-input::-webkit-slider-thumb { -webkit-appearance: none; width: 20px; height: 20px; border-radius: 50%; background: #fff; cursor: pointer; }
-
-        /* User Detail Modal */
-        .modal {
-            position: fixed; inset: 0; background: rgba(0,0,0,0.8); backdrop-filter: blur(10px);
-            z-index: 200; display: none; align-items: flex-end;
+        /* Dock */
+        .dock {
+            padding: 12px; border-top: 1px solid var(--border); background: #000;
+            display: flex; justify-content: center; gap: 20px;
         }
-        .modal.open { display: flex; }
-        .sheet {
-            background: #1c1c1e; width: 100%; border-top-left-radius: 24px; border-top-right-radius: 24px;
-            padding: 24px; max-height: 90vh; overflow-y: auto; border-top: 1px solid var(--border);
-            animation: slideUp 0.3s ease-out;
+        .dock-btn {
+            background: transparent; border: 1px solid transparent; color: #666;
+            width: 40px; height: 40px; display: flex; align-items: center; justify-content: center;
+            font-size: 18px; cursor: pointer; transition: all 0.2s;
         }
         @keyframes slideUp { from { transform: translateY(100%); } to { transform: translateY(0); } }
 
@@ -205,8 +188,8 @@
         .input-row { display: flex; align-items: center; gap: 10px; padding: 10px; background: rgba(15, 15, 25, 0.7); border-radius: 12px; margin-bottom: 10px; }
         .input-row input { background: transparent; border: none; color: #fff; flex: 1; text-align: right; font-size: 16px; font-weight: 600; outline: none; }
 
-        .spinner { width: 20px; height: 20px; border: 2px solid rgba(255,255,255,0.3); border-top-color: #fff; border-radius: 50%; animation: spin 1s infinite linear; }
-        @keyframes spin { to { transform: rotate(360deg); } }
+        .view-section { display: none; }
+        .view-section.active { display: block; }
 
     </style>
 </head>
@@ -225,7 +208,7 @@
 
     <div class="content">
         
-        <!-- DASHBOARD VIEW -->
+        <!-- DASHBOARD -->
         <div id="view-dash" class="view-section active">
             <div class="maint-card">
                 <div class="maint-info">
@@ -242,28 +225,18 @@
                     <div class="slider-label"><span>Hunger</span><span id="lunaHungerVal">50</span></div>
                     <input type="range" class="slider-input" id="lunaHunger" min="0" max="100" onchange="updateLunaStat()">
                 </div>
-                <div class="slider-group">
-                    <div class="slider-label"><span>Liebe</span><span id="lunaLoveVal">50</span></div>
-                    <input type="range" class="slider-input" id="lunaLove" min="0" max="100" onchange="updateLunaStat()">
+                <div class="card">
+                    <div class="label">MEMORY</div>
+                    <div class="value" id="ramVal">4GB</div>
+                    <div class="bar-track" style="margin-top:8px"><div class="bar-fill" id="ramBar" style="width:40%; background:var(--accent)"></div></div>
                 </div>
-                <div class="slider-group">
-                    <div class="slider-label"><span>Energie</span><span id="lunaEnergyVal">50</span></div>
-                    <input type="range" class="slider-input" id="lunaEnergy" min="0" max="100" onchange="updateLunaStat()">
-                </div>
-                <button class="btn-action" style="margin-top:0;" onclick="saveLunaStats()">Speichern & Aktualisieren</button>
             </div>
 
-            <div class="section-label">System Status</div>
-            <div class="dashboard-grid">
-                <div class="stat-card">
-                    <div class="stat-icon">👥</div>
-                    <div class="stat-val" id="statUsers">3</div>
-                    <div class="stat-label">Registrierte User</div>
-                </div>
-                <div class="stat-card">
-                    <div class="stat-icon">⏳</div>
-                    <div class="stat-val" id="statUptime">0h</div>
-                    <div class="stat-label">Session Time</div>
+            <div class="card" style="margin-top:10px; border-color: var(--border);">
+                <div class="label">SYSTEM LOCKDOWN</div>
+                <div class="control-row">
+                    <span style="font-size:12px">MAINTENANCE MODE</span>
+                    <div class="switch" id="maintToggle" onclick="toggleMaintenance()"></div>
                 </div>
                 <div class="stat-card">
                     <div class="stat-icon">🛠️</div>
@@ -279,80 +252,24 @@
             </div>
         </div>
 
-        <!-- APPS VIEW -->
+        <!-- APPS -->
         <div id="view-apps" class="view-section">
-            <div class="section-label">App Sichtbarkeit</div>
-            <div class="apps-grid" id="appsGrid">
-                <!-- Populated by JS -->
-            </div>
+            <div class="label">APP CONTROLLER</div>
+            <div id="appsList"></div>
         </div>
 
-        <!-- USERS VIEW -->
+        <!-- USERS -->
         <div id="view-users" class="view-section">
-            <div class="section-label">Benutzerverwaltung</div>
-            <div id="usersList">
-                <!-- Populated by JS -->
-            </div>
-        </div>
-
-        <!-- REWARDS VIEW -->
-        <div id="view-rewards" class="view-section">
-            <div class="section-label">Rewards Editor</div>
-            
-            <div style="background:var(--bg-card); padding:16px; border-radius:20px; border:1px solid var(--border); margin-bottom:20px;">
-                <label style="font-size:12px; color:var(--text-sec); display:block; margin-bottom:8px;">ZIEL-USER</label>
-                <select id="rewardUserSelect" onchange="loadUserRewardsList()" style="width:100%; padding:12px; background:#2c2c2e; border:none; border-radius:12px; color:#fff; font-size:16px; outline:none;">
-                    <option value="fia">Fia</option>
-                    <option value="collin">Collin</option>
-                    <option value="guest">Gast</option>
-                </select>
-            </div>
-
-            <input type="text" class="search-bar" id="rewardSearch" placeholder="Suche (z.B. Pizza, Theme)..." onkeyup="filterRewards()">
-
-            <div id="rewardsList">
-                <!-- Populated by JS -->
-                <div style="text-align:center; color:var(--text-sec); padding:20px;">Wähle einen User...</div>
-            </div>
+            <div class="label">USER DATABASE</div>
+            <div id="usersList"></div>
         </div>
 
     </div>
 
-    <!-- Navigation Dock -->
-    <nav class="admin-dock">
+    <div class="dock">
         <button class="dock-btn active" onclick="switchView('dash', this)">⚡</button>
-        <button class="dock-btn" onclick="switchView('apps', this)">📱</button>
+        <button class="dock-btn" onclick="switchView('apps', this)">❖</button>
         <button class="dock-btn" onclick="switchView('users', this)">👥</button>
-        <button class="dock-btn" onclick="switchView('rewards', this)">🎁</button>
-    </nav>
-
-    <!-- User Detail Modal -->
-    <div class="modal" id="userModal">
-        <div class="sheet">
-            <div class="sheet-header">
-                <h2 id="modalUserName" style="margin:0; font-size:22px;">User</h2>
-                <button class="close-btn" onclick="closeUserModal()">✕</button>
-            </div>
-            
-            <div class="section-label">Daily Stats</div>
-            <div class="input-row">
-                <span>🔥 Streak</span>
-                <input type="number" id="inpStreak" placeholder="0">
-            </div>
-            <div class="input-row">
-                <span>✨ Punkte</span>
-                <input type="number" id="inpPoints" placeholder="0">
-            </div>
-            <button class="btn-action" style="background:var(--primary); color:#000;" onclick="saveUserDaily()">Speichern</button>
-
-            <div class="section-label" style="margin-top:24px; color:var(--danger);">Danger Zone</div>
-            <div style="display:flex; justify-content:space-between; align-items:center; background:#2c2c2e; padding:16px; border-radius:12px; margin-bottom:10px;">
-                <span>Account Ban</span>
-                <div class="toggle" id="banToggle" onclick="toggleBan()"></div>
-            </div>
-            <button class="btn-danger" onclick="forceLogoutUser()">Force Logout 🔌</button>
-            <button class="btn-danger" onclick="resetUser()">FACTORY RESET 💥</button>
-        </div>
     </div>
 
     <script src="admin.js"></script>

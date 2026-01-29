@@ -1,4 +1,11 @@
+
+/**
+ * Game: Precision Timer
+ * Goal: Stop exactly at 3.000s
+ */
+
 const KEYS = { SESSION: 'fiaos_session', USER_GAMES: 'fiaos_user_', GLOBAL_ARCADE: 'fiaos_global_arcade' };
+const TARGET_TIME = 3000; // ms
 
 let user = null;
 let score = 0;
@@ -92,15 +99,20 @@ function unlock(id) {
     if (window.parent.FIAOS_EVENTS) {
         window.parent.FIAOS_EVENTS.emit('games.unlock', { id });
     }
+
+    saveScore(points);
 }
 
 function saveData(diff) {
     if (!user) return;
-    const uKey = `${KEYS.USER_GAMES}${user.id}_games`;
+    
+    // Local
+    // Fix: use user.userId
+    const uKey = `${KEYS.USER_GAMES}${user.userId}_games`;
     let uData = JSON.parse(localStorage.getItem(uKey) || '{}');
     if (!uData.reaction) uData.reaction = { best: 0, bestDiff: null, plays: 0 };
     
-    uData.reaction.last = score;
+    uData.reaction.last = s;
     uData.reaction.plays++;
     if (score > uData.reaction.best) uData.reaction.best = score;
     if (uData.reaction.bestDiff === null || diff < uData.reaction.bestDiff) {

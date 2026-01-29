@@ -1,24 +1,24 @@
 
 import React, { useState } from 'react';
 import { motion } from 'framer-motion';
-import { Lock, CloudOff, AlertTriangle } from 'lucide-react';
+import { CloudOff, Lock } from 'lucide-react';
+import { loadSession } from '../utils/session'; // Helper to check session
 
 interface MaintenanceScreenProps {
   onBypass: () => void;
 }
 
 const MaintenanceScreen: React.FC<MaintenanceScreenProps> = ({ onBypass }) => {
-  const [password, setPassword] = useState('');
-  const [shake, setShake] = useState(false);
+  const [error, setError] = useState(false);
 
-  const checkBypass = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (password === 'AmbradisPW826*') {
-      onBypass();
+  const checkBypass = () => {
+    // Check if current session has admin privileges
+    const session = loadSession();
+    if (session && (session.role === 'admin' || session.role === 'developer')) {
+        onBypass();
     } else {
-      setShake(true);
-      setTimeout(() => setShake(false), 500);
-      setPassword('');
+        setError(true);
+        setTimeout(() => setError(false), 2000);
     }
   };
 
@@ -61,28 +61,14 @@ const MaintenanceScreen: React.FC<MaintenanceScreenProps> = ({ onBypass }) => {
 
         <div className="w-full h-px bg-gradient-to-r from-transparent via-white/10 to-transparent mb-8" />
 
-        {/* Bypass Form */}
-        <motion.form 
-          onSubmit={checkBypass}
-          animate={shake ? { x: [-5, 5, -5, 5, 0] } : {}}
-          className="w-full flex flex-col gap-3"
+        {/* Action */}
+        <button 
+            onClick={checkBypass}
+            className="flex items-center gap-2 text-xs text-white/40 hover:text-white transition-colors"
         >
-          <div className="relative">
-            <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-white/30" />
-            <input 
-              type="password" 
-              placeholder="Admin Bypass"
-              value={password}
-              onChange={e => setPassword(e.target.value)}
-              className="w-full bg-white/5 border border-white/10 rounded-xl py-3 pl-10 pr-4 text-sm text-white placeholder-white/20 focus:outline-none focus:border-pink-500/50 transition-colors"
-            />
-          </div>
-          {password.length > 0 && (
-            <button type="submit" className="text-xs text-white/40 hover:text-white transition-colors">
-              Entsperren →
-            </button>
-          )}
-        </motion.form>
+            <Lock className="w-3 h-3" />
+            {error ? "Kein Admin-Zugriff" : "Admin Zugang prüfen"}
+        </button>
 
         <div className="absolute bottom-8 text-[10px] text-white/20 font-mono tracking-widest uppercase">
           FiaOS v0.2 • Maintenance Active

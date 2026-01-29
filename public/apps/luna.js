@@ -1,6 +1,6 @@
 
 /**
- * Luna 3D Logic
+ * Luna 3D Logic v2.0
  */
 
 const KEYS = { SESSION: 'fiaos_session' };
@@ -17,7 +17,6 @@ let state = {
 // Three.js Globals
 let scene, camera, renderer;
 let lunaGroup, headGroup, bodyGroup, legs = [];
-let particles = [];
 let clock = new THREE.Clock();
 let raycaster = new THREE.Raycaster();
 let mouse = new THREE.Vector2();
@@ -44,6 +43,9 @@ function init() {
     animate();
     setInterval(tickNeeds, 15000);
     
+    // Decay Logic (Run locally for UI feel, but cloud sync is master)
+    decayInterval = setInterval(decayStats, 30000); // Every 30s decay
+
     // Listeners
     window.addEventListener('resize', onWindowResize, false);
     document.addEventListener('mousemove', onMouseMove, false);
@@ -57,6 +59,7 @@ async function loadState() {
             state.hunger = remote.stats.hunger || 50;
             state.love = remote.stats.love || 50;
             state.energy = remote.stats.energy || 80;
+            state.isSleeping = !!remote.isSleeping;
         }
     }
     updateUI();
@@ -69,7 +72,8 @@ async function saveState() {
                 hunger: state.hunger, 
                 love: state.love, 
                 energy: state.energy 
-            }
+            },
+            isSleeping: state.isSleeping
         });
     }
 }
@@ -111,28 +115,23 @@ function tickNeeds() {
 function init3D() {
     const container = document.getElementById('scene-container');
 
-    // Scene
     scene = new THREE.Scene();
-    // fog to blend floor
     scene.fog = new THREE.FogExp2(0x1e1b4b, 0.02);
 
-    // Camera
     camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 100);
     camera.position.set(0, 2, 8);
     camera.lookAt(0, 0.5, 0);
 
-    // Renderer
     renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
     renderer.setSize(window.innerWidth, window.innerHeight);
     renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
     renderer.shadowMap.enabled = true;
     container.appendChild(renderer.domElement);
 
-    // Lights
     const ambientLight = new THREE.AmbientLight(0xffffff, 0.6);
     scene.add(ambientLight);
 
-    const dirLight = new THREE.DirectionalLight(0xffd700, 0.8); // Gold sunlight
+    const dirLight = new THREE.DirectionalLight(0xffd700, 0.8);
     dirLight.position.set(5, 10, 7);
     dirLight.castShadow = true;
     scene.add(dirLight);
@@ -141,7 +140,6 @@ function init3D() {
     purpleLight.position.set(-5, 2, -5);
     scene.add(purpleLight);
 
-    // Floor (Invisible catcher for shadows)
     const floorGeo = new THREE.PlaneGeometry(50, 50);
     const floorMat = new THREE.ShadowMaterial({ opacity: 0.3 });
     const floor = new THREE.Mesh(floorGeo, floorMat);
@@ -150,35 +148,22 @@ function init3D() {
     floor.receiveShadow = true;
     scene.add(floor);
 
-    // --- Create Luna ---
     createLuna();
 }
 
 function createLuna() {
     lunaGroup = new THREE.Group();
     
-    // Materials
-    const woolMat = new THREE.MeshStandardMaterial({ 
-        color: 0xffffff, 
-        roughness: 0.8,
-        emissive: 0x222222
-    });
-    const skinMat = new THREE.MeshStandardMaterial({ color: 0x1e1b4b, roughness: 0.5 }); // Dark blue face
+    const woolMat = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.8, emissive: 0x222222 });
+    const skinMat = new THREE.MeshStandardMaterial({ color: 0x1e1b4b, roughness: 0.5 });
     const blushMat = new THREE.MeshBasicMaterial({ color: 0xf43f5e });
 
-    // Body (Cloud of Spheres)
     bodyGroup = new THREE.Group();
     const sphereGeo = new THREE.SphereGeometry(0.6, 16, 16);
     
-    // Main body clumps
     const positions = [
-        [0, 0, 0, 1],
-        [0.6, 0.2, 0.2, 0.8],
-        [-0.6, 0.1, -0.2, 0.85],
-        [0, 0.5, 0.3, 0.7],
-        [0, -0.4, -0.3, 0.7],
-        [0.4, -0.3, 0.4, 0.6],
-        [-0.5, 0.4, 0, 0.6]
+        [0, 0, 0, 1], [0.6, 0.2, 0.2, 0.8], [-0.6, 0.1, -0.2, 0.85],
+        [0, 0.5, 0.3, 0.7], [0, -0.4, -0.3, 0.7], [0.4, -0.3, 0.4, 0.6], [-0.5, 0.4, 0, 0.6]
     ];
 
     positions.forEach(pos => {
@@ -191,46 +176,29 @@ function createLuna() {
     });
     lunaGroup.add(bodyGroup);
 
-    // Head
     headGroup = new THREE.Group();
     headGroup.position.set(0, 0.3, 0.8);
-    
     const faceMesh = new THREE.Mesh(new THREE.SphereGeometry(0.5, 32, 32), skinMat);
     faceMesh.castShadow = true;
     headGroup.add(faceMesh);
 
-    // Eyes (White dots)
     const eyeGeo = new THREE.SphereGeometry(0.05, 8, 8);
     const eyeMat = new THREE.MeshBasicMaterial({ color: 0xffffff });
-    const leftEye = new THREE.Mesh(eyeGeo, eyeMat);
-    leftEye.position.set(0.15, 0.1, 0.45);
-    const rightEye = new THREE.Mesh(eyeGeo, eyeMat);
-    rightEye.position.set(-0.15, 0.1, 0.45);
-    headGroup.add(leftEye);
-    headGroup.add(rightEye);
+    const leftEye = new THREE.Mesh(eyeGeo, eyeMat); leftEye.position.set(0.15, 0.1, 0.45);
+    const rightEye = new THREE.Mesh(eyeGeo, eyeMat); rightEye.position.set(-0.15, 0.1, 0.45);
+    headGroup.add(leftEye); headGroup.add(rightEye);
 
-    // Blush
     const blushGeo = new THREE.CircleGeometry(0.08, 16);
     const leftBlush = new THREE.Mesh(blushGeo, blushMat);
-    leftBlush.position.set(0.25, -0.05, 0.42);
-    leftBlush.rotation.y = 0.5;
+    leftBlush.position.set(0.25, -0.05, 0.42); leftBlush.rotation.y = 0.5;
     const rightBlush = new THREE.Mesh(blushGeo, blushMat);
-    rightBlush.position.set(-0.25, -0.05, 0.42);
-    rightBlush.rotation.y = -0.5;
-    headGroup.add(leftBlush);
-    headGroup.add(rightBlush);
+    rightBlush.position.set(-0.25, -0.05, 0.42); rightBlush.rotation.y = -0.5;
+    headGroup.add(leftBlush); headGroup.add(rightBlush);
 
     lunaGroup.add(headGroup);
 
-    // Legs (Floating Rayman Style)
     const legGeo = new THREE.CylinderGeometry(0.1, 0.1, 0.6, 8);
-    const legPositions = [
-        [0.4, -1, 0.4],
-        [-0.4, -1, 0.4],
-        [0.4, -1, -0.4],
-        [-0.4, -1, -0.4]
-    ];
-
+    const legPositions = [ [0.4, -1, 0.4], [-0.4, -1, 0.4], [0.4, -1, -0.4], [-0.4, -1, -0.4] ];
     legPositions.forEach(pos => {
         const leg = new THREE.Mesh(legGeo, skinMat);
         leg.position.set(pos[0], pos[1], pos[2]);
@@ -251,27 +219,22 @@ function animate() {
     const time = clock.getElapsedTime();
 
     if (lunaGroup) {
-        // Floating (breathing)
         if (!state.isSleeping) {
             floatOffset = Math.sin(time * 2) * 0.05;
             lunaGroup.position.y = floatOffset;
-            
-            // Subtle rotation
             lunaGroup.rotation.y = Math.sin(time * 0.5) * 0.1;
-            
-            // Leg swing
+            lunaGroup.rotation.x = 0; 
+            lunaGroup.rotation.z = 0;
             legs.forEach((leg, i) => {
                 leg.position.y = -1 + Math.sin(time * 4 + i) * 0.1;
                 leg.rotation.x = Math.sin(time * 4 + i) * 0.2;
             });
         } else {
-            // Sleeping pose
             lunaGroup.position.y = -0.5;
-            lunaGroup.rotation.z = 0.1; // tilt
-            lunaGroup.rotation.x = 0.2; // nod
+            lunaGroup.rotation.z = 0.2;
+            lunaGroup.rotation.x = 0.2;
         }
 
-        // Jump Logic
         if (isJumping) {
             jumpTime += delta * 5;
             const jumpHeight = Math.sin(jumpTime) * 1.5;
@@ -282,10 +245,6 @@ function animate() {
             }
         }
     }
-
-    // Particles
-    updateParticles();
-
     renderer.render(scene, camera);
 }
 
@@ -293,19 +252,12 @@ function animate() {
 
 function onMouseMove(event) {
     if (state.isSleeping) return;
-    
-    // Normalize mouse
     mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
     mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
-
     checkPetting();
-    
-    // Head tracking (Subtle)
     if (headGroup) {
-        const targetX = mouse.x * 0.5;
-        const targetY = mouse.y * 0.5;
-        headGroup.rotation.y += (targetX - headGroup.rotation.y) * 0.1;
-        headGroup.rotation.x += (targetY - headGroup.rotation.x) * 0.1;
+        headGroup.rotation.y += (mouse.x * 0.5 - headGroup.rotation.y) * 0.1;
+        headGroup.rotation.x += (mouse.y * 0.5 - headGroup.rotation.x) * 0.1;
     }
 }
 
@@ -318,7 +270,6 @@ function onTouchMove(event) {
     }
 }
 
-// "Petting" via Raycasting
 let lastPetTime = 0;
 function checkPetting() {
     raycaster.setFromCamera(mouse, camera);
@@ -326,22 +277,21 @@ function checkPetting() {
 
     if (intersects.length > 0) {
         const now = Date.now();
-        if (now - lastPetTime > 100) { // Limit rate
+        if (now - lastPetTime > 150) { 
             spawnHeart(intersects[0].point);
-            state.love = Math.min(100, state.love + 0.5);
+            state.love = Math.min(100, state.love + 1);
             lastPetTime = now;
             updateUI();
-            
-            // Random jump if loved enough
-            if (Math.random() > 0.95 && !isJumping) {
-                showBubble("Yay! 💗");
+            if (Math.random() > 0.9 && !isJumping) {
+                showBubble("Mäh! 💗");
                 isJumping = true;
             }
+            saveState(); // Debounce this in real app, but ok for now
         }
     }
 }
 
-// --- Drag and Drop Logic ---
+// --- Drag & Drop ---
 
 let draggedItem = null;
 const dragProxy = document.getElementById('dragProxy');
@@ -349,7 +299,6 @@ const dragProxy = document.getElementById('dragProxy');
 window.startDrag = (e, itemType) => {
     e.preventDefault();
     draggedItem = itemType;
-    
     const clientX = e.touches ? e.touches[0].clientX : e.clientX;
     const clientY = e.touches ? e.touches[0].clientY : e.clientY;
     
@@ -376,21 +325,17 @@ function updateDragProxy(x, y) {
 }
 
 function onDragEnd(e) {
-    // Check if dropped near center (approx where Luna is)
     const clientX = e.changedTouches ? e.changedTouches[0].clientX : e.clientX;
     const clientY = e.changedTouches ? e.changedTouches[0].clientY : e.clientY;
+    const w = window.innerWidth; const h = window.innerHeight;
     
-    const width = window.innerWidth;
-    const height = window.innerHeight;
-    
-    // Simple box check for center screen
-    if (clientX > width * 0.3 && clientX < width * 0.7 && clientY > height * 0.2 && clientY < height * 0.7) {
+    // Check drop zone (Center screen)
+    if (clientX > w * 0.3 && clientX < w * 0.7 && clientY > h * 0.2 && clientY < h * 0.7) {
         performAction(draggedItem);
     }
 
     dragProxy.style.display = 'none';
     draggedItem = null;
-    
     document.removeEventListener('mousemove', onDragMove);
     document.removeEventListener('touchmove', onDragMove);
     document.removeEventListener('mouseup', onDragEnd);
@@ -398,52 +343,63 @@ function onDragEnd(e) {
 }
 
 function performAction(item) {
-    if (state.isSleeping && item !== 'star') { // Only star wakes up? Or just shake
-        showBubble("Zzz...");
+    if (state.isSleeping && item !== 'star') {
+        showBubble("Zzz... (Schläft)");
         return;
     }
 
     if (item === 'apple') {
-        state.hunger = Math.min(100, state.hunger + 20);
-        showBubble("Mjam! 🍎");
+        state.hunger = Math.min(100, state.hunger + 15);
+        showBubble("Lecker! 🍎");
         isJumping = true;
     }
     if (item === 'star') {
         state.energy = Math.min(100, state.energy + 20);
-        showBubble("Power! ⚡");
-        // Flash effect
+        showBubble("Wach! ⚡");
         scene.background = new THREE.Color(0x333333);
-        setTimeout(() => scene.background = null, 100);
+        setTimeout(() => scene.background = null, 150);
+        if (state.isSleeping) toggleSleep();
     }
     if (item === 'water') {
-        showBubble("Erfrischend 💧");
         state.hunger = Math.min(100, state.hunger + 5);
+        state.energy = Math.min(100, state.energy + 5);
+        showBubble("Glug glug 💧");
     }
-    
     updateUI();
     saveState();
 }
 
 window.toggleSleep = () => {
     state.isSleeping = !state.isSleeping;
-    if (state.isSleeping) {
-        showBubble("Gute Nacht 🌙");
-        state.energy = 100; // instant recharge logic for demo
-    } else {
-        showBubble("Guten Morgen! ☀️");
-    }
+    showBubble(state.isSleeping ? "Gute Nacht 🌙" : "Guten Morgen ☀️");
     updateUI();
     saveState();
 };
 
-function getItemEmoji(type) {
-    if(type==='apple') return '🍎';
-    if(type==='star') return '🌟';
-    if(type==='water') return '💧';
-    return '📦';
+function getItemEmoji(type) { return type==='apple'?'🍎':type==='star'?'🌟':type==='water'?'💧':'📦'; }
+
+// --- UI Helpers ---
+
+function updateUI() {
+    document.getElementById('bar-love').style.width = state.love + '%';
+    document.getElementById('bar-hunger').style.width = state.hunger + '%';
+    
+    // Determine Mood Text
+    let moodText = "Glücklich";
+    if (state.isSleeping) moodText = "Schläft 🌙";
+    else if (state.hunger < 30) moodText = "Hungrig 🍎";
+    else if (state.energy < 20) moodText = "Müde 😴";
+    else if (state.love < 30) moodText = "Einsam 💔";
+    
+    document.getElementById('status-text').innerText = moodText;
 }
 
-// --- Particles (Hearts) ---
+function showBubble(text) {
+    const b = document.getElementById('speech-bubble');
+    b.innerText = text;
+    b.classList.add('show');
+    setTimeout(() => b.classList.remove('show'), 2000);
+}
 
 function spawnHeart(pos) {
     const div = document.createElement('div');
@@ -451,25 +407,15 @@ function spawnHeart(pos) {
     div.style.position = 'absolute';
     div.style.fontSize = '24px';
     div.style.pointerEvents = 'none';
-    
-    // Project 3D pos to 2D screen
-    const vec = pos.clone();
-    vec.project(camera);
-    const x = (vec.x * .5 + .5) * window.innerWidth;
-    const y = (-(vec.y * .5) + .5) * window.innerHeight;
-    
-    div.style.left = x + 'px';
-    div.style.top = y + 'px';
+    const vec = pos.clone().project(camera);
+    div.style.left = ((vec.x * .5 + .5) * window.innerWidth) + 'px';
+    div.style.top = ((-(vec.y * .5) + .5) * window.innerHeight) + 'px';
     div.style.transition = 'transform 1s, opacity 1s';
-    
     document.body.appendChild(div);
-    
-    // Animate CSS
     setTimeout(() => {
         div.style.transform = `translate(${Math.random()*40-20}px, -100px) scale(1.5)`;
         div.style.opacity = '0';
     }, 50);
-    
     setTimeout(() => div.remove(), 1000);
 }
 

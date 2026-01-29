@@ -1,6 +1,10 @@
 
 import { UserRewardsData, Reward, UserProfile, UserPrefs, Session, AdminConfig, UserIndex, UserIndexItem, DailyState } from '../types';
-import { REWARD_CATALOG, VALENTINE_REWARDS, THEMES } from '../constants';
+import { REWARD_CATALOG, VALENTINE_REWARDS, THEMES, INITIAL_ADMIN_CONFIG as DEFAULT_ADMIN_CONFIG } from '../constants';
+
+export const INITIAL_ADMIN_CONFIG = DEFAULT_ADMIN_CONFIG;
+
+// --- INITIAL STATES (Single Source of Truth) ---
 
 export const INITIAL_REWARDS_DATA: UserRewardsData = {
   version: 2,
@@ -24,7 +28,7 @@ export const INITIAL_REWARDS_DATA: UserRewardsData = {
       "valentine.reward.art": true,
       "valentine.reward.secret": true,
     },
-    completedAt: Date.now() // Standardmäßig abgeschlossen
+    completedAt: Date.now()
   },
   meta: {
     lastSeenAt: Date.now(),
@@ -83,68 +87,49 @@ const normalizeAdminConfigLocal = (config?: AdminConfig | null): AdminConfig => 
     };
 };
 
-// --- Helpers ---
+// --- Types Builders ---
 
-const userKey = (userId: string, suffix: string) => {
-    const prefix = userId === 'guest' ? 'fiaos_guest_' : 'fiaos_user_';
-    return `${prefix}${userId}_${suffix}`;
-}
+export const createDefaultProfile = (session: Session): UserProfile => ({
+    userId: session.userId,
+    role: session.role,
+    displayName: session.name,
+    avatar: { type: 'emoji', value: session.name.charAt(0) },
+    createdAt: Date.now(),
+    updatedAt: Date.now()
+});
 
-// --- Rewards ---
+export const createDefaultDailyState = (userId: string): DailyState => ({
+     lastClaimDateISO: null,
+     streak: 0,
+     totalClaims: 0,
+     points: 0,
+     todaySeed: `${userId}_${new Date().toISOString().split('T')[0]}`,
+     openedToday: false,
+     lastOpenAt: 0
+});
+
+// --- Logic Helpers (Pure Functions) ---
 
 export const getRewardCatalog = (): Reward[] => {
   return REWARD_CATALOG;
 };
 
-// Note: saveUserRewards/loadUserRewards in this file are now legacy/guest-only helpers 
-// or used for initial data structure generation. 
-// The main app logic has moved to cloud.ts / App.tsx integration.
-
-export const saveUserRewards = (userId: string, data: UserRewardsData): void => {
-  try {
-    localStorage.setItem(`fiaos_rewards_${userId}`, JSON.stringify(data));
-  } catch (error) {
-    console.error("Failed to save rewards", error);
-  }
-};
-
-export const loadUserRewards = (userId: string): UserRewardsData => {
-  try {
-    const key = `fiaos_rewards_${userId}`;
-    const stored = localStorage.getItem(key);
-    if (!stored) {
-      const initial = JSON.parse(JSON.stringify(INITIAL_REWARDS_DATA));
-      saveUserRewards(userId, initial);
-      return initial;
-    }
-    const data = JSON.parse(stored) as UserRewardsData;
-    
-    // Auto-migrate valentine to unlocked if missing or old version
-    if (!data.valentine || data.version < 2) {
-      data.valentine = JSON.parse(JSON.stringify(INITIAL_REWARDS_DATA.valentine));
-      data.version = 2;
-      saveUserRewards(userId, data);
-    }
-    return data;
-  } catch (e) {
-    console.error("Failed to load rewards", e);
-    return JSON.parse(JSON.stringify(INITIAL_REWARDS_DATA));
-  }
-};
-
 export const unlockRewardLogic = (currentRewards: UserRewardsData, rewardId: string) => {
-  const data = JSON.parse(JSON.stringify(currentRewards)); // Deep clone
+  // Defensive Copy
+  const data = JSON.parse(JSON.stringify(currentRewards || INITIAL_REWARDS_DATA)); 
   let wasUnlocked = false;
 
-  // Check if it's a valentine reward
+  // Initialize sections if missing (Migration safety)
+  if (!data.rewards) data.rewards = {};
+  if (!data.valentine) data.valentine = { total: 6, unlocked: {}, completedAt: null };
+
+  // Logic
   if (rewardId.startsWith('valentine.')) {
-     if (!data.valentine) data.valentine = { total: 6, unlocked: {}, completedAt: null };
      if (!data.valentine.unlocked[rewardId]) {
         data.valentine.unlocked[rewardId] = true;
         wasUnlocked = true;
      }
   } else {
-     // Regular reward
      if (!data.rewards[rewardId]) {
         data.rewards[rewardId] = { unlocked: true, unlockedAt: Date.now() };
         wasUnlocked = true;
@@ -158,65 +143,16 @@ export const unlockRewardLogic = (currentRewards: UserRewardsData, rewardId: str
   return { updatedData: data, wasUnlocked };
 };
 
-export const setRewardsLastSeen = (userId: string, data: UserRewardsData): UserRewardsData => {
-    const updated = { ...data, meta: { ...data.meta, lastSeenAt: Date.now() } };
-    return updated;
+export const setRewardsLastSeen = (rewards: UserRewardsData): UserRewardsData => {
+    rewards.meta.lastSeenAt = Date.now();
+    return rewards;
 };
 
-export const debugUnlockValentine = (currentRewards: UserRewardsData): UserRewardsData => {
-    const data = JSON.parse(JSON.stringify(currentRewards));
-    VALENTINE_REWARDS.forEach(r => {
-        data.valentine.unlocked[r.id] = true;
-    });
-    return data;
-};
-
-export const debugResetValentine = (currentRewards: UserRewardsData): UserRewardsData => {
-    const data = JSON.parse(JSON.stringify(currentRewards));
-    data.valentine.unlocked = {};
-    return data;
-};
-
-// --- Profile & Prefs ---
-
-export const loadUserProfile = (session: Session): UserProfile => {
-    const key = userKey(session.userId, 'profile');
-    try {
-        const stored = localStorage.getItem(key);
-        if (stored) return JSON.parse(stored);
-    } catch(e) {}
-
-    // Default
-    return {
-        userId: session.userId,
-        role: session.role,
-        displayName: session.name,
-        avatar: { type: 'emoji', value: session.name.charAt(0) },
-        createdAt: Date.now(),
-        updatedAt: Date.now()
-    };
-};
-
-export const loadUserPrefs = (session: Session): UserPrefs => {
-    const key = userKey(session.userId, 'prefs');
-    try {
-        const stored = localStorage.getItem(key);
-        if (stored) return JSON.parse(stored);
-    } catch(e) {}
-
-    return {
-        theme: 'roseGlass',
-        accent: '#818cf8',
-        wallpaper: 'gradient_1',
-        reduceMotion: false,
-        uiDensity: 'cozy',
-        quickstartMode: 'lastApp',
-        quickstartApp: ''
-    };
-};
+// --- UI/Theme Helpers ---
 
 export const applyTheme = (prefs: UserPrefs) => {
-    const theme = THEMES[prefs.theme] || THEMES['roseGlass'];
+    const themeId = prefs?.theme || 'roseGlass';
+    const theme = THEMES[themeId] || THEMES['roseGlass'];
     const root = document.documentElement;
     
     root.setAttribute('data-theme', theme.id);
@@ -228,6 +164,8 @@ export const applyTheme = (prefs: UserPrefs) => {
         root.style.setProperty('--text-dim', theme.colors.textDim);
     }
 };
+
+// --- Local Cache Helpers (Only for UI state that doesn't need cloud persistence) ---
 
 export const saveLastApp = (session: Session, appId: string) => {
     try {
@@ -241,7 +179,37 @@ export const loadLastApp = (session: Session): string | null => {
     } catch(e) { return null; }
 };
 
-// --- Admin ---
+export const loadUserPrefs = (session: Session): UserPrefs => {
+  try {
+    const key = session.role === 'guest' ? 'fiaos_guest_guest_prefs' : `fiaos_user_${session.userId}_prefs`;
+    const stored = localStorage.getItem(key);
+    return stored ? JSON.parse(stored) : INITIAL_USER_PREFS;
+  } catch (error) {
+    return INITIAL_USER_PREFS;
+  }
+};
+
+export const loadUserProfile = (session: Session): UserProfile => {
+  try {
+    const key = session.role === 'guest' ? 'fiaos_guest_guest_profile' : `fiaos_user_${session.userId}_profile`;
+    const stored = localStorage.getItem(key);
+    return stored ? JSON.parse(stored) : createDefaultProfile(session);
+  } catch (error) {
+    return createDefaultProfile(session);
+  }
+};
+
+export const loadDailyState = (userId: string): DailyState => {
+  try {
+    const key = `fiaos_user_${userId}_daily_state`;
+    const stored = localStorage.getItem(key);
+    return stored ? JSON.parse(stored) : createDefaultDailyState(userId);
+  } catch (error) {
+    return createDefaultDailyState(userId);
+  }
+};
+
+// --- Admin Config Loader (Read-Only wrapper) ---
 
 export const loadAdminConfig = (): AdminConfig => {
     try {
@@ -253,6 +221,8 @@ export const loadAdminConfig = (): AdminConfig => {
     } catch(e) {}
     return normalizeAdminConfigLocal(INITIAL_ADMIN_CONFIG);
 };
+
+// --- Search Index Helper ---
 
 export const updateUserIndex = (session: Session, profile: UserProfile) => {
     try {
@@ -277,25 +247,4 @@ export const updateUserIndex = (session: Session, profile: UserProfile) => {
         
         localStorage.setItem(key, JSON.stringify(index));
     } catch(e) {}
-};
-
-// --- Daily ---
-
-export const loadDailyState = (userId: string): DailyState => {
-     try {
-        const key = `${userKey(userId, 'daily_state')}`;
-        const stored = localStorage.getItem(key);
-        if (stored) return JSON.parse(stored);
-     } catch(e) {}
-     
-     const todayISO = new Date().toISOString().split('T')[0];
-     return {
-         lastClaimDateISO: null,
-         streak: 0,
-         totalClaims: 0,
-         points: 0,
-         todaySeed: `${userId}_${todayISO}`,
-         openedToday: false,
-         lastOpenAt: 0
-     };
 };

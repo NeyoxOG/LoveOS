@@ -1,5 +1,5 @@
 
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Session, AppItem } from '../types';
 import { APPS } from '../constants';
 import { motion } from 'framer-motion';
@@ -12,28 +12,16 @@ interface HomeScreenProps {
   onLogout: () => void;
   onAppClick: (app: AppItem) => void;
   onShowToast: (msg: string) => void;
-  onOpenOverlay: (title: string, content: string) => void;
-  onOpenRewards: (tab?: string) => void;
-  onOpenAccountSheet: () => void;
 }
 
-const HomeScreen: React.FC<HomeScreenProps> = ({ 
-  session, 
-  onLogout, 
-  onAppClick, 
-  onShowToast, 
-  onOpenOverlay,
-  onOpenRewards,
-  onOpenAccountSheet
-}) => {
-  const [activeTab, setActiveTab] = useState<'home' | 'apps' | 'achievements' | 'profile'>('home');
+const HomeScreen: React.FC<HomeScreenProps> = ({ session, onLogout, onAppClick }) => {
   const [visibleApps, setVisibleApps] = useState<AppItem[]>(APPS);
   const [activeThemeName, setActiveThemeName] = useState('Rose Glass');
   const containerRef = useRef<HTMLDivElement>(null);
   const appsRef = useRef<HTMLDivElement>(null);
 
-  // Load App Visibility & Badges
   useEffect(() => {
+    // Synchronous load first
     const config = loadAdminConfig();
     const dailyState = loadDailyState(session.userId);
     const prefs = loadUserPrefs(session);
@@ -111,10 +99,7 @@ const HomeScreen: React.FC<HomeScreenProps> = ({
   };
 
   return (
-    <div 
-      ref={containerRef}
-      className="h-full w-full relative z-10 flex flex-col overflow-y-auto overflow-x-hidden no-scrollbar scroll-smooth pb-[calc(8rem+env(safe-area-inset-bottom))]"
-    >
+    <div className="h-full w-full flex flex-col pt-[calc(env(safe-area-inset-top)+20px)] pb-[calc(env(safe-area-inset-bottom)+20px)] px-6 relative z-10">
       
       {/* --- Top Bar (Compact) --- */}
       <header className="px-6 pt-12 pb-6 flex items-start justify-between flex-shrink-0">
@@ -250,114 +235,54 @@ const HomeScreen: React.FC<HomeScreenProps> = ({
         <ClockWidget />
       </div>
 
-      {/* --- App Grid --- */}
-      <div className="flex-1 px-6 py-2" ref={appsRef}>
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-x-6 gap-y-10">
-          {visibleApps.map((app) => {
-            const isValentine = app.id === 'valentine';
-            
-            return (
-              <div key={app.id} className="flex flex-col items-center gap-3">
-                <motion.button
-                  whileTap={{ scale: 0.92 }}
-                  onClick={() => onAppClick(app)}
-                  className={`
-                    relative w-20 h-20 rounded-[1.6rem] flex items-center justify-center text-4xl shadow-lg border-t border-white/20 overflow-visible group
-                    ${isValentine 
-                      ? 'bg-gradient-to-b from-gray-800 to-gray-900 border-white/10' 
-                      : app.status === 'lockedHint'
-                        ? 'bg-gradient-to-b from-gray-800 to-black border-white/5 shadow-indigo-500/20'
-                        : 'bg-gradient-to-b from-white/10 to-white/5 backdrop-blur-md border-white/10 hover:bg-white/15'}
-                  `}
-                >
-                  {/* Badge */}
-                  {app.badge && (
-                      <div className="absolute -top-1 -right-1 w-6 h-6 bg-red-500 rounded-full flex items-center justify-center text-[10px] font-bold border-2 border-black z-20 shadow-sm animate-bounce">
-                          {app.badge}
-                      </div>
-                  )}
-
-                  {/* Icon */}
-                  <span className={`relative z-10 drop-shadow-md transition-transform duration-300 group-hover:scale-110 ${isValentine ? 'scale-90 grayscale-[0.3]' : ''}`}>
-                    {app.icon}
-                  </span>
-
-                  {!isValentine && app.status === 'lockedHint' && (
-                    <div className="absolute inset-0 rounded-[1.6rem] ring-2 ring-indigo-500/20 animate-pulse" />
-                  )}
-                </motion.button>
-                
-                <span className="text-xs font-medium text-white/90 tracking-wide text-center drop-shadow-md">
-                  {app.name}
-                </span>
-              </div>
-            );
-          })}
+      {/* Grid */}
+      <div className="flex-1 overflow-y-auto no-scrollbar pb-24">
+        <div className="grid grid-cols-4 gap-y-8 gap-x-4">
+            {visibleApps.map((app, i) => (
+                <div key={app.id} className="flex flex-col items-center gap-2 group">
+                    <motion.button
+                        initial={{ scale: 0.8, opacity: 0 }}
+                        animate={{ scale: 1, opacity: 1 }}
+                        transition={{ delay: i * 0.03, type: "spring", stiffness: 300, damping: 20 }}
+                        whileTap={{ scale: 0.85 }}
+                        onClick={() => onAppClick(app)}
+                        className={`
+                            relative w-[64px] h-[64px] squircle flex items-center justify-center text-3xl shadow-lg transition-transform
+                            ${app.id === 'valentine' 
+                                ? 'bg-gradient-to-br from-red-600 to-pink-700 shadow-pink-500/20' 
+                                : 'bg-white/10 backdrop-blur-md border border-white/20 hover:bg-white/20'}
+                        `}
+                    >
+                        <span className="filter drop-shadow-sm">{app.icon}</span>
+                    </motion.button>
+                    <span className="text-[11px] font-medium text-white/90 text-center tracking-tight truncate w-full drop-shadow-md">
+                        {app.name}
+                    </span>
+                </div>
+            ))}
         </div>
       </div>
 
-      {/* --- Dock --- */}
-      <div 
-        className="fixed left-6 right-6 z-40"
-        style={{ bottom: 'calc(1.5rem + env(safe-area-inset-bottom))' }}
-      >
-        <div className="bg-black/40 backdrop-blur-2xl border border-white/10 rounded-[2.5rem] h-20 px-6 flex items-center justify-between shadow-2xl relative overflow-hidden">
-           {/* Glass reflection */}
-           <div className="absolute inset-x-0 top-0 h-[1px] bg-gradient-to-r from-transparent via-white/20 to-transparent" />
-
-           <DockItem 
-             icon={<Home className="w-6 h-6" />} 
-             label="Home" 
-             isActive={activeTab === 'home'} 
-             onClick={() => handleDockClick('home')} 
-           />
-           <DockItem 
-             icon={<GridIcon className="w-6 h-6" />} 
-             label="Apps" 
-             isActive={activeTab === 'apps'} 
-             onClick={() => handleDockClick('apps')} 
-           />
-           <DockItem 
-             icon={<Trophy className="w-6 h-6" />} 
-             label="Erfolge" 
-             isActive={activeTab === 'achievements'} 
-             onClick={() => handleDockClick('achievements')} 
-           />
-           <DockItem 
-             icon={<UserIcon className="w-6 h-6" />} 
-             label="Profil" 
-             isActive={activeTab === 'profile'} 
-             onClick={() => handleDockClick('profile')} 
-           />
+      {/* Dock (Fixed Bottom) */}
+      <div className="absolute bottom-8 left-1/2 -translate-x-1/2 w-auto">
+        <div className="bg-white/10 backdrop-blur-2xl border border-white/10 rounded-[2rem] px-6 h-[70px] flex items-center gap-6 shadow-2xl">
+            {/* Dock Items - Simplified for robustness */}
+            <DockIcon icon={<Grid size={24} />} onClick={() => {}} active />
         </div>
       </div>
     </div>
   );
 };
 
-const DockItem: React.FC<{ 
-  icon: React.ReactNode, 
-  label: string, 
-  isActive: boolean, 
-  onClick: () => void 
-}> = ({ icon, label, isActive, onClick }) => {
-  return (
-    <motion.button
-      whileTap={{ scale: 0.8, y: 2 }}
-      onClick={onClick}
-      className={`flex flex-col items-center gap-1.5 w-14 transition-colors ${isActive ? 'text-white' : 'text-white/40 hover:text-white/60'}`}
+const DockIcon = ({ icon, onClick, active }: any) => (
+    <motion.button 
+        whileTap={{ scale: 0.8 }} 
+        className={`p-3 rounded-2xl transition-colors ${active ? 'bg-white/20 text-white' : 'text-white/60'}`}
+        onClick={onClick}
     >
-      <div className="relative">
         {icon}
-        {isActive && (
-          <motion.div 
-            layoutId="dock-dot"
-            className="absolute -bottom-3 left-1/2 -translate-x-1/2 w-1 h-1 bg-white rounded-full shadow-[0_0_8px_white]"
-          />
-        )}
-      </div>
     </motion.button>
-  );
-};
+);
 
 export default HomeScreen;
+    

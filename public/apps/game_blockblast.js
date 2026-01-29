@@ -9,7 +9,6 @@ const KEYS = { SESSION: 'fiaos_session', USER_GAMES: 'fiaos_user_' };
 // Config
 const ROWS = 10;
 const COLS = 10;
-const CELL_SIZE = 30; // Visual logic size reference (css uses flex/grid)
 
 // Colors for blocks
 const COLORS = [
@@ -70,6 +69,11 @@ function init() {
     document.addEventListener('touchend', handleDragEnd);
     document.addEventListener('mousemove', handleDragMove);
     document.addEventListener('mouseup', handleDragEnd);
+    
+    // Escape
+    window.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape') window.history.back();
+    });
 }
 
 function initGrid() {
@@ -90,7 +94,8 @@ function initGrid() {
 
 function loadStats() {
     if (!user) return;
-    const key = `${KEYS.USER_GAMES}${user.id}_games`;
+    // Fix: user.userId
+    const key = `${KEYS.USER_GAMES}${user.userId}_games`;
     const data = JSON.parse(localStorage.getItem(key) || '{}');
     state.best = data.blockblast?.best || 0;
     document.getElementById('best').innerText = state.best;
@@ -170,6 +175,11 @@ function handleDragStart(e) {
     
     const touch = e.touches ? e.touches[0] : e;
     
+    // Calculate Cell Size dynamically based on current grid width
+    const gridEl = document.getElementById('grid');
+    const cellRect = gridEl.children[0].getBoundingClientRect();
+    const draggedCellSize = cellRect.width; 
+
     // Create floating clone
     const clone = target.cloneNode(true);
     clone.classList.add('dragging');
@@ -190,8 +200,6 @@ function handleDragStart(e) {
     });
 
     document.body.appendChild(clone);
-    
-    // Hide original
     target.style.opacity = '0';
 
     dragInfo = {
@@ -202,7 +210,7 @@ function handleDragStart(e) {
         width: cols * cellSize,
         height: rows * cellSize,
         offsetX: 0,
-        offsetY: -50 // lift slightly above finger
+        offsetY: -50 
     };
 
     updateDragPosition(touch.clientX, touch.clientY);
@@ -214,25 +222,16 @@ function handleDragMove(e) {
     const touch = e.touches ? e.touches[0] : e;
     updateDragPosition(touch.clientX, touch.clientY);
     
-    // Snapping / Preview
     const gridRect = document.getElementById('grid').getBoundingClientRect();
     const cellW = gridRect.width / COLS;
     const cellH = gridRect.height / ROWS;
     
-    // Calculate grid coords relative to top-left of dragged piece
-    // Center the piece under finger? Or finger is top-left?
-    // Let's assume finger is center of piece.
     const ptrX = touch.clientX;
     const ptrY = touch.clientY + dragInfo.offsetY;
     
-    // Top-left of piece in grid space
-    // Let's try to map the piece's center to grid center
-    const pieceCX = ptrX;
-    const pieceCY = ptrY;
-    
-    // Col/Row under center
-    const c = Math.round((pieceCX - gridRect.left - (dragInfo.width/2)) / cellW);
-    const r = Math.round((pieceCY - gridRect.top - (dragInfo.height/2)) / cellH);
+    // Map center of piece to grid
+    const c = Math.round((ptrX - gridRect.left - (dragInfo.width/2)) / cellW);
+    const r = Math.round((ptrY - gridRect.top - (dragInfo.height/2)) / cellH);
     
     clearPreview();
     
@@ -251,18 +250,16 @@ function handleDragEnd(e) {
     
     if (validPos) {
         placePiece(piece, validPos.r, validPos.c);
-        state.tray[slotIdx] = null; // Remove from tray
+        state.tray[slotIdx] = null;
         clone.remove();
-        element.remove(); // Remove original from DOM
+        element.remove();
         
-        // Refill if empty
         if (state.tray.every(p => p === null)) {
             fillTray();
         } else {
             checkGameOver();
         }
     } else {
-        // Return to tray animation could go here
         clone.remove();
         element.style.opacity = '1';
     }
@@ -273,7 +270,6 @@ function handleDragEnd(e) {
 
 function updateDragPosition(x, y) {
     if (dragInfo && dragInfo.clone) {
-        // Center the clone on finger
         dragInfo.clone.style.left = (x - dragInfo.width/2) + 'px';
         dragInfo.clone.style.top = (y + dragInfo.offsetY - dragInfo.height/2) + 'px';
     }
@@ -284,13 +280,11 @@ function updateDragPosition(x, y) {
 function isValidPlacement(shape, r, c) {
     const rows = shape.length;
     const cols = shape[0].length;
-    
     for(let i=0; i<rows; i++) {
         for(let j=0; j<cols; j++) {
             if (shape[i][j]) {
                 const gridR = r + i;
                 const gridC = c + j;
-                
                 if (gridR < 0 || gridR >= ROWS || gridC < 0 || gridC >= COLS) return false;
                 if (state.grid[gridR][gridC] !== null) return false;
             }
@@ -302,7 +296,6 @@ function isValidPlacement(shape, r, c) {
 function showPreview(shape, r, c) {
     const rows = shape.length;
     const cols = shape[0].length;
-    
     for(let i=0; i<rows; i++) {
         for(let j=0; j<cols; j++) {
             if (shape[i][j]) {
@@ -322,7 +315,6 @@ function placePiece(piece, r, c) {
     const cols = piece.shape[0].length;
     let placedCount = 0;
 
-    // 1. Commit to grid
     for(let i=0; i<rows; i++) {
         for(let j=0; j<cols; j++) {
             if (piece.shape[i][j]) {
@@ -331,25 +323,18 @@ function placePiece(piece, r, c) {
             }
         }
     }
-    
-    // 2. Score Placement
     state.score += placedCount * 10;
-    
     renderGrid();
-    
-    // 3. Check Lines
-    setTimeout(checkLines, 50); // slight delay for visual sync
+    setTimeout(checkLines, 50);
 }
 
 function checkLines() {
     let rowsToClear = [];
     let colsToClear = [];
     
-    // Rows
     for(let r=0; r<ROWS; r++) {
         if (state.grid[r].every(cell => cell !== null)) rowsToClear.push(r);
     }
-    // Cols
     for(let c=0; c<COLS; c++) {
         let full = true;
         for(let r=0; r<ROWS; r++) {
@@ -361,20 +346,16 @@ function checkLines() {
     const totalLines = rowsToClear.length + colsToClear.length;
     
     if (totalLines > 0) {
-        // Animation & Score
-        let multiplier = totalLines; // 1x, 2x, 3x...
+        let multiplier = totalLines;
         if (totalLines > 2) showCombo(totalLines);
         
         state.score += totalLines * 100 * multiplier;
         
-        // Trigger Clear
         rowsToClear.forEach(r => clearRow(r));
         colsToClear.forEach(c => clearCol(c));
         
-        // Sound/Haptic hook
         if (navigator.vibrate) navigator.vibrate(10 * totalLines);
         
-        // Update Grid Data after anim
         setTimeout(() => {
             rowsToClear.forEach(r => { for(let c=0; c<COLS; c++) state.grid[r][c] = null; });
             colsToClear.forEach(c => { for(let r=0; r<ROWS; r++) state.grid[r][c] = null; });
@@ -404,7 +385,7 @@ function renderGrid() {
     for(let r=0; r<ROWS; r++) {
         for(let c=0; c<COLS; c++) {
             const cell = document.querySelector(`.cell[data-r="${r}"][data-c="${c}"]`);
-            cell.className = 'cell'; // reset
+            cell.className = 'cell';
             if (state.grid[r][c]) {
                 cell.classList.add('filled');
                 cell.style.background = state.grid[r][c];
@@ -416,20 +397,14 @@ function renderGrid() {
 }
 
 function checkGameOver() {
-    // If tray has items, check if ANY fit
-    let canMove = false;
-    
-    // Filter non-null pieces
     const pieces = state.tray.filter(p => p !== null);
-    if (pieces.length === 0) return; // Wait for refill logic
+    if (pieces.length === 0) return;
     
+    let canMove = false;
     for (let p of pieces) {
         for(let r=0; r<ROWS; r++) {
             for(let c=0; c<COLS; c++) {
-                if (isValidPlacement(p.shape, r, c)) {
-                    canMove = true;
-                    break;
-                }
+                if (isValidPlacement(p.shape, r, c)) { canMove = true; break; }
             }
             if(canMove) break;
         }
@@ -453,12 +428,8 @@ function showCombo(count) {
     el.innerText = `Combo x${count}!`;
     el.classList.add('show');
     setTimeout(() => el.classList.remove('show'), 1000);
-    
-    // Achieve
     if (count >= 3) unlock('games.block.combo');
 }
-
-// --- Data ---
 
 function checkAchievements() {
     if (state.score >= 500) unlock('games.block.starter');
@@ -466,9 +437,7 @@ function checkAchievements() {
 }
 
 function unlock(id) {
-    if (window.parent.FIAOS_EVENTS) {
-        window.parent.FIAOS_EVENTS.emit('games.unlock', { id });
-    }
+    if (window.parent.FIAOS_EVENTS) window.parent.FIAOS_EVENTS.emit('games.unlock', { id });
 }
 
 function saveScore() {
@@ -477,7 +446,8 @@ function saveScore() {
 
     if (!user) return;
     
-    const uKey = `${KEYS.USER_GAMES}${user.id}_games`;
+    // Fix: user.userId
+    const uKey = `${KEYS.USER_GAMES}${user.userId}_games`;
     let uData = JSON.parse(localStorage.getItem(uKey) || '{}');
     if (!uData.blockblast) uData.blockblast = { best: 0, plays: 0 };
     
@@ -486,11 +456,7 @@ function saveScore() {
     if (state.score > uData.blockblast.best) uData.blockblast.best = state.score;
     
     localStorage.setItem(uKey, JSON.stringify(uData));
-
-    // Cloud
-    if (cloud) {
-        cloud.saveHighscore('blockblast', state.score);
-    }
+    if (cloud) cloud.saveHighscore('blockblast', state.score);
 }
 
 window.restartGame = startRound;

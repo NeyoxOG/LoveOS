@@ -29,6 +29,14 @@
             user-select: none;
         }
 
+        /* Animated Background */
+        .bg-mesh {
+            position: absolute; inset: 0; z-index: -1;
+            background: radial-gradient(circle at 0% 0%, #2e1065 0%, transparent 50%),
+                        radial-gradient(circle at 100% 100%, #be185d 0%, transparent 50%);
+            opacity: 0.4;
+        }
+
         /* Top Bar */
         .topbar {
             padding: 16px 20px;
@@ -76,6 +84,10 @@
             padding: 12px 16px;
             background: rgba(12, 12, 20, 0.6);
         }
+        .refresh-btn:active { transform: scale(0.9); background: rgba(255,255,255,0.2); }
+
+        /* Tabs */
+        .tabs-wrapper { padding: 0 24px; margin-top: 16px; margin-bottom: 8px; flex-shrink: 0; }
         .segmented-control {
             background: rgba(255, 255, 255, 0.08);
             border-radius: 9px;
@@ -84,15 +96,11 @@
             position: relative;
         }
         .segment-btn {
-            flex: 1;
-            padding: 6px 0;
-            text-align: center;
-            font-size: 13px;
-            font-weight: 500;
-            color: #fff;
-            z-index: 2;
-            cursor: pointer;
+            flex: 1; padding: 8px 0; text-align: center;
+            font-size: 14px; font-weight: 600; color: #fff;
+            z-index: 2; cursor: pointer; opacity: 0.8; transition: opacity 0.2s;
         }
+        .segment-btn.active { opacity: 1; }
         .segment-indicator {
             position: absolute;
             top: 2px; bottom: 2px;
@@ -104,19 +112,38 @@
             z-index: 1;
         }
 
-        /* Content */
+        /* Scroll Content */
         .content {
-            flex: 1;
-            overflow-y: auto;
-            padding: 20px;
-            padding-bottom: 80px;
-            display: flex;
-            flex-direction: column;
-            gap: 20px;
+            flex: 1; overflow-y: auto; padding: 20px 24px;
+            padding-bottom: 100px;
+            display: flex; flex-direction: column; gap: 24px;
         }
-        .hidden { display: none; }
+        .hidden { display: none !important; }
 
-        /* Game Cards */
+        /* Hero Banner */
+        .hero {
+            background: linear-gradient(135deg, #ec4899, #8b5cf6);
+            border-radius: 24px; padding: 24px;
+            position: relative; overflow: hidden;
+            box-shadow: 0 10px 30px rgba(236, 72, 153, 0.3);
+            display: flex; align-items: center; justify-content: space-between;
+        }
+        .hero-text { position: relative; z-index: 2; }
+        .hero h2 { margin: 0; font-size: 22px; font-weight: 800; }
+        .hero p { margin: 4px 0 0 0; font-size: 13px; opacity: 0.9; font-weight: 500; }
+        .hero-icon { font-size: 60px; filter: drop-shadow(0 10px 20px rgba(0,0,0,0.3)); transform: rotate(10deg); }
+        .hero-bg {
+            position: absolute; inset: 0; 
+            background: url("data:image/svg+xml,%3Csvg width='40' height='40' viewBox='0 0 40 40' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='%23ffffff' fill-opacity='0.1' fill-rule='evenodd'%3E%3Cpath d='M0 40L40 0H20L0 20M40 40V20L20 40'/%3E%3C/g%3E%3C/svg%3E");
+            z-index: 1;
+        }
+
+        /* Grid Layout */
+        .games-grid {
+            display: grid; grid-template-columns: 1fr 1fr; gap: 16px;
+        }
+
+        /* Game Card */
         .game-card {
             background: var(--bg-card);
             border-radius: 20px;
@@ -136,6 +163,8 @@
             background: linear-gradient(135deg, #333, #000);
             position: relative;
             display: flex; align-items: center; justify-content: center;
+            font-size: 48px;
+            background: radial-gradient(circle at center, rgba(255,255,255,0.1), transparent);
         }
         .card-header::after {
             content: '';
@@ -159,9 +188,33 @@
         .play-btn {
             background: #fff; color: #000; border: none; padding: 6px 14px; border-radius: 999px; font-size: 13px; font-weight: 700; cursor: pointer;
         }
+        .game-name { font-size: 15px; font-weight: 700; margin-bottom: 2px; }
+        .game-score { 
+            font-size: 11px; font-weight: 600; color: #fbbf24; 
+            background: rgba(0,0,0,0.4); padding: 2px 8px; border-radius: 10px;
+            display: inline-block; backdrop-filter: blur(4px);
+        }
 
-        /* Leaderboard */
-        .lb-item {
+        /* Specific Gradients */
+        .g-stack { background: linear-gradient(135deg, #be185d, #fb7185); }
+        .g-reaction { background: linear-gradient(135deg, #7c3aed, #a78bfa); }
+        .g-block { background: linear-gradient(135deg, #2563eb, #60a5fa); }
+        .g-puzzle { background: linear-gradient(135deg, #059669, #34d399); }
+        .g-snake { background: linear-gradient(135deg, #16a34a, #4ade80); }
+        .g-flappy { background: linear-gradient(135deg, #0891b2, #22d3ee); }
+
+        /* Leaderboard Styles */
+        .lb-container { display: flex; flex-direction: column; gap: 24px; }
+        .lb-section h3 { 
+            font-size: 14px; text-transform: uppercase; color: var(--text-dim); 
+            margin: 0 0 12px 4px; letter-spacing: 1px; 
+        }
+        
+        .lb-list {
+            background: var(--glass); border-radius: 20px;
+            border: 1px solid var(--card-border); overflow: hidden;
+        }
+        .lb-row {
             display: flex; align-items: center; justify-content: space-between;
             padding: 12px;
             background: rgba(255,255,255,0.08);
@@ -169,8 +222,18 @@
             margin-bottom: 8px;
             font-size: 14px;
         }
-        .lb-rank { width: 24px; font-weight: 700; color: var(--text-dim); }
-        .lb-score { font-weight: 600; color: var(--primary); }
+        .lb-row:last-child { border-bottom: none; }
+        
+        .lb-rank { 
+            width: 28px; font-weight: 800; font-size: 14px; 
+            color: var(--text-dim); text-align: center; 
+        }
+        .lb-rank.top-1 { color: #fbbf24; font-size: 18px; }
+        .lb-rank.top-2 { color: #94a3b8; font-size: 16px; }
+        .lb-rank.top-3 { color: #b45309; font-size: 16px; }
+
+        .lb-user { font-weight: 600; font-size: 15px; flex: 1; margin-left: 12px; }
+        .lb-val { font-family: monospace; font-weight: 700; color: #ec4899; font-size: 15px; }
 
         .lb-section { margin-bottom: 30px; }
         .lb-title { font-size: 14px; font-weight: 600; color: var(--text-dim); margin-bottom: 10px; text-transform: uppercase; letter-spacing: 0.5px; }
@@ -198,6 +261,8 @@
 </head>
 <body>
 
+    <div class="bg-mesh"></div>
+
     <div class="topbar">
         <div class="subtitle">Game Hub</div>
         <div class="title">Arcade 💗</div>
@@ -207,31 +272,26 @@
         </div>
     </div>
 
-    <div class="tabs-container">
+    <div class="tabs-wrapper">
         <div class="segmented-control">
             <div class="segment-indicator" id="segIndicator"></div>
-            <div class="segment-btn" onclick="switchTab('games', 0)">Games</div>
-            <div class="segment-btn" onclick="switchTab('stats', 1)">Leaderboard</div>
+            <div class="segment-btn active" onclick="switchTab('games', 0)">Spiele</div>
+            <div class="segment-btn" onclick="switchTab('stats', 1)">Rangliste</div>
         </div>
     </div>
 
     <div class="content">
         
         <!-- GAMES TAB -->
-        <div id="tab-games">
+        <div id="tab-games" class="tab-content">
             
-            <div class="game-card" onclick="playGame('stack')">
-                <div class="card-header" style="background: linear-gradient(135deg, #ec4899, #db2777);">
-                    <div class="card-icon">🧱</div>
+            <div class="hero">
+                <div class="hero-bg"></div>
+                <div class="hero-text">
+                    <h2>Game of the Day</h2>
+                    <p>Fordere deine Reflexe heraus!</p>
                 </div>
-                <div class="card-body">
-                    <div class="game-title">Hearts Stack</div>
-                    <div class="game-desc">Staple Herzen so hoch du kannst. Timing ist alles!</div>
-                    <div class="game-meta">
-                        <span class="score-badge" id="best-stack">Best: 0</span>
-                        <button class="play-btn">SPIELEN</button>
-                    </div>
-                </div>
+                <div class="hero-icon">⚡</div>
             </div>
 
             <div class="game-card" onclick="playGame('reaction')">
@@ -246,64 +306,48 @@
                         <button class="play-btn">SPIELEN</button>
                     </div>
                 </div>
-            </div>
 
-            <div class="game-card" onclick="playGame('blockblast')">
-                <div class="card-header" style="background: linear-gradient(135deg, #2563eb, #3b82f6);">
-                    <div class="card-icon">🟦</div>
-                </div>
-                <div class="card-body">
-                    <div class="game-title">BlockBlast</div>
-                    <div class="game-desc">Block Puzzle. Entspannend & Süchtig.</div>
-                    <div class="game-meta">
-                        <span class="score-badge" id="best-blockblast">Best: 0</span>
-                        <button class="play-btn">SPIELEN</button>
+                <div class="game-card g-reaction" onclick="playGame('reaction')">
+                    <div class="card-visual">⏱️</div>
+                    <div class="card-meta">
+                        <div class="game-name">Precision</div>
+                        <div class="game-score" id="best-reaction">Best: 0</div>
                     </div>
                 </div>
-            </div>
 
-            <div class="game-card" onclick="playGame('puzzle')">
-                <div class="card-header" style="background: linear-gradient(135deg, #10b981, #059669);">
-                    <div class="card-icon">🧩</div>
-                </div>
-                <div class="card-body">
-                    <div class="game-title">Slider Puzzle</div>
-                    <div class="game-desc">Klassisches Schiebe-Puzzle. Löse es schnell!</div>
-                    <div class="game-meta">
-                        <span class="score-badge" id="best-puzzle">Best: --</span>
-                        <button class="play-btn">SPIELEN</button>
+                <div class="game-card g-block" onclick="playGame('blockblast')">
+                    <div class="card-visual">🟦</div>
+                    <div class="card-meta">
+                        <div class="game-name">BlockBlast</div>
+                        <div class="game-score" id="best-blockblast">Best: 0</div>
                     </div>
                 </div>
-            </div>
 
-            <div class="game-card" onclick="playGame('snake')">
-                <div class="card-header" style="background: linear-gradient(135deg, #22c55e, #15803d);">
-                    <div class="card-icon">🐍</div>
-                </div>
-                <div class="card-body">
-                    <div class="game-title">Snake v2</div>
-                    <div class="game-desc">Upgrade: Gegner + Swipe + LoveOS Design</div>
-                    <div class="game-meta">
-                        <span class="score-badge" id="best-snake">Best: 0</span>
-                        <button class="play-btn">SPIELEN</button>
+                <div class="game-card g-snake" onclick="playGame('snake')">
+                    <div class="card-visual">🐍</div>
+                    <div class="card-meta">
+                        <div class="game-name">Snake v2</div>
+                        <div class="game-score" id="best-snake">Best: 0</div>
                     </div>
                 </div>
-            </div>
 
-            <div class="game-card" onclick="playGame('flappy')">
-                <div class="card-header" style="background: linear-gradient(135deg, #60a5fa, #3b82f6);">
-                    <div class="card-icon">🐦</div>
-                </div>
-                <div class="card-body">
-                    <div class="game-title">Flappy Love</div>
-                    <div class="game-desc">Tap & Fly. Berühre nicht die Röhren!</div>
-                    <div class="game-meta">
-                        <span class="score-badge" id="best-flappy">Best: 0</span>
-                        <button class="play-btn">SPIELEN</button>
+                <div class="game-card g-flappy" onclick="playGame('flappy')">
+                    <div class="card-visual">🐦</div>
+                    <div class="card-meta">
+                        <div class="game-name">Flappy</div>
+                        <div class="game-score" id="best-flappy">Best: 0</div>
                     </div>
                 </div>
-            </div>
 
+                <div class="game-card g-puzzle" onclick="playGame('puzzle')">
+                    <div class="card-visual">🧩</div>
+                    <div class="card-meta">
+                        <div class="game-name">Puzzle</div>
+                        <div class="game-score" id="best-puzzle">Best: --</div>
+                    </div>
+                </div>
+
+            </div>
         </div>
 
         <!-- STATS TAB -->

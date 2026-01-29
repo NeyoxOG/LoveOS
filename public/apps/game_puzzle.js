@@ -1,7 +1,8 @@
+
 const KEYS = { SESSION: 'fiaos_session', USER_GAMES: 'fiaos_user_', GLOBAL_ARCADE: 'fiaos_global_arcade' };
 
 let user = null;
-let board = [1,2,3,4,5,6,7,8,0]; // 0 is empty
+let board = [1,2,3,4,5,6,7,8,0]; 
 let startTime = 0;
 let timerInterval = null;
 let isPlaying = false;
@@ -13,18 +14,19 @@ function init() {
     user.id = user.id || user.userId;
 
     render();
+    
+    window.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape') window.history.back();
+    });
 }
 
 function render() {
     const container = document.getElementById('board');
     container.innerHTML = '';
-    
-    // Grid 3x3. Gap ~5px. Tile 90px.
-    // offsets: 5, 105, 205
     const positions = [5, 105, 205];
 
     board.forEach((val, idx) => {
-        if (val === 0) return; // Empty tile
+        if (val === 0) return; 
 
         const r = Math.floor(idx / 3);
         const c = idx % 3;
@@ -34,7 +36,6 @@ function render() {
         el.style.transform = `translate(${positions[c]}px, ${positions[r]}px)`;
         el.innerText = val;
         
-        // Correct position highlight (optional)
         if (val === idx + 1) el.classList.add('correct');
         
         el.onclick = () => move(idx);
@@ -52,10 +53,8 @@ function move(idx) {
     const er = Math.floor(emptyIdx / 3);
     const ec = emptyIdx % 3;
     
-    // Check adjacency
     const dist = Math.abs(r - er) + Math.abs(c - ec);
     if (dist === 1) {
-        // Swap
         [board[idx], board[emptyIdx]] = [board[emptyIdx], board[idx]];
         render();
         checkWin();
@@ -74,7 +73,6 @@ function checkWin() {
 function shuffle() {
     document.getElementById('winScreen').classList.remove('active');
     
-    // Valid shuffle logic: perform random valid moves
     let currEmpty = 8;
     board = [1,2,3,4,5,6,7,8,0];
     
@@ -82,7 +80,6 @@ function shuffle() {
         const er = Math.floor(currEmpty / 3);
         const ec = currEmpty % 3;
         const neighbors = [];
-        
         if (er > 0) neighbors.push(currEmpty - 3);
         if (er < 2) neighbors.push(currEmpty + 3);
         if (ec > 0) neighbors.push(currEmpty - 1);
@@ -120,14 +117,13 @@ function gameOver() {
 }
 
 function unlock(id) {
-    if (window.parent.FIAOS_EVENTS) {
-        window.parent.FIAOS_EVENTS.emit('games.unlock', { id });
-    }
+    if (window.parent.FIAOS_EVENTS) window.parent.FIAOS_EVENTS.emit('games.unlock', { id });
 }
 
 function saveData(timeMs) {
     if (!user) return;
-    const uKey = `${KEYS.USER_GAMES}${user.id}_games`;
+    // Fix: user.userId
+    const uKey = `${KEYS.USER_GAMES}${user.userId}_games`;
     let uData = JSON.parse(localStorage.getItem(uKey) || '{}');
     if (!uData.puzzle) uData.puzzle = { bestTimeMs: null, plays: 0 };
     
@@ -138,10 +134,9 @@ function saveData(timeMs) {
     
     localStorage.setItem(uKey, JSON.stringify(uData));
 
-    // Global (Ascending sort for time)
     const gKey = KEYS.GLOBAL_ARCADE;
     let gData = JSON.parse(localStorage.getItem(gKey) || '{"puzzle":[]}');
-    gData.puzzle.push({ userId: user.id, name: user.name, score: timeMs, date: Date.now() });
+    gData.puzzle.push({ userId: user.userId, name: user.name, score: timeMs, date: Date.now() });
     gData.puzzle.sort((a,b) => a.score - b.score);
     gData.puzzle = gData.puzzle.slice(0, 10);
     localStorage.setItem(gKey, JSON.stringify(gData));

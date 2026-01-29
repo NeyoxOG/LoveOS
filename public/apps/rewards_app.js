@@ -72,7 +72,8 @@ async function loadData() {
     if (cloud) {
         rewardsData = await cloud.loadRewards();
     } else {
-        rewardsData = JSON.parse(localStorage.getItem(user.role === 'guest' ? 'fiaos_rewards_guest' : `fiaos_rewards_${user.id}`));
+        // Fix: user.userId
+        rewardsData = JSON.parse(localStorage.getItem(user.role === 'guest' ? 'fiaos_rewards_guest' : `fiaos_rewards_${user.userId}`));
     }
     
     // Points (from meta or daily state)
@@ -238,7 +239,8 @@ window.redeem = async (id) => {
     if (cloud) {
         await cloud.saveRewards(rewardsData);
     } else {
-        localStorage.setItem(user.role === 'guest' ? 'fiaos_rewards_guest' : `fiaos_rewards_${user.id}`, JSON.stringify(rewardsData));
+        // Fix: user.userId
+        localStorage.setItem(user.role === 'guest' ? 'fiaos_rewards_guest' : `fiaos_rewards_${user.userId}`, JSON.stringify(rewardsData));
     }
 
     // Handle Theme Unlock Payload

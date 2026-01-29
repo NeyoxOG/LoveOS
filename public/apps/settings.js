@@ -16,13 +16,12 @@ const PROFILE_KEY = (uid) => {
 let user = null;
 let prefs = {};
 let profile = {};
-let rewards = null; // New: Load rewards to check locks
+let rewards = null; 
 let cloud = null;
 
-// Emojis for Avatar Picker
 const AVATAR_EMOJIS = ["👽", "🦊", "🐱", "🐶", "🦁", "🐯", "🐨", "🐼", "🐻", "🐰", "🐹", "🐭", "🦄", "🦋", "🍄", "🌺", "🌸", "🌼", "⚡", "🔥", "💧", "❄️", "🌟", "🌙", "🌍", "🪐", "🍕", "🍔", "🍟", "🍩"];
 
-// Themes Defs (Visual) - Exact match with constants.ts
+// Exact copy of THEMES from constants.ts for accurate preview
 const THEMES_UI = [
     { id: 'roseGlass', name: 'Rose Glass', preview: 'radial-gradient(circle at top, rgba(236, 72, 153, 0.25), transparent 55%), linear-gradient(145deg, #1b0f2f 0%, #0a0615 55%, #05030d 100%)', unlockRewardId: null },
     { id: 'aurora', name: 'Aurora Drift', preview: 'radial-gradient(circle at top right, rgba(56, 189, 248, 0.45), transparent 60%), radial-gradient(circle at left, rgba(14, 165, 233, 0.25), transparent 50%), linear-gradient(140deg, #0b1023 0%, #111827 45%, #0f172a 100%)', unlockRewardId: 'reward.welcomeTheme' },
@@ -50,7 +49,9 @@ function init() {
 }
 
 async function loadEverything() {
-    // 1. Prefs & Profile & Rewards
+    // Fix: user.userId
+    const uid = user.userId;
+    
     if (user.role === 'guest') {
         const pStr = localStorage.getItem(PREFS_KEY('guest'));
         prefs = pStr ? JSON.parse(pStr) : defaultPrefs();
@@ -70,14 +71,13 @@ async function loadEverything() {
 
             rewards = await cloud.loadRewards();
         } else {
-            // Local fallback for non-guest (unlikely but safe)
-            const pStr = localStorage.getItem(PREFS_KEY(user.id));
+            const pStr = localStorage.getItem(PREFS_KEY(uid));
             prefs = pStr ? JSON.parse(pStr) : defaultPrefs();
             
-            const profStr = localStorage.getItem(PROFILE_KEY(user.id));
+            const profStr = localStorage.getItem(PROFILE_KEY(uid));
             profile = profStr ? JSON.parse(profStr) : defaultProfile();
             
-            const rewStr = localStorage.getItem(`fiaos_rewards_${user.id}`);
+            const rewStr = localStorage.getItem(`fiaos_rewards_${uid}`);
             rewards = rewStr ? JSON.parse(rewStr) : null;
         }
     }
@@ -99,7 +99,7 @@ function defaultPrefs() {
 
 function defaultProfile() {
     return {
-        userId: user.id,
+        userId: user.userId, // Fix
         role: user.role,
         displayName: user.name,
         avatar: { type: 'emoji', value: user.name.charAt(0) },
@@ -108,17 +108,12 @@ function defaultProfile() {
     };
 }
 
-// --- Render ---
-
 function renderUI() {
-    // Profile
     document.getElementById('avatarDisplay').innerText = profile.avatar?.value || '👤';
     document.getElementById('nameInput').value = profile.displayName || user.name;
 
-    // Themes
     const tList = document.getElementById('themeList');
     tList.innerHTML = THEMES_UI.map(t => {
-        // Unlock check
         const isUnlocked = !t.unlockRewardId || 
                            (rewards?.rewards?.[t.unlockRewardId]?.unlocked) || 
                            (rewards?.valentine?.unlocked?.[t.unlockRewardId]);
@@ -136,16 +131,13 @@ function renderUI() {
         </div>
     `}).join('');
 
-    // Custom Upload Visibility
     const uploadDiv = document.getElementById('customUpload');
     if (prefs.theme === 'custom') uploadDiv.classList.add('visible');
     else uploadDiv.classList.remove('visible');
 
-    // Behavior
     const tog = document.getElementById('toggleMotion');
     if (prefs.reduceMotion) tog.classList.add('active'); else tog.classList.remove('active');
 
-    // Quickstart
     const sel = document.getElementById('quickstartSelect');
     const label = document.getElementById('quickstartVal');
     
@@ -154,9 +146,11 @@ function renderUI() {
         label.innerText = "Zuletzt geöffnet";
     } else {
         sel.value = prefs.quickstartApp || 'luna';
-        // Need to wait for DOM or just use logic
-        const opt = sel.querySelector(`option[value="${sel.value}"]`);
-        label.innerText = opt ? opt.innerText : "App";
+        // Wait for DOM
+        setTimeout(() => {
+            const opt = sel.querySelector(`option[value="${sel.value}"]`);
+            if(opt) label.innerText = opt.innerText;
+        }, 0);
     }
 }
 
@@ -178,8 +172,6 @@ function updateStatus() {
         txt.innerText = "Offline";
     }
 }
-
-// --- Actions ---
 
 window.saveProfile = async () => {
     const name = document.getElementById('nameInput').value.trim();
@@ -211,7 +203,7 @@ window.uploadWallpaper = () => {
                 alert("Bild gespeichert! (Nur dieses Gerät)");
                 applyPrefs(); 
             } catch(err) {
-                alert("Bild zu groß für Speicher! Bitte kleineres Bild wählen.");
+                alert("Bild zu groß für Speicher!");
             }
         };
         reader.readAsDataURL(input.files[0]);
@@ -237,20 +229,15 @@ window.saveQuickstart = () => {
 
 async function applyPrefs() {
     renderUI();
-    
     if (window.parent.FIAOS_APPLY_PREFS) {
-        // Send a deep copy to ensure React state update works
         window.parent.FIAOS_APPLY_PREFS(JSON.parse(JSON.stringify(prefs)));
     }
-
     if (user.role === 'guest') {
         localStorage.setItem(PREFS_KEY('guest'), JSON.stringify(prefs));
     } else if (cloud) {
         await cloud.savePrefs(prefs);
     }
 }
-
-// --- Emoji Picker ---
 
 window.openEmojiPicker = () => {
     const grid = document.getElementById('emojiGrid');
