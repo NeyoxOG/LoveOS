@@ -675,6 +675,23 @@ export const cloud = {
             }));
         } catch { return []; }
     },
+
+    listenToLeaderboards(gameIds: string[], callback: (gameId: string) => void) {
+        if (isGuest()) return () => {};
+        try {
+            const unsub = client.subscribe(`databases.${DB_ID}.collections.${COL_GAMES}.documents`, res => {
+                if (res.events.some(e => e.includes('databases.*.collections.*.documents.*.'))) {
+                    const payload = res.payload as any;
+                    if (payload?.gameId && gameIds.includes(payload.gameId)) {
+                        callback(payload.gameId);
+                    }
+                }
+            });
+            return unsub;
+        } catch {
+            return () => {};
+        }
+    },
     
     // --- Profile ---
     async loadProfile() {

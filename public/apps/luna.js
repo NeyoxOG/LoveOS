@@ -26,6 +26,8 @@ let mouse = new THREE.Vector2();
 let jumpTime = 0;
 let isJumping = false;
 let floatOffset = 0;
+let lastDecayAt = Date.now();
+let lastSaveAt = Date.now();
 
 function init() {
     const sessionStr = localStorage.getItem(KEYS.SESSION);
@@ -40,6 +42,7 @@ function init() {
     loadState();
     init3D();
     animate();
+    setInterval(tickNeeds, 15000);
     
     // Listeners
     window.addEventListener('resize', onWindowResize, false);
@@ -68,6 +71,38 @@ async function saveState() {
                 energy: state.energy 
             }
         });
+    }
+}
+
+function clampStat(value) {
+    return Math.max(0, Math.min(100, value));
+}
+
+function tickNeeds() {
+    const now = Date.now();
+    const minutes = (now - lastDecayAt) / 60000;
+    if (minutes <= 0) return;
+
+    if (state.isSleeping) {
+        state.energy = clampStat(state.energy + minutes * 6);
+        state.hunger = clampStat(state.hunger - minutes * 1);
+    } else {
+        state.energy = clampStat(state.energy - minutes * 4);
+        state.hunger = clampStat(state.hunger - minutes * 2);
+        state.love = clampStat(state.love - minutes * 0.5);
+    }
+
+    if (!state.isSleeping && state.energy <= 10) {
+        state.isSleeping = true;
+        showBubble("Müde... 😴");
+    }
+
+    lastDecayAt = now;
+    updateUI();
+
+    if (now - lastSaveAt > 60000) {
+        lastSaveAt = now;
+        saveState();
     }
 }
 
@@ -447,7 +482,16 @@ function updateParticles() {
 function updateUI() {
     document.getElementById('bar-love').style.width = state.love + '%';
     document.getElementById('bar-hunger').style.width = state.hunger + '%';
-    document.getElementById('status-text').innerText = state.isSleeping ? 'Schläft 🌙' : 'Wach ☀️';
+    document.getElementById('bar-energy').style.width = state.energy + '%';
+    document.getElementById('status-text').innerText = getMoodText();
+}
+
+function getMoodText() {
+    if (state.isSleeping) return 'Schläft 🌙';
+    if (state.hunger <= 20) return 'Hungrig 🍎';
+    if (state.energy <= 20) return 'Müde 💤';
+    if (state.love >= 80) return 'Glücklich 💗';
+    return 'Wach ☀️';
 }
 
 function showBubble(text) {

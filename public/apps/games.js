@@ -8,6 +8,7 @@ const KEYS = { SESSION: 'fiaos_session' };
 let user = null;
 let globalStats = null;
 let cloud = null;
+let leaderboardUnsub = null;
 
 function init() {
     const sessionStr = localStorage.getItem(KEYS.SESSION);
@@ -20,6 +21,7 @@ function init() {
     }
 
     renderUI();
+    updateStatus();
 }
 
 async function loadLeaderboard(gameId) {
@@ -45,7 +47,78 @@ function renderUI() {
 
 function updateBadge(id, score) {
     const el = document.getElementById(`best-${id}`);
-    if(el) el.innerText = `Best: ${score || 0}`;
+    if(el) el.innerText = score ? `Best: ${score}` : 'Best: —';
+}
+
+function updateStatus() {
+    const pill = document.getElementById('cloudStatus');
+    const text = document.getElementById('cloudStatusText');
+    if (!pill || !text) return;
+    if (cloud) {
+        pill.classList.add('online');
+        text.innerText = 'Cloud';
+    } else {
+        pill.classList.remove('online');
+        text.innerText = 'Offline';
+    }
+}
+
+async function loadLeaderboards() {
+    const lb = document.getElementById('lb-container');
+    if (!lb) return;
+    if (!cloud) {
+        lb.innerHTML = '<div style="text-align:center; padding:20px; color:#666;">Keine Cloud-Verbindung.</div>';
+        return;
+    }
+
+    lb.innerHTML = '<div style="text-align:center; padding:20px;">Lade Cloud Scores... ☁️</div>';
+    const games = [
+        { key: 'stack', title: 'Hearts Stack' },
+        { key: 'reaction', title: 'Reaction Tap' },
+        { key: 'blockblast', title: 'BlockBlast' },
+        { key: 'snake', title: 'Snake' },
+        { key: 'flappy', title: 'Flappy Love' }
+    ];
+
+    let html = '';
+    for (const g of games) {
+        const scores = await loadLeaderboard(g.key);
+        html += `<div class="lb-section"><div class="lb-title">${g.title}</div>`;
+        if (scores.length === 0) {
+            html += '<div style="font-size:12px; color:#666;">Keine Scores</div>';
+        } else {
+            scores.forEach((s, i) => {
+                html += `
+                    <div class="lb-item">
+                        <div style="display:flex; align-items:center;">
+                            <span class="lb-rank">${i+1}</span>
+                            <span>${s.displayName || 'Unbekannt'}</span>
+                        </div>
+                        <span class="lb-score">${s.score}</span>
+                    </div>
+                `;
+            });
+        }
+        html += `</div>`;
+    }
+    lb.innerHTML = html;
+
+    const updatedEl = document.getElementById('lbUpdated');
+    if (updatedEl) updatedEl.innerText = `Zuletzt aktualisiert: ${new Date().toLocaleTimeString()}`;
+}
+
+function subscribeLeaderboards() {
+    if (!cloud || leaderboardUnsub) return;
+    leaderboardUnsub = cloud.listenToLeaderboards(['stack', 'reaction', 'blockblast', 'snake', 'flappy'], () => {
+        loadLeaderboards();
+    });
+}
+
+function unsubscribeLeaderboards() {
+    if (leaderboardUnsub) {
+        leaderboardUnsub();
+        leaderboardUnsub = null;
+    }
 }
 
 window.switchTab = async (id, idx) => {
@@ -54,42 +127,14 @@ window.switchTab = async (id, idx) => {
     document.getElementById('segIndicator').style.transform = `translateX(${idx * 100}%)`;
     
     if (id === 'stats') {
-        const lb = document.getElementById('lb-container');
-        lb.innerHTML = '<div style="text-align:center; padding:20px;">Lade Cloud Scores... ☁️</div>';
-        
-        const games = [
-            { key: 'stack', title: 'Hearts Stack' },
-            { key: 'reaction', title: 'Reaction Tap' },
-            { key: 'blockblast', title: 'BlockBlast' },
-            { key: 'snake', title: 'Snake' },
-            { key: 'flappy', title: 'Flappy Love' }
-        ];
-
-        let html = '';
-        for (const g of games) {
-            const scores = await loadLeaderboard(g.key);
-            html += `<div class="lb-section"><div class="lb-title">${g.title}</div>`;
-            if (scores.length === 0) {
-                html += '<div style="font-size:12px; color:#666;">Keine Scores</div>';
-            } else {
-                scores.forEach((s, i) => {
-                    html += `
-                        <div class="lb-item">
-                            <div style="display:flex; align-items:center;">
-                                <span class="lb-rank">${i+1}</span>
-                                <span>${s.displayName || 'Unbekannt'}</span>
-                            </div>
-                            <span class="lb-score">${s.score}</span>
-                        </div>
-                    `;
-                });
-            }
-            html += `</div>`;
-        }
-        lb.innerHTML = html;
+        subscribeLeaderboards();
+        await loadLeaderboards();
+    } else {
+        unsubscribeLeaderboards();
     }
 };
 
 window.playGame = (gameId) => { window.location.href = `game_${gameId}.html`; };
+window.refreshLeaderboard = () => loadLeaderboards();
 
 init();
