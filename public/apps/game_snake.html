@@ -8,7 +8,7 @@
     <style>
         body { 
             margin:0; padding:0; 
-            background: #022c22; 
+            background: radial-gradient(circle at top, #14532d 0%, #022c22 70%);
             color: #fff; font-family: -apple-system, sans-serif; 
             overflow: hidden; user-select: none; touch-action: none; 
             display: flex; flex-direction: column; height: 100vh; 
@@ -30,7 +30,7 @@
         .header {
             position: relative; z-index: 10;
             padding: 16px 20px; display: flex; justify-content: space-between; align-items: center;
-            background: rgba(0,0,0,0.2); backdrop-filter: blur(10px);
+            background: rgba(0,0,0,0.35); backdrop-filter: blur(12px);
             border-bottom: 1px solid rgba(255,255,255,0.05);
         }
         .header-title { font-size: 18px; font-weight: 700; color: #fff; display: flex; align-items: center; gap: 6px; }
@@ -62,30 +62,30 @@
 
         /* D-Pad Controls */
         .dpad-container {
-            position: absolute; bottom: 40px; left: 0; right: 0;
+            position: absolute; bottom: 24px; left: 0; right: 0;
             display: none; justify-content: center; align-items: center;
             pointer-events: none; z-index: 20;
         }
         .dpad-container.visible { display: flex; }
         
         .dpad {
-            position: relative; width: 160px; height: 160px;
+            position: relative; width: 200px; height: 200px;
             pointer-events: auto;
         }
         .dpad-btn {
-            position: absolute; width: 50px; height: 50px;
+            position: absolute; width: 64px; height: 64px;
             background: rgba(255,255,255,0.1); backdrop-filter: blur(5px);
             border: 1px solid rgba(255,255,255,0.2); border-radius: 12px;
             display: flex; justify-content: center; align-items: center;
             font-size: 24px; color: rgba(255,255,255,0.8);
             transition: transform 0.1s, background 0.1s;
         }
-        .dpad-btn:active { background: rgba(255,255,255,0.3); transform: scale(0.95); }
+        .dpad-btn:active { background: rgba(255,255,255,0.3); transform: scale(0.92); }
         
-        .dpad-up { top: 0; left: 55px; }
-        .dpad-down { bottom: 0; left: 55px; }
-        .dpad-left { top: 55px; left: 0; }
-        .dpad-right { top: 55px; right: 0; }
+        .dpad-up { top: 0; left: 68px; }
+        .dpad-down { bottom: 0; left: 68px; }
+        .dpad-left { top: 68px; left: 0; }
+        .dpad-right { top: 68px; right: 0; }
 
         /* Overlays */
         .overlay {

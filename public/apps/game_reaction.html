@@ -3,34 +3,97 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Reaction</title>
+    <title>Precision Timer</title>
     <style>
-        body { margin:0; background:#000; color:#fff; font-family:-apple-system; overflow:hidden; display:flex; flex-direction:column; align-items:center; justify-content:center; height:100vh; user-select:none; }
-        
-        .game-ui { position:absolute; top:20px; width:100%; padding:0 20px; display:flex; justify-content:space-between; font-weight:700; font-size:20px; z-index:10; }
-        .combo-box { color:#a78bfa; }
-
-        .circle-container { position:relative; width:300px; height:300px; }
-        .ring { position:absolute; inset:0; border:4px solid #333; border-radius:50%; }
-        .target { position:absolute; inset:-4px; border:8px solid transparent; border-top-color:#ec4899; border-radius:50%; transform:rotate(0deg); z-index:2; }
-        
-        .pointer {
-            position:absolute; top:50%; left:50%; width:2px; height:150px; background:transparent;
-            transform-origin: top center; z-index:5;
+        body {
+            margin:0;
+            background: radial-gradient(circle at top, #1f1147 0%, #0a0a14 55%, #000 100%);
+            color:#fff;
+            font-family:-apple-system, system-ui, sans-serif;
+            overflow:hidden;
+            display:flex;
+            flex-direction:column;
+            align-items:center;
+            justify-content:center;
+            height:100vh;
+            user-select:none;
+            touch-action:manipulation;
         }
-        .dot { position:absolute; bottom:0; left:-6px; width:12px; height:12px; background:#fff; border-radius:50%; box-shadow:0 0 10px #fff; }
 
-        .center-heart { position:absolute; top:50%; left:50%; transform:translate(-50%, -50%); font-size:60px; animation:pulse 2s infinite; }
-        @keyframes pulse { 0%,100%{transform:translate(-50%, -50%) scale(1);} 50%{transform:translate(-50%, -50%) scale(1.1);} }
+        .game-ui {
+            position:absolute;
+            top:20px;
+            width:100%;
+            padding:0 20px;
+            display:flex;
+            justify-content:space-between;
+            font-weight:700;
+            font-size:16px;
+            z-index:10;
+        }
+        .target-pill {
+            background: rgba(239, 68, 68, 0.18);
+            border: 1px solid rgba(239, 68, 68, 0.4);
+            color: #fecaca;
+            padding: 6px 14px;
+            border-radius: 999px;
+            font-size: 12px;
+            letter-spacing: 0.04em;
+            text-transform: uppercase;
+        }
+        .score-box { color:#f8fafc; }
 
-        .tap-area { position:absolute; inset:0; z-index:20; cursor:pointer; }
-        
-        .feedback { position:absolute; top:60%; font-size:30px; font-weight:800; opacity:0; pointer-events:none; transition:transform 0.2s, opacity 0.2s; }
-        .feedback.pop { opacity:1; transform:translateY(-20px) scale(1.2); }
+        .center {
+            display:flex;
+            flex-direction:column;
+            align-items:center;
+            gap:20px;
+            text-align:center;
+        }
 
-        .overlay { position:absolute; inset:0; background:rgba(0,0,0,0.85); z-index:100; display:flex; flex-direction:column; align-items:center; justify-content:center; display:none; }
+        .timer {
+            font-size:56px;
+            font-weight:800;
+            letter-spacing:1px;
+            text-shadow:0 10px 30px rgba(0,0,0,0.45);
+        }
+        .timer-sub {
+            font-size:14px;
+            color:rgba(255,255,255,0.6);
+        }
+
+        .big-button {
+            width:min(70vw, 260px);
+            height:min(70vw, 260px);
+            border-radius:50%;
+            background: radial-gradient(circle at top, #f87171 0%, #ef4444 55%, #991b1b 100%);
+            border: 6px solid rgba(255,255,255,0.15);
+            box-shadow: 0 20px 50px rgba(239, 68, 68, 0.45), inset 0 -12px 30px rgba(0,0,0,0.35);
+            display:flex;
+            align-items:center;
+            justify-content:center;
+            font-size:22px;
+            font-weight:800;
+            text-transform:uppercase;
+            letter-spacing:2px;
+            color:#fff;
+            cursor:pointer;
+            transition: transform 0.1s ease, box-shadow 0.2s ease;
+        }
+        .big-button:active { transform: scale(0.97); box-shadow: 0 12px 30px rgba(239, 68, 68, 0.4); }
+
+        .feedback {
+            font-size:24px;
+            font-weight:800;
+            opacity:0;
+            pointer-events:none;
+            transition:transform 0.2s, opacity 0.2s;
+        }
+        .feedback.pop { opacity:1; transform:translateY(-10px) scale(1.1); }
+
+        .overlay { position:absolute; inset:0; background:rgba(0,0,0,0.85); z-index:100; display:flex; flex-direction:column; align-items:center; justify-content:center; display:none; padding:24px; text-align:center; }
         .overlay.active { display:flex; }
-        button { margin-top:20px; padding:12px 30px; border-radius:20px; border:none; background:#ec4899; color:white; font-weight:700; font-size:16px; cursor:pointer; }
+        button { margin-top:20px; padding:12px 30px; border-radius:20px; border:none; background:#ef4444; color:white; font-weight:700; font-size:16px; cursor:pointer; }
 
         .btn-close { position:absolute; top:16px; left:16px; background:rgba(255,255,255,0.1); width:40px; height:40px; border-radius:50%; border:none; color:white; font-size:20px; cursor:pointer; z-index:30; }
 
@@ -40,32 +103,27 @@
     <button class="btn-close" onclick="window.history.back()">✕</button>
 
     <div class="game-ui">
-        <div>Score: <span id="score">0</span></div>
-        <div class="combo-box">x<span id="combo">0</span></div>
+        <div class="score-box">Best: <span id="best">—</span></div>
+        <div class="target-pill">Zielzeit 03:00</div>
     </div>
 
-    <div class="circle-container">
-        <div class="ring"></div>
-        <div class="target" id="targetRing"></div>
-        <div class="pointer" id="pointer">
-            <div class="dot"></div>
-        </div>
-        <div class="center-heart">💗</div>
+    <div class="center">
+        <div class="timer" id="timer">00:00.000</div>
+        <div class="timer-sub">Drücke den roten Button exakt bei 3 Minuten.</div>
+        <button class="big-button" id="tapButton">STOP</button>
+        <div class="feedback" id="feedback">Perfekt!</div>
     </div>
-
-    <div class="feedback" id="feedback">PERFECT!</div>
-    <div class="tap-area" id="tapArea"></div>
 
     <div class="overlay" id="startScreen" style="display:flex">
-        <h1>Reaction Tap</h1>
-        <p style="color:#aaa; margin-bottom:20px;">Tap when the dot hits pink!</p>
+        <h1>Precision Timer</h1>
+        <p style="color:#aaa; margin-bottom:20px;">Ziel: 03:00.000 treffen. Je näher, desto besser.</p>
         <button onclick="startGame()">Start Game</button>
     </div>
 
     <div class="overlay" id="endScreen">
-        <h1>Time's Up!</h1>
-        <p>Final Score: <span id="finalScore">0</span></p>
-        <p style="font-size:14px; color:#aaa">Best Combo: <span id="finalCombo">0</span></p>
+        <h1>Ergebnis</h1>
+        <p>Abweichung: <span id="finalDiff">0</span> ms</p>
+        <p style="font-size:14px; color:#aaa">Score: <span id="finalScore">0</span></p>
         <button onclick="startGame()">Play Again</button>
         <button style="background:transparent; border:1px solid #555" onclick="window.history.back()">Exit</button>
     </div>
