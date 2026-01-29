@@ -105,63 +105,35 @@ const COLLECTIONS = [
     }
 ];
 
-const DEFAULT_ADMIN_CONFIG = {
+// --- Seed Data ---
+
+const INITIAL_ADMIN_CONFIG = {
     appVisibility: {
-        love: true,
-        story: true,
-        daily: true,
-        bucket: true,
-        rewards_app: true,
-        messages: true,
-        valentine: true,
         luna: true,
-        vault: true,
-        diary: true,
-        games: true,
-        achievements: true,
+        rewards: true,
         settings: true,
-        admin: true
+        valentine: true,
+        vault: true,
+        admin: true,
+        messages: true,
+        achievements: true,
+        games: true,
+        diary: true,
+        daily: true,
+        love: true,
+        rewards_app: true,
+        story: true,
+        bucket: true
     },
     userStatus: {
-        fia: { role: 'user', banned: false },
-        collin: { role: 'admin', banned: false },
-        guest: { role: 'guest', banned: false }
+        "fia": { role: "user", banned: false },
+        "collin": { role: "admin", banned: false },
+        "guest": { role: "guest", banned: false }
     },
     maintenanceMode: false,
-    lastEditedBy: 'system',
-    updatedAt: Date.now(),
-    forceLogoutAt: 0
+    lastEditedBy: "system",
+    updatedAt: Date.now()
 };
-
-const DEFAULT_APP_CATALOG = [
-    { id: 'love', name: 'Love', icon: '💞', status: 'available' },
-    { id: 'story', name: 'Story of Love', icon: '🎞️', status: 'available' },
-    { id: 'daily', name: 'Daily', icon: '✨', status: 'available' },
-    { id: 'bucket', name: 'Ziele', icon: '📍', status: 'available' },
-    { id: 'rewards_app', name: 'Belohnungen', icon: '🎁', status: 'available' },
-    { id: 'messages', name: 'Nachrichten', icon: '💬', status: 'available' },
-    { id: 'valentine', name: 'Valentinstag', icon: '💘', status: 'available' },
-    { id: 'luna', name: 'Luna', icon: '🐑', status: 'available' },
-    { id: 'vault', name: 'Message Vault', icon: '💌', status: 'available' },
-    { id: 'diary', name: 'Tagebuch', icon: '📔', status: 'available' },
-    { id: 'games', name: 'Arcade', icon: '🕹️', status: 'available' },
-    { id: 'achievements', name: 'Erfolge', icon: '🏆', status: 'available' },
-    { id: 'settings', name: 'Einstellungen', icon: '⚙️', status: 'available' },
-    { id: 'admin', name: 'Admin Center', icon: '🛠️', status: 'available' }
-];
-
-const STATE_SEEDS = [
-    {
-        module: 'admin_config',
-        profileKey: 'system',
-        payload: DEFAULT_ADMIN_CONFIG
-    },
-    {
-        module: 'app_catalog',
-        profileKey: 'system',
-        payload: { apps: DEFAULT_APP_CATALOG }
-    }
-];
 
 // --- Env Loader ---
 
@@ -190,7 +162,6 @@ const API_KEY = process.env.VITE_APPWRITE_API_KEY;
 if (!PROJECT_ID || !API_KEY) {
     console.warn("⚠️  Setup Skipped: Missing VITE_APPWRITE_PROJECT_ID or VITE_APPWRITE_API_KEY.");
     console.warn("   (This is normal in production or if you haven't set up the .env file yet)");
-    // Exit with success code (0) so chained commands (like 'vite') still run
     process.exit(0);
 }
 
@@ -213,15 +184,27 @@ const api = async (method, path, body = null) => {
     const json = await res.json();
 
     if (!res.ok) {
-        // Ignore "already exists" errors (409)
         if (res.status === 409) return { error: 'conflict', ...json };
         throw new Error(`API Error [${res.status}] ${path}: ${JSON.stringify(json)}`);
     }
     return json;
 };
 
+/**
+ * Creates or updates a state document in the 'states' collection
+ */
 const upsertState = async (module, profileKey, payload) => {
-    const docId = `state_${module}_${profileKey}`.replace(/[^a-zA-Z0-9_]/g, '_');
+    const queryPath = `/databases/${DB_ID}/collections/states/documents`;
+    const searchUrl = `${ENDPOINT}${queryPath}?queries[]=equal("module", ["${module}"])&queries[]=equal("profileKey", ["${profileKey}"])`;
+    
+    const searchRes = await fetch(searchUrl, {
+        headers: {
+            'X-Appwrite-Project': PROJECT_ID,
+            'X-Appwrite-Key': API_KEY
+        }
+    });
+    const searchJson = await searchRes.json();
+    
     const data = {
         module,
         profileKey,
@@ -229,17 +212,17 @@ const upsertState = async (module, profileKey, payload) => {
         updatedAt: new Date().toISOString()
     };
 
-    const res = await api('POST', `/databases/${DB_ID}/collections/states/documents`, {
-        documentId: docId,
-        ...data
-    });
-
-    if (res.error === 'conflict') {
-        await api('PATCH', `/databases/${DB_ID}/collections/states/documents/${docId}`, data);
-        return { action: 'updated', docId };
+    if (searchJson.total > 0) {
+        const docId = searchJson.documents[0].$id;
+        await api('PATCH', `${queryPath}/${docId}`, data);
+        console.log(`      - State [${module}:${profileKey}]: Updated`);
+    } else {
+        await api('POST', queryPath, {
+            documentId: 'unique()',
+            data
+        });
+        console.log(`      - State [${module}:${profileKey}]: Created`);
     }
-
-    return { action: 'created', docId };
 };
 
 // --- Execution ---
@@ -248,7 +231,6 @@ const setup = async () => {
     console.log(`🚀 Checking Appwrite Schema...`);
 
     // 1. Create Database
-    // console.log(`\n📦 Checking Database: ${DB_ID}`);
     const dbRes = await api('POST', '/databases', {
         databaseId: DB_ID,
         name: 'FiaOS Database'
@@ -257,8 +239,6 @@ const setup = async () => {
 
     // 2. Process Collections
     for (const col of COLLECTIONS) {
-        // console.log(`\n📂 Processing Collection: ${col.id} (${col.name})`);
-        
         // Create Collection
         const colRes = await api('POST', `/databases/${DB_ID}/collections`, {
             collectionId: col.id,
@@ -287,16 +267,13 @@ const setup = async () => {
             
             if (attrRes.error !== 'conflict') {
                 console.log(`      - Attribute ${attr.key}: Created`);
-                // Wait a bit to ensure attribute is ready before indexing (Appwrite async nature)
                 await new Promise(r => setTimeout(r, 500));
             }
         }
 
         // Create Indexes
         if (col.indexes) {
-            // Wait for attributes to be "available"
             await new Promise(r => setTimeout(r, 2000));
-
             for (const idx of col.indexes) {
                 const idxRes = await api('POST', `/databases/${DB_ID}/collections/${col.id}/indexes`, {
                     key: idx.key,
@@ -312,13 +289,20 @@ const setup = async () => {
         }
     }
 
-    // 3. Seed initial states (admin config + app catalog)
-    for (const seed of STATE_SEEDS) {
-        const result = await upsertState(seed.module, seed.profileKey, seed.payload);
-        console.log(`   -> State ${seed.module}:${seed.profileKey} ${result.action}.`);
-    }
+    console.log(`\n🌱 Seeding Initial Data...`);
+    // Wait for attributes to be ready before querying/writing
+    await new Promise(r => setTimeout(r, 2000));
+    
+    // Seed Admin Config
+    await upsertState('admin_config', 'system', INITIAL_ADMIN_CONFIG);
+    
+    // Seed an empty/default Luna state for the couple
+    await upsertState('luna', 'couple', {
+        stats: { hunger: 50, love: 50, energy: 80 },
+        isSleeping: false
+    });
 
-    console.log(`✅ Appwrite Schema Synced`);
+    console.log(`✅ Appwrite Setup & Seeding Complete!`);
 };
 
 setup().catch(err => {

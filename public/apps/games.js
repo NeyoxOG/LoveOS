@@ -6,22 +6,19 @@
 const KEYS = { SESSION: 'fiaos_session' };
 
 let user = null;
-let globalStats = null;
 let cloud = null;
-let leaderboardUnsub = null;
+let currentTab = 'games';
 
 function init() {
     const sessionStr = localStorage.getItem(KEYS.SESSION);
     if (!sessionStr) return;
     user = JSON.parse(sessionStr);
-    user.id = user.id || user.userId;
 
     if (window.parent.FIAOS && window.parent.FIAOS.cloud) {
         cloud = window.parent.FIAOS.cloud;
     }
 
     renderUI();
-    updateStatus();
 }
 
 async function loadLeaderboard(gameId) {
@@ -31,7 +28,9 @@ async function loadLeaderboard(gameId) {
 
 function renderUI() {
     // Local bests from cache for instant feedback
-    const key = `fiaos_user_${user.id}_games`;
+    // Fix: Access user.userId instead of user.id
+    const uid = user.userId;
+    const key = `fiaos_user_${uid}_games`;
     const data = JSON.parse(localStorage.getItem(key) || '{}');
     
     updateBadge('stack', data.stack?.best);
@@ -47,36 +46,34 @@ function renderUI() {
 
 function updateBadge(id, score) {
     const el = document.getElementById(`best-${id}`);
-    if(el) el.innerText = score ? `Best: ${score}` : 'Best: —';
+    if(el) el.innerText = `Best: ${score || 0}`;
 }
 
-function updateStatus() {
-    const pill = document.getElementById('cloudStatus');
-    const text = document.getElementById('cloudStatusText');
-    if (!pill || !text) return;
-    if (cloud) {
-        pill.classList.add('online');
-        text.innerText = 'Cloud';
-    } else {
-        pill.classList.remove('online');
-        text.innerText = 'Offline';
+window.switchTab = async (id, idx) => {
+    currentTab = id;
+    document.querySelectorAll('[id^="tab-"]').forEach(el => el.classList.add('hidden'));
+    document.getElementById(`tab-${id}`).classList.remove('hidden');
+    document.getElementById('segIndicator').style.transform = `translateX(${idx * 100}%)`;
+    
+    if (id === 'stats') {
+        loadStatsView();
     }
-}
+};
 
-async function loadLeaderboards() {
+window.forceRefresh = () => {
+    if (currentTab === 'stats') loadStatsView();
+    else renderUI();
+};
+
+async function loadStatsView() {
     const lb = document.getElementById('lb-container');
-    if (!lb) return;
-    if (!cloud) {
-        lb.innerHTML = '<div style="text-align:center; padding:20px; color:#666;">Keine Cloud-Verbindung.</div>';
-        return;
-    }
-
     lb.innerHTML = '<div style="text-align:center; padding:20px;">Lade Cloud Scores... ☁️</div>';
+    
     const games = [
         { key: 'stack', title: 'Hearts Stack' },
-        { key: 'reaction', title: 'Reaction Tap' },
+        { key: 'reaction', title: 'Precision Timer' },
         { key: 'blockblast', title: 'BlockBlast' },
-        { key: 'snake', title: 'Snake' },
+        { key: 'snake', title: 'Snake v2' },
         { key: 'flappy', title: 'Flappy Love' }
     ];
 
@@ -85,56 +82,35 @@ async function loadLeaderboards() {
         const scores = await loadLeaderboard(g.key);
         html += `<div class="lb-section"><div class="lb-title">${g.title}</div>`;
         if (scores.length === 0) {
-            html += '<div style="font-size:12px; color:#666;">Keine Scores</div>';
+            html += '<div style="font-size:12px; color:#666; margin-bottom:20px;">Keine Scores</div>';
         } else {
             scores.forEach((s, i) => {
+                let displayScore = s.score;
+                if (g.key === 'puzzle' || g.key === 'reaction') {
+                    // Time based display if needed, but reaction is points now based on accuracy
+                    if (g.key === 'puzzle') displayScore = (s.score/1000).toFixed(1) + 's';
+                }
                 html += `
                     <div class="lb-item">
                         <div style="display:flex; align-items:center;">
                             <span class="lb-rank">${i+1}</span>
                             <span>${s.displayName || 'Unbekannt'}</span>
                         </div>
-                        <span class="lb-score">${s.score}</span>
+                        <span class="lb-score">${displayScore}</span>
                     </div>
                 `;
             });
+            html += '</div>';
         }
-        html += `</div>`;
     }
     lb.innerHTML = html;
-
-    const updatedEl = document.getElementById('lbUpdated');
-    if (updatedEl) updatedEl.innerText = `Zuletzt aktualisiert: ${new Date().toLocaleTimeString()}`;
 }
-
-function subscribeLeaderboards() {
-    if (!cloud || leaderboardUnsub) return;
-    leaderboardUnsub = cloud.listenToLeaderboards(['stack', 'reaction', 'blockblast', 'snake', 'flappy'], () => {
-        loadLeaderboards();
-    });
-}
-
-function unsubscribeLeaderboards() {
-    if (leaderboardUnsub) {
-        leaderboardUnsub();
-        leaderboardUnsub = null;
-    }
-}
-
-window.switchTab = async (id, idx) => {
-    document.querySelectorAll('[id^="tab-"]').forEach(el => el.classList.add('hidden'));
-    document.getElementById(`tab-${id}`).classList.remove('hidden');
-    document.getElementById('segIndicator').style.transform = `translateX(${idx * 100}%)`;
-    
-    if (id === 'stats') {
-        subscribeLeaderboards();
-        await loadLeaderboards();
-    } else {
-        unsubscribeLeaderboards();
-    }
-};
 
 window.playGame = (gameId) => { window.location.href = `game_${gameId}.html`; };
-window.refreshLeaderboard = () => loadLeaderboards();
+
+// Global Escape Listener
+window.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') window.history.back();
+});
 
 init();

@@ -17,9 +17,7 @@ const SHAPES = [
 
 function init() {
     const sessionStr = localStorage.getItem(KEYS.SESSION);
-    if (!sessionStr) return;
-    user = JSON.parse(sessionStr);
-    user.id = user.id || user.userId;
+    if (sessionStr) user = JSON.parse(sessionStr);
 
     // Gen grid DOM
     const el = document.getElementById('grid');

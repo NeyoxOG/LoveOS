@@ -13,7 +13,6 @@ function init() {
     const sessionStr = localStorage.getItem(KEYS.SESSION);
     if (!sessionStr) return;
     user = JSON.parse(sessionStr);
-    user.id = user.id || user.userId;
 
     if (window.parent.FIAOS && window.parent.FIAOS.cloud) {
         cloud = window.parent.FIAOS.cloud;
@@ -41,23 +40,18 @@ function renderMessages(messages) {
         return;
     }
 
-    // Sort by Date Ascending for Display (Appwrite integer or Firestore timestamp)
-    const sorted = [...messages].sort((a, b) => {
-        const aTime = a.createdAt?.seconds ? a.createdAt.seconds * 1000 : a.createdAt || 0;
-        const bTime = b.createdAt?.seconds ? b.createdAt.seconds * 1000 : b.createdAt || 0;
-        return aTime - bTime;
-    });
+    // Sort by Date Ascending
+    const sorted = [...messages].sort((a,b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
 
     sorted.forEach(msg => {
         const div = document.createElement('div');
-        const isMe = msg.senderId === user.id;
+        // Fix: user.userId
+        const isMe = msg.senderId === user.userId;
         div.className = `message ${isMe ? 'me' : 'other'}`;
         
         let timeStr = '';
         if (msg.createdAt) {
-            // Handle Firestore Timestamp or Date
-            const ms = msg.createdAt.seconds ? msg.createdAt.seconds * 1000 : msg.createdAt;
-            const d = new Date(ms);
+            const d = new Date(msg.createdAt);
             timeStr = d.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
         }
 
@@ -68,7 +62,6 @@ function renderMessages(messages) {
         list.appendChild(div);
     });
 
-    // Auto Scroll to bottom
     list.scrollTop = list.scrollHeight;
 }
 

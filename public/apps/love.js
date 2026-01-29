@@ -20,7 +20,6 @@ function init() {
     const sessionStr = localStorage.getItem(KEYS.SESSION);
     if (!sessionStr) return;
     user = JSON.parse(sessionStr);
-    user.id = user.id || user.userId;
 
     loadData();
     updateLive();

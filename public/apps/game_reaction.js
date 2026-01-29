@@ -1,145 +1,112 @@
+
+/**
+ * Game: Precision Timer
+ * Goal: Stop exactly at 3.000s
+ */
+
 const KEYS = { SESSION: 'fiaos_session', USER_GAMES: 'fiaos_user_', GLOBAL_ARCADE: 'fiaos_global_arcade' };
+const TARGET_TIME = 3000; // ms
 
 let user = null;
-let score = 0;
-let bestScore = 0;
-let bestDiff = null;
-let isPlaying = false;
+let cloud = null;
 let startTime = 0;
-let rafId = null;
-const TARGET_TIME = 180000; // 3 minutes
+let timerInterval = null;
+let isRunning = false;
+let score = 0;
 
 function init() {
     const sessionStr = localStorage.getItem(KEYS.SESSION);
-    if (!sessionStr) return;
-    user = JSON.parse(sessionStr);
-    user.id = user.id || user.userId;
+    if (sessionStr) user = JSON.parse(sessionStr);
 
-    document.getElementById('tapButton').addEventListener('mousedown', tap);
-    document.getElementById('tapButton').addEventListener('touchstart', (e) => { e.preventDefault(); tap(); });
-    document.addEventListener('keydown', (e) => { if (e.code === 'Space') tap(); });
+    if (window.parent.FIAOS && window.parent.FIAOS.cloud) {
+        cloud = window.parent.FIAOS.cloud;
+    }
 
-    loadBest();
-    updateTimerDisplay(0);
+    // Escape Key
+    window.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape') window.history.back();
+        if (e.code === 'Space') handleAction();
+    });
 }
 
-function startGame() {
-    score = 0;
-    startTime = Date.now();
-    isPlaying = true;
-
-    document.getElementById('startScreen').style.display = 'none';
-    document.getElementById('endScreen').classList.remove('active');
-    updateUI();
+function handleAction(e) {
+    if (e) e.preventDefault();
     
-    if (rafId) cancelAnimationFrame(rafId);
-    rafId = requestAnimationFrame(loop);
-}
-
-function tap() {
-    if (!isPlaying) return;
-    const elapsed = Date.now() - startTime;
-    const diff = Math.abs(elapsed - TARGET_TIME);
-    const bounded = Math.max(0, 100000 - diff);
-    score = Math.floor(bounded / 10);
-
-    const feedback = document.getElementById('feedback');
-    feedback.classList.remove('pop');
-    void feedback.offsetWidth; // trigger reflow
-
-    if (diff <= 250) {
-        feedback.innerText = "PERFEKT!";
-        feedback.style.color = "#fda4af";
-        unlock('games.react.combo10');
-    } else if (diff <= 1000) {
-        feedback.innerText = "SEHR GUT";
-        feedback.style.color = "#f87171";
-        unlock('games.react.first');
-    } else if (diff <= 5000) {
-        feedback.innerText = "GUT";
-        feedback.style.color = "#fbbf24";
+    const btn = document.getElementById('actionBtn');
+    
+    if (!isRunning) {
+        // Start
+        isRunning = true;
+        startTime = Date.now();
+        btn.innerText = "STOP";
+        btn.classList.add('stop');
+        document.getElementById('result').classList.remove('show');
+        
+        timerInterval = setInterval(() => {
+            const now = Date.now();
+            const elapsed = now - startTime;
+            document.getElementById('timer').innerText = (elapsed / 1000).toFixed(3);
+        }, 10); // Update frequently
+        
     } else {
-        feedback.innerText = "ZU FRÜH / SPÄT";
-        feedback.style.color = "#fca5a5";
-    }
-    
-    feedback.classList.add('pop');
-    gameOver(diff);
-}
-
-function updateUI() {
-    document.getElementById('best').innerText = bestDiff !== null ? `${bestDiff} ms` : '—';
-}
-
-function loop() {
-    if (!isPlaying) return;
-    const elapsed = Date.now() - startTime;
-    updateTimerDisplay(elapsed);
-    rafId = requestAnimationFrame(loop);
-}
-
-function gameOver(diff) {
-    isPlaying = false;
-    if (rafId) cancelAnimationFrame(rafId);
-    document.getElementById('finalScore').innerText = score;
-    document.getElementById('finalDiff').innerText = diff;
-    document.getElementById('endScreen').classList.add('active');
-    
-    saveData(diff);
-}
-
-function unlock(id) {
-    if (window.parent.FIAOS_EVENTS) {
-        window.parent.FIAOS_EVENTS.emit('games.unlock', { id });
+        // Stop
+        clearInterval(timerInterval);
+        isRunning = false;
+        btn.innerText = "Retry";
+        btn.classList.remove('stop');
+        
+        const now = Date.now();
+        const elapsed = now - startTime;
+        document.getElementById('timer').innerText = (elapsed / 1000).toFixed(3);
+        
+        calculateScore(elapsed);
     }
 }
 
-function saveData(diff) {
+function calculateScore(elapsed) {
+    const diff = Math.abs(elapsed - TARGET_TIME);
+    let points = 0;
+    
+    // Scoring Logic
+    if (diff === 0) points = 10000; // Perfect
+    else if (diff <= 10) points = 5000;
+    else if (diff <= 50) points = 1000;
+    else if (diff <= 100) points = 500;
+    else if (diff <= 500) points = 100;
+    else points = 10;
+
+    score = points;
+    
+    const diffText = diff === 0 ? "PERFECT!" : `${(diff/1000).toFixed(3)}s off`;
+    document.getElementById('diff').innerText = diffText;
+    document.getElementById('score').innerText = `Score: ${points}`;
+    document.getElementById('result').classList.add('show');
+    
+    if (diff <= 10) {
+        if (window.parent.FIAOS) window.parent.FIAOS.playSound('success');
+    }
+
+    saveScore(points);
+}
+
+function saveScore(s) {
     if (!user) return;
-    const uKey = `${KEYS.USER_GAMES}${user.id}_games`;
+    
+    // Local
+    // Fix: use user.userId
+    const uKey = `${KEYS.USER_GAMES}${user.userId}_games`;
     let uData = JSON.parse(localStorage.getItem(uKey) || '{}');
-    if (!uData.reaction) uData.reaction = { best: 0, bestDiff: null, plays: 0 };
+    if (!uData.reaction) uData.reaction = { best: 0, plays: 0 };
     
-    uData.reaction.last = score;
+    uData.reaction.last = s;
     uData.reaction.plays++;
-    if (score > uData.reaction.best) uData.reaction.best = score;
-    if (uData.reaction.bestDiff === null || diff < uData.reaction.bestDiff) {
-        uData.reaction.bestDiff = diff;
-        bestDiff = diff;
-        bestScore = score;
-    }
-    
+    if (s > uData.reaction.best) uData.reaction.best = s;
     localStorage.setItem(uKey, JSON.stringify(uData));
-    updateUI();
 
-    // Global
-    const gKey = KEYS.GLOBAL_ARCADE;
-    let gData = JSON.parse(localStorage.getItem(gKey) || '{"reaction":[]}');
-    gData.reaction.push({ userId: user.id, name: user.name, score, diff, date: Date.now() });
-    gData.reaction.sort((a,b) => b.score - a.score);
-    gData.reaction = gData.reaction.slice(0, 10);
-    localStorage.setItem(gKey, JSON.stringify(gData));
-}
-
-function updateTimerDisplay(elapsed) {
-    const timerEl = document.getElementById('timer');
-    if (!timerEl) return;
-    const totalMs = Math.max(0, elapsed);
-    const minutes = Math.floor(totalMs / 60000);
-    const seconds = Math.floor((totalMs % 60000) / 1000);
-    const millis = Math.floor(totalMs % 1000);
-    timerEl.innerText = `${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}.${String(millis).padStart(3, '0')}`;
-}
-
-function loadBest() {
-    if (!user) return;
-    const uKey = `${KEYS.USER_GAMES}${user.id}_games`;
-    const uData = JSON.parse(localStorage.getItem(uKey) || '{}');
-    if (uData.reaction) {
-        bestScore = uData.reaction.best || 0;
-        bestDiff = uData.reaction.bestDiff ?? null;
+    // Cloud
+    if (cloud) {
+        cloud.saveHighscore('reaction', s);
     }
-    updateUI();
 }
 
 init();

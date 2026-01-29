@@ -24,28 +24,7 @@ const DEFAULT_ADMIN_CONFIG: AdminConfig = {
   },
   maintenanceMode: false,
   lastEditedBy: "system",
-  updatedAt: Date.now(),
-  forceLogoutAt: 0
-};
-
-const normalizeAdminConfig = (config?: AdminConfig | null): AdminConfig => {
-    const safeConfig = config || {};
-    return {
-        ...DEFAULT_ADMIN_CONFIG,
-        ...safeConfig,
-        appVisibility: {
-            ...DEFAULT_ADMIN_CONFIG.appVisibility,
-            ...(safeConfig.appVisibility || {})
-        },
-        userStatus: {
-            ...DEFAULT_ADMIN_CONFIG.userStatus,
-            ...(safeConfig.userStatus || {})
-        },
-        maintenanceMode: safeConfig.maintenanceMode ?? DEFAULT_ADMIN_CONFIG.maintenanceMode,
-        lastEditedBy: safeConfig.lastEditedBy || DEFAULT_ADMIN_CONFIG.lastEditedBy,
-        updatedAt: safeConfig.updatedAt || DEFAULT_ADMIN_CONFIG.updatedAt,
-        forceLogoutAt: safeConfig.forceLogoutAt ?? DEFAULT_ADMIN_CONFIG.forceLogoutAt
-    };
+  updatedAt: Date.now()
 };
 
 // --- Helpers ---
@@ -222,33 +201,29 @@ export const cloud = {
         }
 
         if (config) {
-            const normalized = normalizeAdminConfig(config);
-            localStorage.setItem(cacheKey, JSON.stringify(normalized));
-            return normalized;
+            localStorage.setItem(cacheKey, JSON.stringify(config));
+            return config;
         }
 
         // Fallback
-        const cached = JSON.parse(localStorage.getItem(cacheKey) || 'null');
-        return normalizeAdminConfig(cached || DEFAULT_ADMIN_CONFIG);
+        return JSON.parse(localStorage.getItem(cacheKey) || JSON.stringify(DEFAULT_ADMIN_CONFIG));
     },
 
     async saveAdminConfig(config: AdminConfig) {
-        const normalized = normalizeAdminConfig(config);
-        localStorage.setItem('fiaos_global_admin_config', JSON.stringify(normalized));
-        await docHelper.setState('admin_config', 'system', normalized);
+        localStorage.setItem('fiaos_global_admin_config', JSON.stringify(config));
+        await docHelper.setState('admin_config', 'system', config);
     },
 
     listenToAdminConfig(callback: (config: AdminConfig) => void) {
         // Initial Local Load
         const local = localStorage.getItem('fiaos_global_admin_config');
-        const localConfig = local ? JSON.parse(local) : DEFAULT_ADMIN_CONFIG;
-        callback(normalizeAdminConfig(localConfig));
+        callback(local ? JSON.parse(local) : DEFAULT_ADMIN_CONFIG);
 
         if (isGuest()) return () => {};
 
         // Fetch Fresh
         this.loadAdminConfig().then(cfg => {
-            if (cfg) callback(normalizeAdminConfig(cfg));
+            if (cfg) callback(cfg);
         });
 
         try {
@@ -258,7 +233,7 @@ export const cloud = {
                     
                     const payload = (response.payload as any);
                     if (payload.module === 'admin_config' && payload.profileKey === 'system') {
-                        const data = normalizeAdminConfig(JSON.parse(payload.payload));
+                        const data = JSON.parse(payload.payload);
                         callback(data);
                         localStorage.setItem('fiaos_global_admin_config', JSON.stringify(data));
                     }
@@ -674,23 +649,6 @@ export const cloud = {
                 date: d.updatedAt
             }));
         } catch { return []; }
-    },
-
-    listenToLeaderboards(gameIds: string[], callback: (gameId: string) => void) {
-        if (isGuest()) return () => {};
-        try {
-            const unsub = client.subscribe(`databases.${DB_ID}.collections.${COL_GAMES}.documents`, res => {
-                if (res.events.some(e => e.includes('databases.*.collections.*.documents.*.'))) {
-                    const payload = res.payload as any;
-                    if (payload?.gameId && gameIds.includes(payload.gameId)) {
-                        callback(payload.gameId);
-                    }
-                }
-            });
-            return unsub;
-        } catch {
-            return () => {};
-        }
     },
     
     // --- Profile ---

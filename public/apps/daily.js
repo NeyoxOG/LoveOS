@@ -31,7 +31,6 @@ function init() {
     const sessionStr = localStorage.getItem(KEYS.SESSION);
     if (!sessionStr) return;
     user = JSON.parse(sessionStr);
-    user.id = user.id || user.userId;
 
     if (window.parent.FIAOS && window.parent.FIAOS.cloud) {
         cloud = window.parent.FIAOS.cloud;
@@ -56,7 +55,8 @@ function initDevTools() {
 
 async function loadData() {
     const todayISO = new Date().toISOString().split('T')[0];
-    const localKey = `${KEYS.DAILY_STATE}${user.id}_daily_state`;
+    // Fix: user.userId
+    const localKey = `${KEYS.DAILY_STATE}${user.userId}_daily_state`;
     
     let loadedState = null;
 
@@ -64,7 +64,7 @@ async function loadData() {
     if (cloud && user.role !== 'guest') {
         try {
             // console.log("Loading Daily from Cloud...");
-            const cloudData = await cloud.loadDailyState(user.id);
+            const cloudData = await cloud.loadDailyState(user.userId);
             if (cloudData) {
                 loadedState = cloudData;
                 // Update local cache to match cloud (sync down)
@@ -76,8 +76,6 @@ async function loadData() {
     }
 
     // 2. Fallback to Local (Only if cloud failed or guest)
-    // IMPORTANT: If cloud returned null (success but empty), we do NOT load local.
-    // This allows Admin Reset to actually wipe the data.
     if (!loadedState && (!cloud || user.role === 'guest')) {
         const rawState = localStorage.getItem(localKey);
         if (rawState) loadedState = JSON.parse(rawState);
@@ -90,7 +88,7 @@ async function loadData() {
             streak: 0,
             totalClaims: 0,
             points: 0,
-            todaySeed: `${user.id}_${todayISO}`,
+            todaySeed: `${user.userId}_${todayISO}`,
             openedToday: false,
             lastOpenAt: 0
         };
@@ -106,7 +104,7 @@ async function loadData() {
     if (state.points === undefined) state.points = (state.totalClaims || 0) * 10;
 
     // 4. Refresh Day/Seed Logic
-    const expectedSeed = `${user.id}_${todayISO}`;
+    const expectedSeed = `${user.userId}_${todayISO}`;
     if (state.todaySeed !== expectedSeed) {
         state.todaySeed = expectedSeed;
         state.openedToday = false;
@@ -119,7 +117,6 @@ async function loadData() {
             const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
             
             // If more than 1 day passed, streak resets
-            // (diffDays 0 = same day, 1 = yesterday, >1 = missed a day)
             if (diffDays > 1) {
                 state.streak = 0;
             }
@@ -142,7 +139,7 @@ async function loadData() {
 }
 
 async function saveState() {
-    const localKey = `${KEYS.DAILY_STATE}${user.id}_daily_state`;
+    const localKey = `${KEYS.DAILY_STATE}${user.userId}_daily_state`;
     localStorage.setItem(localKey, JSON.stringify(state));
     
     if (cloud && user.role !== 'guest') {
@@ -235,7 +232,7 @@ async function checkCoupleBonus(todayISO) {
         badge.classList.add('active');
         badge.style.background = 'linear-gradient(90deg, #ec4899, #8b5cf6)';
         badge.innerText = "Couple Bonus aktiv 💗";
-    } else if (claims.length > 0 && !claims.includes(user.id)) {
+    } else if (claims.length > 0 && !claims.includes(user.userId)) {
         badge.classList.add('active');
         badge.style.background = 'rgba(255,255,255,0.1)';
         badge.innerText = "Partner wartet auf dich... ⏳";
@@ -245,7 +242,7 @@ async function checkCoupleBonus(todayISO) {
 }
 
 function renderInbox() {
-    const inboxKey = `${KEYS.DAILY_INBOX}${user.id}_daily_inbox`;
+    const inboxKey = `${KEYS.DAILY_INBOX}${user.userId}_daily_inbox`;
     const inbox = JSON.parse(localStorage.getItem(inboxKey) || '[]');
     const inboxEl = document.getElementById('inboxList');
     inboxEl.innerHTML = '';
@@ -269,7 +266,7 @@ function renderInbox() {
 }
 
 function renderHistory() {
-    const histKey = `${KEYS.DAILY_HISTORY}${user.id}_daily_history`;
+    const histKey = `${KEYS.DAILY_HISTORY}${user.userId}_daily_history`;
     const history = JSON.parse(localStorage.getItem(histKey) || '[]');
     const histGrid = document.getElementById('historyGrid');
     histGrid.innerHTML = '';
@@ -348,7 +345,7 @@ async function processClaim() {
     await saveState();
 
     // Update History (Local only mostly, fine for now)
-    const histKey = `${KEYS.DAILY_HISTORY}${user.id}_daily_history`;
+    const histKey = `${KEYS.DAILY_HISTORY}${user.userId}_daily_history`;
     let history = JSON.parse(localStorage.getItem(histKey) || '[]');
     history.unshift({
         dateISO: todayISO,
@@ -365,7 +362,7 @@ async function processClaim() {
 
     // Couple Bonus Update
     if (cloud && user.role !== 'guest') {
-        await cloud.addDailyClaim(todayISO, user.id);
+        await cloud.addDailyClaim(todayISO, user.userId);
         const claims = await cloud.getDailyShared(todayISO);
         
         if (claims.includes('fia') && claims.includes('collin')) {
@@ -403,7 +400,7 @@ function executePayload(offer) {
 }
 
 function addInboxItem(item) {
-    const key = `${KEYS.DAILY_INBOX}${user.id}_daily_inbox`;
+    const key = `${KEYS.DAILY_INBOX}${user.userId}_daily_inbox`;
     let inbox = JSON.parse(localStorage.getItem(key) || '[]');
     inbox.unshift({
         id: crypto.randomUUID(),
@@ -473,7 +470,7 @@ function getLocalDailyOffer(seed) {
 window.devReset = async () => { 
     if (!isAdmin()) return alert("Access Denied");
     // Clear Local
-    localStorage.removeItem(`${KEYS.DAILY_STATE}${user.id}_daily_state`); 
+    localStorage.removeItem(`${KEYS.DAILY_STATE}${user.userId}_daily_state`); 
     // Clear Cloud (Mock reset via save empty)
     if(cloud) await cloud.saveDailyState(null);
     location.reload(); 

@@ -70,22 +70,11 @@ const App: React.FC = () => {
   const [customBg, setCustomBg] = useState<string | null>(null);
   const [bypassMaintenance, setBypassMaintenance] = useState(false);
 
-  const handleLogout = useCallback(() => {
-    clearSession();
-    setSession(null);
-    setOpenedApp(null);
-    setUserProfile(null);
-    setUserPrefs(null);
-    setBypassMaintenance(false);
-    playSound('close');
-  }, []);
-
   // --- Effects ---
 
   // 1. Global Cloud Config Listener (Priority 1)
   useEffect(() => {
     const unsubscribe = cloud.listenToAdminConfig((conf) => {
-        // console.log("Received Admin Config Update:", conf);
         setAdminConfig(conf);
         localStorage.setItem('fiaos_global_admin_config', JSON.stringify(conf));
     });
@@ -111,19 +100,29 @@ const App: React.FC = () => {
         return;
     }
 
-    // --- REAL-TIME BAN CHECK ---
-    // If admin config loads and user is marked banned, kick them out immediately.
-    if (adminConfig && adminConfig.userStatus) {
-        const myStatus = adminConfig.userStatus[session.userId];
-        if (myStatus && myStatus.banned) {
-            console.warn("User is banned. Forcing logout.");
-            handleLogout();
-            setOverlay({
-                isOpen: true,
-                title: "Account Gesperrt ⛔",
-                content: "Dein Zugang wurde deaktiviert. Wende dich an den Administrator."
-            });
-            return;
+    // --- REAL-TIME BAN & MAINTENANCE CHECK ---
+    if (adminConfig) {
+        // Ban Check
+        if (adminConfig.userStatus) {
+            const myStatus = adminConfig.userStatus[session.userId];
+            if (myStatus && myStatus.banned) {
+                console.warn("User is banned. Forcing logout.");
+                handleLogout();
+                setOverlay({
+                    isOpen: true,
+                    title: "Account Gesperrt ⛔",
+                    content: "Dein Zugang wurde deaktiviert. Wende dich an den Administrator."
+                });
+                return;
+            }
+        }
+
+        // Maintenance Force Logout
+        const isAdminUser = session.role === 'admin' || session.role === 'developer';
+        if (adminConfig.maintenanceMode && !isAdminUser && !bypassMaintenance) {
+             // Close any open apps
+             setOpenedApp(null);
+             // We don't fully logout session to keep state, but we force the maintenance screen rendering below
         }
     }
 
@@ -174,15 +173,7 @@ const App: React.FC = () => {
 
     initUserData();
 
-  }, [session, adminConfig]); // Re-run if session OR admin config changes
-
-  // 3b. Maintenance-triggered global logout
-  useEffect(() => {
-    if (!session || !adminConfig) return;
-    if (adminConfig.forceLogoutAt && session.lastLoginAt < adminConfig.forceLogoutAt) {
-        handleLogout();
-    }
-  }, [adminConfig, session]);
+  }, [session, adminConfig, bypassMaintenance]);
 
   // 4. Global Bridge
   useEffect(() => {
@@ -232,7 +223,6 @@ const App: React.FC = () => {
   // --- Handlers ---
 
   const handleUserSelect = (u: User) => {
-    // Immediate Ban Check (Pre-Login)
     if (adminConfig?.userStatus?.[u.id]?.banned) {
         setOverlay({
             isOpen: true,
@@ -275,6 +265,16 @@ const App: React.FC = () => {
     return true;
   };
 
+  const handleLogout = () => {
+    clearSession();
+    setSession(null);
+    setOpenedApp(null);
+    setUserProfile(null);
+    setUserPrefs(null);
+    setBypassMaintenance(false);
+    playSound('close');
+  };
+
   const handleUnlockReward = async (rewardId: string) => {
     if (!rewardsData || !session) return;
     
@@ -303,7 +303,7 @@ const App: React.FC = () => {
      setUserPrefs(newPrefs);
      applyTheme(newPrefs);
      if (session.role === 'guest') {
-         // save local
+         localStorage.setItem(`fiaos_user_${session.userId}_prefs`, JSON.stringify(newPrefs));
      } else {
          await cloud.savePrefs(newPrefs);
      }

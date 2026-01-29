@@ -16,29 +16,31 @@ const PROFILE_KEY = (uid) => {
 let user = null;
 let prefs = {};
 let profile = {};
-let rewards = null; // New: Load rewards to check locks
+let rewards = null; 
 let cloud = null;
 
-// Emojis for Avatar Picker
 const AVATAR_EMOJIS = ["👽", "🦊", "🐱", "🐶", "🦁", "🐯", "🐨", "🐼", "🐻", "🐰", "🐹", "🐭", "🦄", "🦋", "🍄", "🌺", "🌸", "🌼", "⚡", "🔥", "💧", "❄️", "🌟", "🌙", "🌍", "🪐", "🍕", "🍔", "🍟", "🍩"];
 
-// Themes Defs (Visual) - Exact match with constants.ts
+// Exact copy of THEMES from constants.ts for accurate preview
 const THEMES_UI = [
-    { id: 'roseGlass', name: 'FiaOS Rose', preview: 'linear-gradient(135deg, #1f1147 0%, #090112 55%, #050007 100%)', unlockRewardId: null },
-    { id: 'aurora', name: 'Aurora', preview: 'radial-gradient(circle at top right, rgba(56, 189, 248, 0.35), transparent 55%), linear-gradient(135deg, #0f172a 0%, #1f2937 45%, #0b1020 100%)', unlockRewardId: 'reward.welcomeTheme' },
-    { id: 'softRose', name: 'Soft Rose', preview: 'linear-gradient(135deg, #fb7185 0%, #be123c 55%, #4c0519 100%)', unlockRewardId: 'love_1_month' },
-    { id: 'midnightLove', name: 'Midnight Love', preview: 'linear-gradient(180deg, #0f172a 0%, #1e1b4b 45%, #312e81 100%)', unlockRewardId: 'love_3_month' },
-    { id: 'pastelSky', name: 'Pastel Sky', preview: 'linear-gradient(160deg, #bae6fd 0%, #fef9c3 55%, #fbcfe8 100%)', unlockRewardId: 'love_6_month' },
-    { id: 'eternal', name: 'Eternal Gold', preview: 'linear-gradient(135deg, #92400e 0%, #713f12 45%, #3f1a06 100%)', unlockRewardId: 'love_1_year' },
-    { id: 'royal', name: 'Royal Gold', preview: 'linear-gradient(135deg, #3b0764 0%, #7c2d12 50%, #451a03 100%)', unlockRewardId: 'daily.points100' },
-    { id: 'custom', name: 'Eigene', preview: '#111827', unlockRewardId: 'custom_theme_unlock' }
+    { id: 'roseGlass', name: 'Default', color: 'linear-gradient(to bottom right, #2e1065, #000)', unlockRewardId: null },
+    { id: 'lavender', name: 'Lavender', color: 'linear-gradient(to bottom, #4c1d95, #2e1065)', unlockRewardId: null },
+    { id: 'mint', name: 'Mint', color: 'linear-gradient(to bottom, #064e3b, #065f46)', unlockRewardId: null },
+    { id: 'ocean', name: 'Ocean', color: 'linear-gradient(to bottom, #0c4a6e, #0369a1)', unlockRewardId: null },
+    { id: 'sunset', name: 'Sunset', color: 'linear-gradient(to bottom, #7c2d12, #9a3412)', unlockRewardId: null },
+    { id: 'aurora', name: 'Aurora', color: 'linear-gradient(45deg, #2b5876 0%, #4e4376 100%)', unlockRewardId: 'reward.welcomeTheme' },
+    { id: 'softRose', name: 'Soft Rose', color: 'linear-gradient(to bottom right, #be185d, #4c0519)', unlockRewardId: 'love_1_month' },
+    { id: 'midnightLove', name: 'Midnight', color: 'linear-gradient(to bottom, #1e1b4b, #312e81)', unlockRewardId: 'love_3_month' },
+    { id: 'pastelSky', name: 'Pastel', color: 'linear-gradient(to top, #7dd3fc 0%, #e0f2fe 100%)', unlockRewardId: 'love_6_month' },
+    { id: 'eternal', name: 'Eternal', color: 'linear-gradient(to bottom right, #713f12, #451a03)', unlockRewardId: 'love_1_year' },
+    { id: 'royal', name: 'Royal', color: 'linear-gradient(135deg, #422006, #78350f)', unlockRewardId: 'daily.points100' },
+    { id: 'custom', name: 'Eigene', color: '#333', unlockRewardId: 'custom_theme_unlock' }
 ];
 
 function init() {
     const s = localStorage.getItem(KEYS.SESSION);
     if (!s) return;
     user = JSON.parse(s);
-    user.id = user.id || user.userId;
 
     if (window.parent.FIAOS && window.parent.FIAOS.cloud) {
         cloud = window.parent.FIAOS.cloud;
@@ -50,7 +52,9 @@ function init() {
 }
 
 async function loadEverything() {
-    // 1. Prefs & Profile & Rewards
+    // Fix: user.userId
+    const uid = user.userId;
+    
     if (user.role === 'guest') {
         const pStr = localStorage.getItem(PREFS_KEY('guest'));
         prefs = pStr ? JSON.parse(pStr) : defaultPrefs();
@@ -70,14 +74,13 @@ async function loadEverything() {
 
             rewards = await cloud.loadRewards();
         } else {
-            // Local fallback for non-guest (unlikely but safe)
-            const pStr = localStorage.getItem(PREFS_KEY(user.id));
+            const pStr = localStorage.getItem(PREFS_KEY(uid));
             prefs = pStr ? JSON.parse(pStr) : defaultPrefs();
             
-            const profStr = localStorage.getItem(PROFILE_KEY(user.id));
+            const profStr = localStorage.getItem(PROFILE_KEY(uid));
             profile = profStr ? JSON.parse(profStr) : defaultProfile();
             
-            const rewStr = localStorage.getItem(`fiaos_rewards_${user.id}`);
+            const rewStr = localStorage.getItem(`fiaos_rewards_${uid}`);
             rewards = rewStr ? JSON.parse(rewStr) : null;
         }
     }
@@ -99,7 +102,7 @@ function defaultPrefs() {
 
 function defaultProfile() {
     return {
-        userId: user.id,
+        userId: user.userId, // Fix
         role: user.role,
         displayName: user.name,
         avatar: { type: 'emoji', value: user.name.charAt(0) },
@@ -108,17 +111,12 @@ function defaultProfile() {
     };
 }
 
-// --- Render ---
-
 function renderUI() {
-    // Profile
     document.getElementById('avatarDisplay').innerText = profile.avatar?.value || '👤';
     document.getElementById('nameInput').value = profile.displayName || user.name;
 
-    // Themes
     const tList = document.getElementById('themeList');
     tList.innerHTML = THEMES_UI.map(t => {
-        // Unlock check
         const isUnlocked = !t.unlockRewardId || 
                            (rewards?.rewards?.[t.unlockRewardId]?.unlocked) || 
                            (rewards?.valentine?.unlocked?.[t.unlockRewardId]);
@@ -129,23 +127,20 @@ function renderUI() {
         
         return `
         <div class="theme-opt ${activeClass}" onclick="${onclick}">
-            <div class="theme-preview" style="background:${t.preview}">
+            <div class="theme-preview" style="background:${t.color}">
                 ${lockHtml}
             </div>
             <div class="theme-name">${t.name}</div>
         </div>
     `}).join('');
 
-    // Custom Upload Visibility
     const uploadDiv = document.getElementById('customUpload');
     if (prefs.theme === 'custom') uploadDiv.classList.add('visible');
     else uploadDiv.classList.remove('visible');
 
-    // Behavior
     const tog = document.getElementById('toggleMotion');
     if (prefs.reduceMotion) tog.classList.add('active'); else tog.classList.remove('active');
 
-    // Quickstart
     const sel = document.getElementById('quickstartSelect');
     const label = document.getElementById('quickstartVal');
     
@@ -154,9 +149,11 @@ function renderUI() {
         label.innerText = "Zuletzt geöffnet";
     } else {
         sel.value = prefs.quickstartApp || 'luna';
-        // Need to wait for DOM or just use logic
-        const opt = sel.querySelector(`option[value="${sel.value}"]`);
-        label.innerText = opt ? opt.innerText : "App";
+        // Wait for DOM
+        setTimeout(() => {
+            const opt = sel.querySelector(`option[value="${sel.value}"]`);
+            if(opt) label.innerText = opt.innerText;
+        }, 0);
     }
 }
 
@@ -178,8 +175,6 @@ function updateStatus() {
         txt.innerText = "Offline";
     }
 }
-
-// --- Actions ---
 
 window.saveProfile = async () => {
     const name = document.getElementById('nameInput').value.trim();
@@ -211,7 +206,7 @@ window.uploadWallpaper = () => {
                 alert("Bild gespeichert! (Nur dieses Gerät)");
                 applyPrefs(); 
             } catch(err) {
-                alert("Bild zu groß für Speicher! Bitte kleineres Bild wählen.");
+                alert("Bild zu groß für Speicher!");
             }
         };
         reader.readAsDataURL(input.files[0]);
@@ -237,20 +232,15 @@ window.saveQuickstart = () => {
 
 async function applyPrefs() {
     renderUI();
-    
     if (window.parent.FIAOS_APPLY_PREFS) {
-        // Send a deep copy to ensure React state update works
         window.parent.FIAOS_APPLY_PREFS(JSON.parse(JSON.stringify(prefs)));
     }
-
     if (user.role === 'guest') {
         localStorage.setItem(PREFS_KEY('guest'), JSON.stringify(prefs));
     } else if (cloud) {
         await cloud.savePrefs(prefs);
     }
 }
-
-// --- Emoji Picker ---
 
 window.openEmojiPicker = () => {
     const grid = document.getElementById('emojiGrid');

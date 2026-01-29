@@ -21,7 +21,6 @@ function init() {
     const sessionStr = localStorage.getItem(KEYS.SESSION);
     if (!sessionStr) return;
     user = JSON.parse(sessionStr);
-    user.id = user.id || user.userId;
 
     if (window.parent.FIAOS && window.parent.FIAOS.cloud) {
         cloud = window.parent.FIAOS.cloud;
@@ -179,7 +178,8 @@ window.saveEntry = async () => {
         title, text, mood: currentMood,
         createdAt: editingId ? (entries.find(e=>e.id===editingId).createdAt) : Date.now(),
         updatedAt: Date.now(),
-        authorUserId: user.id,
+        // Fix: user.userId
+        authorUserId: user.userId,
         authorName: user.name,
         scope: 'user' // Default to private for Journal 2.0 simplification
     };
