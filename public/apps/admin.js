@@ -77,6 +77,7 @@ function init() {
     const sessionStr = localStorage.getItem(KEYS.SESSION);
     if (!sessionStr) return denyAccess();
     currentUser = JSON.parse(sessionStr);
+    currentUser.id = currentUser.id || currentUser.userId;
 
     if (currentUser.role !== 'admin' && currentUser.role !== 'developer') return denyAccess();
     
@@ -85,6 +86,14 @@ function init() {
     }
 
     loadSystemData();
+    if (cloud && cloud.listenToAdminConfig) {
+        cloud.listenToAdminConfig((conf) => {
+            adminConfig = conf;
+            renderDashboard();
+            renderApps();
+            renderUsersList();
+        });
+    }
     setInterval(updateUptime, 60000);
 }
 
@@ -118,9 +127,10 @@ async function loadSystemData() {
         }
 
         // Init defaults if empty
-        if (!adminConfig) adminConfig = { appVisibility: {}, userStatus: {}, maintenanceMode: false };
+        if (!adminConfig) adminConfig = { appVisibility: {}, userStatus: {}, maintenanceMode: false, forceLogoutAt: 0, forceLogoutAtByUser: {} };
         if (!adminConfig.appVisibility) adminConfig.appVisibility = {};
         if (!adminConfig.userStatus) adminConfig.userStatus = {};
+        if (!adminConfig.forceLogoutAtByUser) adminConfig.forceLogoutAtByUser = {};
 
         // Force defaults for apps
         APP_DEFS.forEach(a => {
@@ -151,6 +161,16 @@ function renderDashboard() {
 
     // Stats
     document.getElementById('statUsers').innerText = USERS_LIST.length;
+    const updatedAt = adminConfig.updatedAt ? new Date(adminConfig.updatedAt).toLocaleString() : '—';
+    const editedBy = adminConfig.lastEditedBy ? `von ${adminConfig.lastEditedBy}` : '—';
+    const updatedEl = document.getElementById('statUpdated');
+    const editedEl = document.getElementById('statEditedBy');
+    const lastLogoutEl = document.getElementById('statLogoutAt');
+    if (updatedEl) updatedEl.innerText = updatedAt;
+    if (editedEl) editedEl.innerText = editedBy;
+    if (lastLogoutEl) {
+        lastLogoutEl.innerText = adminConfig.forceLogoutAt ? new Date(adminConfig.forceLogoutAt).toLocaleString() : '—';
+    }
 }
 
 function updateUptime() {
@@ -217,6 +237,9 @@ window.switchView = (viewId, btn) => {
 window.toggleMaintenance = async () => {
     // 1. Flip State
     adminConfig.maintenanceMode = !adminConfig.maintenanceMode;
+    if (adminConfig.maintenanceMode) {
+        adminConfig.forceLogoutAt = Date.now();
+    }
     
     // 2. Optimistic UI
     renderDashboard(); 
@@ -236,6 +259,8 @@ window.toggleAppVisibility = async (appId) => {
 };
 
 async function syncConfig() {
+    adminConfig.lastEditedBy = currentUser?.userId || currentUser?.id || 'system';
+    adminConfig.updatedAt = Date.now();
     // Optimistic local save
     localStorage.setItem('fiaos_global_admin_config', JSON.stringify(adminConfig));
     // Cloud save
