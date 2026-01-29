@@ -8,19 +8,18 @@
     <style>
         :root {
             --bg-dark: #000;
-            --bg-card: #1c1c1e;
-            --primary: #f472b6;
             --text: #ffffff;
-            --text-dim: rgba(255, 255, 255, 0.5);
-            --border: rgba(255, 255, 255, 0.1);
+            --text-dim: rgba(255, 255, 255, 0.6);
+            --card-border: rgba(255, 255, 255, 0.15);
+            --glass: rgba(30, 30, 35, 0.7);
         }
 
         * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
 
         body {
             margin: 0; padding: 0;
-            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-            background: var(--bg-dark);
+            font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "Segoe UI", Roboto, sans-serif;
+            background: #000;
             color: var(--text);
             height: 100vh;
             display: flex;
@@ -29,222 +28,266 @@
             user-select: none;
         }
 
+        /* Animated Background */
+        .bg-mesh {
+            position: absolute; inset: 0; z-index: -1;
+            background: radial-gradient(circle at 0% 0%, #2e1065 0%, transparent 50%),
+                        radial-gradient(circle at 100% 100%, #be185d 0%, transparent 50%);
+            opacity: 0.4;
+        }
+
         /* Top Bar */
         .topbar {
-            padding: 16px 20px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            background: rgba(28, 28, 30, 0.8);
-            backdrop-filter: blur(20px);
-            border-bottom: 1px solid var(--border);
-            z-index: 50;
-            position: relative;
+            padding: 20px 24px;
+            padding-top: calc(20px + env(safe-area-inset-top));
+            display: flex; align-items: center; justify-content: space-between;
+            background: rgba(0,0,0,0.2); backdrop-filter: blur(20px);
+            position: sticky; top: 0; z-index: 50;
+            border-bottom: 1px solid rgba(255,255,255,0.05);
         }
-        .title { font-size: 17px; font-weight: 600; text-align: center; }
+        .title-group h1 { margin: 0; font-size: 28px; font-weight: 800; letter-spacing: -0.5px; }
+        .title-group span { font-size: 13px; color: var(--text-dim); text-transform: uppercase; font-weight: 600; letter-spacing: 1px; }
+
         .refresh-btn {
-            position: absolute; right: 16px; top: 14px;
-            background: rgba(255,255,255,0.1); border: none; 
-            width: 32px; height: 32px; border-radius: 50%;
+            background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.1); 
+            width: 40px; height: 40px; border-radius: 12px;
             display: flex; align-items: center; justify-content: center;
-            font-size: 16px; cursor: pointer; color: #fff;
+            font-size: 18px; cursor: pointer; color: #fff;
+            transition: all 0.2s;
         }
-        .refresh-btn:active { background: rgba(255,255,255,0.2); }
+        .refresh-btn:active { transform: scale(0.9); background: rgba(255,255,255,0.2); }
 
         /* Tabs */
-        .tabs-container {
-            padding: 12px 16px;
-            background: rgba(28, 28, 30, 0.5);
-        }
+        .tabs-wrapper { padding: 0 24px; margin-top: 16px; margin-bottom: 8px; flex-shrink: 0; }
         .segmented-control {
             background: rgba(118, 118, 128, 0.24);
-            border-radius: 9px;
-            padding: 2px;
-            display: flex;
-            position: relative;
+            border-radius: 12px; padding: 4px;
+            display: flex; position: relative;
         }
         .segment-btn {
-            flex: 1; padding: 6px 0; text-align: center;
-            font-size: 13px; font-weight: 500; color: #fff;
-            z-index: 2; cursor: pointer;
+            flex: 1; padding: 8px 0; text-align: center;
+            font-size: 14px; font-weight: 600; color: #fff;
+            z-index: 2; cursor: pointer; opacity: 0.8; transition: opacity 0.2s;
         }
+        .segment-btn.active { opacity: 1; }
         .segment-indicator {
-            position: absolute; top: 2px; bottom: 2px; width: 50%;
-            background: #636366; border-radius: 7px;
-            box-shadow: 0 3px 8px rgba(0,0,0,0.12);
-            transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            position: absolute; top: 4px; bottom: 4px; width: calc(50% - 4px);
+            background: #636366; border-radius: 9px;
+            box-shadow: 0 3px 8px rgba(0,0,0,0.2);
+            transition: transform 0.3s cubic-bezier(0.2, 0.8, 0.2, 1);
             z-index: 1;
         }
 
-        /* Content */
+        /* Scroll Content */
         .content {
-            flex: 1;
-            overflow-y: auto;
-            padding: 20px;
-            padding-bottom: 80px;
-            display: flex;
-            flex-direction: column;
-            gap: 20px;
+            flex: 1; overflow-y: auto; padding: 20px 24px;
+            padding-bottom: 100px;
+            display: flex; flex-direction: column; gap: 24px;
         }
-        .hidden { display: none; }
+        .hidden { display: none !important; }
 
-        /* Game Cards */
-        .game-card {
-            background: var(--bg-card);
-            border-radius: 16px;
-            overflow: hidden;
-            margin-bottom: 20px;
-            border: 1px solid var(--border);
-            display: flex;
-            flex-direction: column;
-            box-shadow: 0 4px 20px rgba(0,0,0,0.3);
-            transition: transform 0.2s;
-        }
-        .game-card:active { transform: scale(0.98); }
-
-        .card-header {
-            height: 120px;
-            background: linear-gradient(135deg, #333, #000);
-            display: flex; align-items: center; justify-content: center;
-        }
-        .card-icon { font-size: 48px; filter: drop-shadow(0 4px 8px rgba(0,0,0,0.4)); }
-        
-        .card-body { padding: 16px; display: flex; flex-direction: column; gap: 4px; }
-        .game-title { font-size: 18px; font-weight: 700; color: #fff; }
-        .game-desc { font-size: 13px; color: var(--text-dim); }
-        
-        .game-meta { 
-            display: flex; justify-content: space-between; align-items: center; margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--border);
-        }
-        .score-badge { font-size: 12px; font-weight: 600; color: var(--primary); background: rgba(244, 114, 182, 0.1); padding: 4px 8px; border-radius: 8px; }
-        
-        .play-btn {
-            background: #fff; color: #000; border: none; padding: 6px 14px; border-radius: 20px; font-size: 13px; font-weight: 700; cursor: pointer;
-        }
-
-        /* Leaderboard */
-        .lb-item {
+        /* Hero Banner */
+        .hero {
+            background: linear-gradient(135deg, #ec4899, #8b5cf6);
+            border-radius: 24px; padding: 24px;
+            position: relative; overflow: hidden;
+            box-shadow: 0 10px 30px rgba(236, 72, 153, 0.3);
             display: flex; align-items: center; justify-content: space-between;
-            padding: 12px; background: rgba(255,255,255,0.05);
-            border-radius: 10px; margin-bottom: 8px; font-size: 14px;
         }
-        .lb-rank { width: 24px; font-weight: 700; color: var(--text-dim); }
-        .lb-score { font-weight: 600; color: var(--primary); }
-        .lb-title { font-size: 14px; font-weight: 600; color: var(--text-dim); margin-bottom: 10px; text-transform: uppercase; }
+        .hero-text { position: relative; z-index: 2; }
+        .hero h2 { margin: 0; font-size: 22px; font-weight: 800; }
+        .hero p { margin: 4px 0 0 0; font-size: 13px; opacity: 0.9; font-weight: 500; }
+        .hero-icon { font-size: 60px; filter: drop-shadow(0 10px 20px rgba(0,0,0,0.3)); transform: rotate(10deg); }
+        .hero-bg {
+            position: absolute; inset: 0; 
+            background: url("data:image/svg+xml,%3Csvg width='40' height='40' viewBox='0 0 40 40' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='%23ffffff' fill-opacity='0.1' fill-rule='evenodd'%3E%3Cpath d='M0 40L40 0H20L0 20M40 40V20L20 40'/%3E%3C/g%3E%3C/svg%3E");
+            z-index: 1;
+        }
+
+        /* Grid Layout */
+        .games-grid {
+            display: grid; grid-template-columns: 1fr 1fr; gap: 16px;
+        }
+
+        /* Game Card */
+        .game-card {
+            background: var(--glass);
+            border-radius: 20px;
+            overflow: hidden;
+            border: 1px solid var(--card-border);
+            display: flex; flex-direction: column;
+            position: relative;
+            transition: transform 0.2s, box-shadow 0.2s;
+            cursor: pointer;
+            height: 180px;
+        }
+        .game-card:active { transform: scale(0.96); opacity: 0.9; }
+
+        .card-visual {
+            flex: 1; position: relative;
+            display: flex; align-items: center; justify-content: center;
+            font-size: 48px;
+            background: radial-gradient(circle at center, rgba(255,255,255,0.1), transparent);
+        }
+        .card-visual::after {
+            content: ''; position: absolute; inset: 0;
+            background: linear-gradient(to bottom, transparent 50%, rgba(0,0,0,0.8));
+        }
+
+        .card-meta {
+            position: absolute; bottom: 0; left: 0; right: 0;
+            padding: 12px; z-index: 2;
+        }
+        .game-name { font-size: 15px; font-weight: 700; margin-bottom: 2px; }
+        .game-score { 
+            font-size: 11px; font-weight: 600; color: #fbbf24; 
+            background: rgba(0,0,0,0.4); padding: 2px 8px; border-radius: 10px;
+            display: inline-block; backdrop-filter: blur(4px);
+        }
+
+        /* Specific Gradients */
+        .g-stack { background: linear-gradient(135deg, #be185d, #fb7185); }
+        .g-reaction { background: linear-gradient(135deg, #7c3aed, #a78bfa); }
+        .g-block { background: linear-gradient(135deg, #2563eb, #60a5fa); }
+        .g-puzzle { background: linear-gradient(135deg, #059669, #34d399); }
+        .g-snake { background: linear-gradient(135deg, #16a34a, #4ade80); }
+        .g-flappy { background: linear-gradient(135deg, #0891b2, #22d3ee); }
+
+        /* Leaderboard Styles */
+        .lb-container { display: flex; flex-direction: column; gap: 24px; }
+        .lb-section h3 { 
+            font-size: 14px; text-transform: uppercase; color: var(--text-dim); 
+            margin: 0 0 12px 4px; letter-spacing: 1px; 
+        }
+        
+        .lb-list {
+            background: var(--glass); border-radius: 20px;
+            border: 1px solid var(--card-border); overflow: hidden;
+        }
+        .lb-row {
+            display: flex; align-items: center; justify-content: space-between;
+            padding: 14px 16px; border-bottom: 1px solid rgba(255,255,255,0.05);
+        }
+        .lb-row:last-child { border-bottom: none; }
+        
+        .lb-rank { 
+            width: 28px; font-weight: 800; font-size: 14px; 
+            color: var(--text-dim); text-align: center; 
+        }
+        .lb-rank.top-1 { color: #fbbf24; font-size: 18px; }
+        .lb-rank.top-2 { color: #94a3b8; font-size: 16px; }
+        .lb-rank.top-3 { color: #b45309; font-size: 16px; }
+
+        .lb-user { font-weight: 600; font-size: 15px; flex: 1; margin-left: 12px; }
+        .lb-val { font-family: monospace; font-weight: 700; color: #ec4899; font-size: 15px; }
+
+        /* Empty State */
+        .loading-state {
+            display: flex; flex-direction: column; align-items: center; justify-content: center;
+            height: 200px; color: var(--text-dim); gap: 10px;
+        }
+        .spinner {
+            width: 30px; height: 30px; border: 3px solid rgba(255,255,255,0.1);
+            border-top-color: #fff; border-radius: 50%; animation: spin 1s infinite linear;
+        }
+        @keyframes spin { to { transform: rotate(360deg); } }
 
     </style>
 </head>
 <body>
 
+    <div class="bg-mesh"></div>
+
     <div class="topbar">
-        <div class="title">Arcade 💗</div>
+        <div class="title-group">
+            <h1>Arcade</h1>
+            <span>Play & Win</span>
+        </div>
         <button class="refresh-btn" onclick="forceRefresh()">↻</button>
     </div>
 
-    <div class="tabs-container">
+    <div class="tabs-wrapper">
         <div class="segmented-control">
             <div class="segment-indicator" id="segIndicator"></div>
-            <div class="segment-btn" onclick="switchTab('games', 0)">Games</div>
-            <div class="segment-btn" onclick="switchTab('stats', 1)">Leaderboard</div>
+            <div class="segment-btn active" onclick="switchTab('games', 0)">Spiele</div>
+            <div class="segment-btn" onclick="switchTab('stats', 1)">Rangliste</div>
         </div>
     </div>
 
     <div class="content">
         
         <!-- GAMES TAB -->
-        <div id="tab-games">
+        <div id="tab-games" class="tab-content">
             
-            <div class="game-card" onclick="playGame('stack')">
-                <div class="card-header" style="background: linear-gradient(135deg, #ec4899, #db2777);">
-                    <div class="card-icon">🧱</div>
+            <div class="hero">
+                <div class="hero-bg"></div>
+                <div class="hero-text">
+                    <h2>Game of the Day</h2>
+                    <p>Fordere deine Reflexe heraus!</p>
                 </div>
-                <div class="card-body">
-                    <div class="game-title">Hearts Stack</div>
-                    <div class="game-desc">Staple Herzen so hoch du kannst.</div>
-                    <div class="game-meta">
-                        <span class="score-badge" id="best-stack">Best: 0</span>
-                        <button class="play-btn">SPIELEN</button>
-                    </div>
-                </div>
+                <div class="hero-icon">⚡</div>
             </div>
 
-            <div class="game-card" onclick="playGame('reaction')">
-                <div class="card-header" style="background: linear-gradient(135deg, #8b5cf6, #7c3aed);">
-                    <div class="card-icon">⏱️</div>
-                </div>
-                <div class="card-body">
-                    <div class="game-title">Precision Timer</div>
-                    <div class="game-desc">Stoppe exakt bei 3.000 Sekunden!</div>
-                    <div class="game-meta">
-                        <span class="score-badge" id="best-reaction">Best: 0</span>
-                        <button class="play-btn">SPIELEN</button>
+            <div class="games-grid">
+                
+                <div class="game-card g-stack" onclick="playGame('stack')">
+                    <div class="card-visual">🧱</div>
+                    <div class="card-meta">
+                        <div class="game-name">Stack</div>
+                        <div class="game-score" id="best-stack">Best: 0</div>
                     </div>
                 </div>
-            </div>
 
-            <div class="game-card" onclick="playGame('blockblast')">
-                <div class="card-header" style="background: linear-gradient(135deg, #2563eb, #3b82f6);">
-                    <div class="card-icon">🟦</div>
-                </div>
-                <div class="card-body">
-                    <div class="game-title">BlockBlast</div>
-                    <div class="game-desc">Block Puzzle. Platziere Formen.</div>
-                    <div class="game-meta">
-                        <span class="score-badge" id="best-blockblast">Best: 0</span>
-                        <button class="play-btn">SPIELEN</button>
+                <div class="game-card g-reaction" onclick="playGame('reaction')">
+                    <div class="card-visual">⏱️</div>
+                    <div class="card-meta">
+                        <div class="game-name">Precision</div>
+                        <div class="game-score" id="best-reaction">Best: 0</div>
                     </div>
                 </div>
-            </div>
 
-            <div class="game-card" onclick="playGame('puzzle')">
-                <div class="card-header" style="background: linear-gradient(135deg, #10b981, #059669);">
-                    <div class="card-icon">🧩</div>
-                </div>
-                <div class="card-body">
-                    <div class="game-title">Slider Puzzle</div>
-                    <div class="game-desc">Schiebe-Puzzle auf Zeit.</div>
-                    <div class="game-meta">
-                        <span class="score-badge" id="best-puzzle">Best: --</span>
-                        <button class="play-btn">SPIELEN</button>
+                <div class="game-card g-block" onclick="playGame('blockblast')">
+                    <div class="card-visual">🟦</div>
+                    <div class="card-meta">
+                        <div class="game-name">BlockBlast</div>
+                        <div class="game-score" id="best-blockblast">Best: 0</div>
                     </div>
                 </div>
-            </div>
 
-            <div class="game-card" onclick="playGame('snake')">
-                <div class="card-header" style="background: linear-gradient(135deg, #22c55e, #15803d);">
-                    <div class="card-icon">🐍</div>
-                </div>
-                <div class="card-body">
-                    <div class="game-title">Snake v2</div>
-                    <div class="game-desc">Sammle Herzen, weiche dem Gegner aus.</div>
-                    <div class="game-meta">
-                        <span class="score-badge" id="best-snake">Best: 0</span>
-                        <button class="play-btn">SPIELEN</button>
+                <div class="game-card g-snake" onclick="playGame('snake')">
+                    <div class="card-visual">🐍</div>
+                    <div class="card-meta">
+                        <div class="game-name">Snake v2</div>
+                        <div class="game-score" id="best-snake">Best: 0</div>
                     </div>
                 </div>
-            </div>
 
-            <div class="game-card" onclick="playGame('flappy')">
-                <div class="card-header" style="background: linear-gradient(135deg, #60a5fa, #3b82f6);">
-                    <div class="card-icon">🐦</div>
-                </div>
-                <div class="card-body">
-                    <div class="game-title">Flappy Love</div>
-                    <div class="game-desc">Tap to Fly.</div>
-                    <div class="game-meta">
-                        <span class="score-badge" id="best-flappy">Best: 0</span>
-                        <button class="play-btn">SPIELEN</button>
+                <div class="game-card g-flappy" onclick="playGame('flappy')">
+                    <div class="card-visual">🐦</div>
+                    <div class="card-meta">
+                        <div class="game-name">Flappy</div>
+                        <div class="game-score" id="best-flappy">Best: 0</div>
                     </div>
                 </div>
-            </div>
 
+                <div class="game-card g-puzzle" onclick="playGame('puzzle')">
+                    <div class="card-visual">🧩</div>
+                    <div class="card-meta">
+                        <div class="game-name">Puzzle</div>
+                        <div class="game-score" id="best-puzzle">Best: --</div>
+                    </div>
+                </div>
+
+            </div>
         </div>
 
         <!-- STATS TAB -->
-        <div id="tab-stats" class="hidden">
-            <div id="lb-container">
-                <!-- Populated by JS -->
-                <div style="text-align:center; padding: 20px; color:#666;">Lade Daten...</div>
+        <div id="tab-stats" class="tab-content hidden">
+            <div id="lb-container" class="lb-container">
+                <div class="loading-state">
+                    <div class="spinner"></div>
+                    <div>Lade Daten...</div>
+                </div>
             </div>
         </div>
 

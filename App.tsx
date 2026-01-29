@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { User, Session, AppItem, ToastState, OverlayState, UserRewardsData, UserProfile, UserPrefs, AdminConfig, Reward } from './types';
-import { NOISE_BG, REWARD_CATALOG, THEMES, VALENTINE_REWARDS, USERS } from './constants';
+import { NOISE_BG, REWARD_CATALOG, THEMES, VALENTINE_REWARDS, USERS, INITIAL_ADMIN_CONFIG } from './constants';
 import { loadSession, saveSession, clearSession } from './utils/session';
 import { cloud } from './utils/cloud'; 
 import { playSound } from './utils/sound';
@@ -9,7 +9,8 @@ import {
   INITIAL_REWARDS_DATA,
   unlockRewardLogic, setRewardsLastSeen, 
   loadUserProfile, loadUserPrefs, applyTheme, saveLastApp, loadLastApp,
-  updateUserIndex
+  updateUserIndex,
+  loadAdminConfig
 } from './utils/data';
 import LoginScreen from './components/LoginScreen';
 import HomeScreen from './components/HomeScreen';
@@ -102,19 +103,30 @@ const App: React.FC = () => {
 
     // --- REAL-TIME BAN & MAINTENANCE CHECK ---
     if (adminConfig) {
-        // Ban Check
-        if (adminConfig.userStatus) {
-            const myStatus = adminConfig.userStatus[session.userId];
-            if (myStatus && myStatus.banned) {
-                console.warn("User is banned. Forcing logout.");
-                handleLogout();
-                setOverlay({
-                    isOpen: true,
-                    title: "Account Gesperrt ⛔",
-                    content: "Dein Zugang wurde deaktiviert. Wende dich an den Administrator."
-                });
-                return;
-            }
+        const myStatus = adminConfig.userStatus[session.userId];
+        
+        // Check 1: Ban
+        if (myStatus && myStatus.banned) {
+            console.warn("User is banned. Forcing logout.");
+            handleLogout();
+            setOverlay({
+                isOpen: true,
+                title: "Account Gesperrt ⛔",
+                content: "Dein Zugang wurde deaktiviert. Wende dich an den Administrator."
+            });
+            return;
+        }
+
+        // Check 2: Force Logout via Timestamp
+        if (myStatus && myStatus.forceLogoutAt && myStatus.forceLogoutAt > session.lastLoginAt) {
+            console.warn("Force logout signal received.");
+            handleLogout();
+            setOverlay({
+                isOpen: true,
+                title: "Sitzung Beendet 🔌",
+                content: "Du wurdest vom System abgemeldet."
+            });
+            return;
         }
 
         // Maintenance Force Logout
@@ -223,6 +235,7 @@ const App: React.FC = () => {
   // --- Handlers ---
 
   const handleUserSelect = (u: User) => {
+    // Optimistic local check before trying login (Cloud will double check later)
     if (adminConfig?.userStatus?.[u.id]?.banned) {
         setOverlay({
             isOpen: true,

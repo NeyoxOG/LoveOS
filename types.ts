@@ -116,6 +116,7 @@ export interface ThemeDef {
 export interface UserStatusConfig {
     role: UserRole;
     banned: boolean;
+    forceLogoutAt?: number; // Timestamp to trigger client-side logout
 }
 
 export interface AdminConfig {

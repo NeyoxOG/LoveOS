@@ -1,79 +1,59 @@
 
 # Appwrite Setup für FiaOS
 
-Da FiaOS client-seitig läuft, müssen die Datenbanken und Collections manuell im Appwrite Dashboard angelegt werden.
+FiaOS benötigt eine Appwrite-Instanz, um Daten (Zustände, Nachrichten, Spiele, etc.) zu speichern. Um die Einrichtung zu vereinfachen, steht ein automatisiertes Setup-Script bereit.
 
-## 1. Projekt erstellen
-*   Erstelle ein neues Projekt: **FiaOS**
-*   Notiere die **Project ID**.
+## 1. Voraussetzungen
 
-## 2. Datenbank
-*   Erstelle eine Datenbank mit der ID: `fiaos`
+1.  **Node.js 18+** installiert.
+2.  Ein aktiver **Appwrite Server** (z.B. Appwrite Cloud oder Self-Hosted).
+3.  Ein neues Projekt im Appwrite Dashboard (z.B. "FiaOS").
 
-## 3. Collections (Struktur)
+## 2. API Key erstellen
 
-Wir nutzen eine vereinfachte Struktur, um JSON-Objekte zu speichern.
+1.  Gehe im Appwrite Dashboard zu deinem Projekt.
+2.  Navigiere zu **Overview > API Keys**.
+3.  Erstelle einen neuen Key mit dem Namen "FiaOS Admin".
+4.  Wähle folgende Scopes (mindestens):
+    *   `databases.read`, `databases.write`
+    *   `collections.read`, `collections.write`
+    *   `documents.read`, `documents.write`
+    *   `indexes.read`, `indexes.write`
+    *   `attributes.read`, `attributes.write`
+5.  Kopiere das **API Secret**.
 
-### Collection A: `states`
-*   **ID:** `states`
-*   **Attribute:**
-    *   `profileKey` (String, 50, Required) -> z.B. "fia", "collin", "couple", "system"
-    *   `module` (String, 50, Required) -> z.B. "luna", "rewards", "settings", "daily", "admin_config"
-    *   `payload` (String, 1000000, Required) -> Das JSON Datenobjekt als String
-    *   `updatedAt` (String, 50, Required) -> ISO Timestamp
-*   **Permissions:**
-    *   Role `Any`: Read, Create, Update (Für MVP. Später auf `Users` einschränken).
+## 3. Konfiguration
 
-### Collection B: `diary`
-*   **ID:** `diary`
-*   **Attribute:**
-    *   `userId` (String, 50, Required)
-    *   `title` (String, 255, Required)
-    *   `text` (String, 5000, Required)
-    *   `mood` (String, 10, Required)
-    *   `createdAt` (Integer, Required) -> Timestamp
-    *   `payload` (String, 10000, Optional) -> Extra Daten
-*   **Permissions:**
-    *   Role `Any`: Read, Create, Update.
+Erstelle oder bearbeite die `.env` Datei im Root-Verzeichnis des Projekts:
 
-### Collection C: `messages`
-*   **ID:** `messages`
-*   **Attribute:**
-    *   `senderId` (String, 50, Required)
-    *   `text` (String, 1000, Required)
-    *   `createdAt` (Integer, Required)
-*   **Permissions:**
-    *   Role `Any`: Read, Create.
-
-### Collection D: `games` (Highscores)
-*   **ID:** `games`
-*   **Attribute:**
-    *   `gameId` (String, 50, Required)
-    *   `userId` (String, 50, Required)
-    *   `score` (Integer, Required)
-    *   `displayName` (String, 50, Required)
-    *   `updatedAt` (Integer, Required)
-*   **Indexes:**
-    *   Key: `score_desc`, Type: Key, Attribute: `score`, Order: Desc
-*   **Permissions:**
-    *   Role `Any`: Read, Create, Update.
-
-### Collection E: `vault`
-*   **ID:** `vault`
-*   **Attribute:**
-    *   `title` (String, 255, Required)
-    *   `body` (String, 5000, Required)
-    *   `lockType` (String, 20, Required)
-    *   `unlockAt` (Integer, Optional)
-    *   `openedAt` (Integer, Optional)
-    *   `createdAt` (Integer, Required)
-*   **Permissions:**
-    *   Role `Any`: Read, Create, Update.
-
-## 4. Umgebungsvariablen (Cloudflare Pages / .env)
-Setze diese Variablen in deinem Build-System oder `.env.local`:
-
-```
+```env
 VITE_APPWRITE_ENDPOINT=https://cloud.appwrite.io/v1
 VITE_APPWRITE_PROJECT_ID=[DEINE_PROJECT_ID]
+VITE_APPWRITE_API_KEY=[DEIN_API_KEY_VON_OBEN]
 ```
+
+## 4. Setup ausführen
+
+Führe folgenden Befehl aus, um die Datenbank, Collections, Attribute und Indizes automatisch anzulegen und initiale Daten zu seeden:
+
+```bash
+npm run db:setup
+```
+
+Das Script führt folgende Schritte aus:
+1.  Erstellt die Datenbank `fiaos`.
+2.  Erstellt Collections: `states`, `diary`, `messages`, `games`, `vault`.
+3.  Konfiguriert Attribute und Indizes.
+4.  Erstellt initiale Daten (Admin Config, Luna Stats).
+
+## 5. Berechtigungen (Permissions)
+
+Das Setup-Script konfiguriert die Collections standardmäßig mit `role:any` für CRUD-Operationen, um den MVP-Betrieb ohne komplexe serverseitige Logik zu ermöglichen.
+
+Für eine erhöhte Sicherheit in Produktion wird empfohlen, die Permissions im Appwrite Dashboard einzuschränken (z.B. nur `users` oder spezifische Teams).
+
+## Manuelle Kontrolle
+
+Falls das Script fehlschlägt, kannst du die Struktur manuell prüfen:
+*   Datenbank ID: `fiaos`
+*   Collections müssen exakt wie in `scripts/setupAppwrite.js` definiert sein.

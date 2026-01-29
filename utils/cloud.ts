@@ -5,27 +5,11 @@ import {
     ID, Query 
 } from './appwriteClient';
 import { UserRewardsData, AdminConfig, UserPrefs } from '../types';
-import { USERS } from '../constants';
+import { INITIAL_ADMIN_CONFIG } from '../constants';
 
 // --- Types & Constants ---
 
 const COUPLE_ID = 'couple';
-
-const DEFAULT_ADMIN_CONFIG: AdminConfig = {
-  appVisibility: {
-    luna: true, rewards: true, settings: true, valentine: true, 
-    vault: true, admin: true, messages: true, achievements: true, 
-    games: true, diary: true, daily: true, love: true, rewards_app: true, story: true, bucket: true
-  },
-  userStatus: {
-    "fia": { role: "user", banned: false },
-    "collin": { role: "admin", banned: false },
-    "guest": { role: "guest", banned: false }
-  },
-  maintenanceMode: false,
-  lastEditedBy: "system",
-  updatedAt: Date.now()
-};
 
 // --- Helpers ---
 
@@ -151,26 +135,36 @@ export const cloud = {
     },
 
     // --- Auth Strategy ---
-    async silentLogin(userId: string, password: string): Promise<boolean> {
-        if (userId === 'guest') return true; 
-        
-        const userConfig = USERS.find(u => u.id === userId);
-        if (!userConfig || userConfig.password !== password) return false;
-
+    
+    // Login with Email/Password (Real Auth)
+    async login(email: string, password: string): Promise<boolean> {
         try {
-            try {
-                await account.get();
-                setStatus('online');
-            } catch {
-                await account.createAnonymousSession();
-                setStatus('online');
-            }
+            // Delete potential anonymous session first
+            try { await account.deleteSession('current'); } catch {}
+            
+            await account.createEmailPasswordSession(email, password);
+            setStatus('online');
             return true;
         } catch (e) {
-            // Suppress network errors during login to allow offline access
-            if (!isNetworkError(e)) console.error("[Cloud] Auth failed", e);
+            console.error("[Cloud] Login failed", e);
             setStatus('offline');
-            return true; 
+            return false;
+        }
+    },
+
+    // Added to support App.tsx usage
+    async silentLogin(userId: string, password?: string): Promise<void> {
+        if (userId === 'guest') return;
+        try {
+            await account.get();
+            setStatus('online');
+        } catch {
+            if (password) {
+                const email = `${userId}@fiaos.app`;
+                try {
+                    await this.login(email, password);
+                } catch {}
+            }
         }
     },
 
@@ -180,13 +174,16 @@ export const cloud = {
             await account.get();
             setStatus('online');
         } catch {
-            try {
-                await account.createAnonymousSession();
-                setStatus('online');
-            } catch {
-                setStatus('offline');
-            }
+            // Do not fallback to anonymous session for registered users
+            setStatus('offline');
         }
+    },
+
+    async logout() {
+        try {
+            await account.deleteSession('current');
+            setStatus('offline');
+        } catch(e) { console.warn("Logout error", e); }
     },
 
     // --- Admin / Config ---
@@ -206,7 +203,7 @@ export const cloud = {
         }
 
         // Fallback
-        return JSON.parse(localStorage.getItem(cacheKey) || JSON.stringify(DEFAULT_ADMIN_CONFIG));
+        return JSON.parse(localStorage.getItem(cacheKey) || JSON.stringify(INITIAL_ADMIN_CONFIG));
     },
 
     async saveAdminConfig(config: AdminConfig) {
@@ -217,7 +214,7 @@ export const cloud = {
     listenToAdminConfig(callback: (config: AdminConfig) => void) {
         // Initial Local Load
         const local = localStorage.getItem('fiaos_global_admin_config');
-        callback(local ? JSON.parse(local) : DEFAULT_ADMIN_CONFIG);
+        callback(local ? JSON.parse(local) : INITIAL_ADMIN_CONFIG);
 
         if (isGuest()) return () => {};
 
@@ -246,8 +243,16 @@ export const cloud = {
     },
 
     async adminForceLogout(targetUid: string) {
-        const config = await this.loadAdminConfig() || DEFAULT_ADMIN_CONFIG;
+        const config = await this.loadAdminConfig() || INITIAL_ADMIN_CONFIG;
+        
+        if (!config.userStatus[targetUid]) {
+            console.warn(`User ${targetUid} not found in config`);
+            return false;
+        }
+
+        config.userStatus[targetUid].forceLogoutAt = Date.now();
         config.updatedAt = Date.now();
+        
         await this.saveAdminConfig(config);
         return true;
     },
@@ -277,7 +282,7 @@ export const cloud = {
     
     async loadRewards(targetUid?: string): Promise<UserRewardsData | null> {
         const uid = targetUid || getUid();
-        const cacheKey = uid === 'guest' ? 'fiaos_rewards_guest' : `fiaos_rewards_${uid}`; // Legacy key match for seamless transition
+        const cacheKey = uid === 'guest' ? 'fiaos_rewards_guest' : `fiaos_rewards_${uid}`; 
         
         let data = null;
         if (!isGuest()) {
@@ -304,11 +309,6 @@ export const cloud = {
 
     async loadPrefs(): Promise<UserPrefs | null> {
         const uid = getUid();
-        const cacheKey = getCacheKey('prefs', uid); // fiaos_prefs_fia
-        // NOTE: data.ts uses specific legacy keys like `fiaos_user_${uid}_prefs`
-        // We will stick to the pattern used in data.ts for compatibility if we want seamless.
-        // Actually data.ts uses: `fiaos_user_${userId}_prefs`
-        
         const legacyKey = `fiaos_user_${uid}_prefs`;
 
         let data = null;
@@ -385,7 +385,6 @@ export const cloud = {
     async saveDiaryEntry(entry: any) {
         const localKey = isGuest() ? 'fiaos_guest_diary' : 'fiaos_cached_diary';
         
-        // Update Local Cache Immediately
         const local = JSON.parse(localStorage.getItem(localKey) || '[]');
         const idx = local.findIndex((e:any) => e.id === entry.id);
         if (idx >= 0) local[idx] = entry; else local.unshift(entry);
@@ -429,13 +428,11 @@ export const cloud = {
     listenToMessages(callback: (msgs: any[]) => void) {
         const localKey = isGuest() ? 'fiaos_guest_messages' : 'fiaos_cached_messages';
         
-        // Initial Local
         const cached = localStorage.getItem(localKey);
         if (cached) callback(JSON.parse(cached));
 
         if (isGuest()) return () => {};
 
-        // Fetch
         databases.listDocuments(DB_ID, COL_MESSAGES, [
             Query.orderDesc('createdAt'),
             Query.limit(50)
@@ -448,14 +445,11 @@ export const cloud = {
             })).reverse();
             localStorage.setItem(localKey, JSON.stringify(msgs));
             callback(msgs);
-        }).catch(() => {
-            // ignore network error, rely on cache
-        });
+        }).catch(() => {});
 
         try {
             const unsub = client.subscribe(`databases.${DB_ID}.collections.${COL_MESSAGES}.documents`, res => {
                 if (res.events.includes('databases.*.collections.*.documents.*.create')) {
-                    // Refetch to sync
                     databases.listDocuments(DB_ID, COL_MESSAGES, [
                         Query.orderDesc('createdAt'),
                         Query.limit(50)
@@ -478,8 +472,6 @@ export const cloud = {
     },
 
     async sendMessage(text: string) {
-        // Optimistic local update not easily possible without breaking callback flow, 
-        // relying on fetch/subscribe cycle for now.
         if (isGuest()) {
             const local = JSON.parse(localStorage.getItem('fiaos_guest_messages') || '[]');
             local.push({ text, senderId: 'guest', createdAt: Date.now() });
@@ -563,7 +555,7 @@ export const cloud = {
 
     async loadDailyState(targetUid?: string) {
         const uid = targetUid || getUid();
-        const legacyKey = `fiaos_user_${uid}_daily_state`; // as in daily.js
+        const legacyKey = `fiaos_user_${uid}_daily_state`;
 
         let data = null;
         if (!isGuest()) {

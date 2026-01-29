@@ -105,7 +105,7 @@ const COLLECTIONS = [
     }
 ];
 
-// --- Seed Data ---
+// --- Seed Data (Matching constants.ts) ---
 
 const INITIAL_ADMIN_CONFIG = {
     appVisibility: {
@@ -126,9 +126,9 @@ const INITIAL_ADMIN_CONFIG = {
         bucket: true
     },
     userStatus: {
-        "fia": { role: "user", banned: false },
-        "collin": { role: "admin", banned: false },
-        "guest": { role: "guest", banned: false }
+        "fia": { role: "user", banned: false, forceLogoutAt: 0 },
+        "collin": { role: "admin", banned: false, forceLogoutAt: 0 },
+        "guest": { role: "guest", banned: false, forceLogoutAt: 0 }
     },
     maintenanceMode: false,
     lastEditedBy: "system",

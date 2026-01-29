@@ -1,7 +1,9 @@
+
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { User } from '../types';
 import { Lock, ArrowRight, X } from 'lucide-react';
+import { cloud } from '../utils/cloud'; // Import cloud
 
 interface AuthSheetProps {
   user: User | null;
@@ -30,16 +32,32 @@ const AuthSheet: React.FC<AuthSheetProps> = ({ user, isOpen, onClose, onLogin })
     setIsSubmitting(true);
     setError(false);
 
-    // Simulate small network delay for realism
-    setTimeout(async () => {
-      const success = await onLogin(password);
-      setIsSubmitting(false);
-      if (!success) {
+    try {
+        let success = false;
+        
+        if (user?.role === 'guest') {
+            // Guest uses existing simple logic
+            success = await onLogin(password);
+        } else if (user) {
+            // Real Users use Cloud Auth
+            // Assumed email format for internal users: user.id + @fiaos.app
+            const email = `${user.id}@fiaos.app`; 
+            success = await cloud.login(email, password);
+            if (success) {
+                // If cloud login worked, we trigger the app's login handler to set session state
+                await onLogin(password); 
+            }
+        }
+
+        setIsSubmitting(false);
+        if (!success) {
+            setError(true);
+            setTimeout(() => setError(false), 500);
+        }
+    } catch (err) {
+        setIsSubmitting(false);
         setError(true);
-        // Reset error state after animation
-        setTimeout(() => setError(false), 500);
-      }
-    }, 400);
+    }
   };
 
   return (

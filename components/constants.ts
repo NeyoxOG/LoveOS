@@ -1,19 +1,19 @@
 
-import { User, AppItem, Reward, ThemeDef, DailyOffer } from './types';
+import { User, AppItem, Reward, ThemeDef, DailyOffer, AdminConfig } from './types';
 
 export const USERS: User[] = [
   { 
     id: "fia", 
     name: "Fia", 
     role: "user", 
-    password: "FiaundCollin*", 
+    password: null, // SECURITY: Password removed. Auth is handled by Appwrite.
     avatar: null 
   },
   { 
     id: "collin", 
     name: "Collin", 
     role: "admin", 
-    password: "AmbradisPW826*", 
+    password: null, // SECURITY: Password removed. Auth is handled by Appwrite.
     avatar: null 
   },
   { 
@@ -24,6 +24,34 @@ export const USERS: User[] = [
     avatar: null 
   }
 ];
+
+export const INITIAL_ADMIN_CONFIG: AdminConfig = {
+  appVisibility: {
+    luna: true,
+    rewards: true,
+    settings: true,
+    valentine: true,
+    vault: true,
+    admin: true,
+    messages: true,
+    achievements: true,
+    games: true,
+    diary: true,
+    daily: true,
+    love: true,
+    rewards_app: true,
+    story: true,
+    bucket: true
+  },
+  userStatus: {
+    "fia": { role: "user", banned: false, forceLogoutAt: 0 },
+    "collin": { role: "admin", banned: false, forceLogoutAt: 0 },
+    "guest": { role: "guest", banned: false, forceLogoutAt: 0 }
+  },
+  maintenanceMode: false,
+  lastEditedBy: "system",
+  updatedAt: Date.now()
+};
 
 export const APPS: AppItem[] = [
   { id:"love", name:"Love", icon:"💞", status:"available" },

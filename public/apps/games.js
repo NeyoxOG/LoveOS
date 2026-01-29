@@ -28,7 +28,6 @@ async function loadLeaderboard(gameId) {
 
 function renderUI() {
     // Local bests from cache for instant feedback
-    // Fix: Access user.userId instead of user.id
     const uid = user.userId;
     const key = `fiaos_user_${uid}_games`;
     const data = JSON.parse(localStorage.getItem(key) || '{}');
@@ -51,10 +50,19 @@ function updateBadge(id, score) {
 
 window.switchTab = async (id, idx) => {
     currentTab = id;
-    document.querySelectorAll('[id^="tab-"]').forEach(el => el.classList.add('hidden'));
-    document.getElementById(`tab-${id}`).classList.remove('hidden');
+    
+    // Toggle Content Visibility
+    document.getElementById('tab-games').classList.toggle('hidden', id !== 'games');
+    document.getElementById('tab-stats').classList.toggle('hidden', id !== 'stats');
+    
+    // Move Indicator
     document.getElementById('segIndicator').style.transform = `translateX(${idx * 100}%)`;
     
+    // Toggle Active State on Buttons
+    const btns = document.querySelectorAll('.segment-btn');
+    btns.forEach(b => b.classList.remove('active'));
+    btns[idx].classList.add('active');
+
     if (id === 'stats') {
         loadStatsView();
     }
@@ -63,11 +71,19 @@ window.switchTab = async (id, idx) => {
 window.forceRefresh = () => {
     if (currentTab === 'stats') loadStatsView();
     else renderUI();
+    
+    // Feedback
+    const btn = document.querySelector('.refresh-btn');
+    btn.style.transform = 'rotate(360deg)';
+    setTimeout(() => btn.style.transform = 'none', 500);
 };
 
 async function loadStatsView() {
     const lb = document.getElementById('lb-container');
-    lb.innerHTML = '<div style="text-align:center; padding:20px;">Lade Cloud Scores... ☁️</div>';
+    // Show spinner if empty
+    if (!lb.innerHTML.includes('lb-section')) {
+        lb.innerHTML = '<div class="loading-state"><div class="spinner"></div></div>';
+    }
     
     const games = [
         { key: 'stack', title: 'Hearts Stack' },
@@ -80,28 +96,33 @@ async function loadStatsView() {
     let html = '';
     for (const g of games) {
         const scores = await loadLeaderboard(g.key);
-        html += `<div class="lb-section"><div class="lb-title">${g.title}</div>`;
+        
+        html += `<div class="lb-section"><h3>${g.title}</h3>`;
+        html += `<div class="lb-list">`;
+        
         if (scores.length === 0) {
-            html += '<div style="font-size:12px; color:#666; margin-bottom:20px;">Keine Scores</div>';
+            html += '<div class="lb-row" style="color:#666; justify-content:center;">Keine Scores</div>';
         } else {
             scores.forEach((s, i) => {
                 let displayScore = s.score;
                 if (g.key === 'puzzle' || g.key === 'reaction') {
-                    // Time based display if needed, but reaction is points now based on accuracy
                     if (g.key === 'puzzle') displayScore = (s.score/1000).toFixed(1) + 's';
                 }
+                
+                // Rank formatting
+                const rankClass = i === 0 ? 'top-1' : (i === 1 ? 'top-2' : (i === 2 ? 'top-3' : ''));
+                const rankIcon = i === 0 ? '🥇' : (i === 1 ? '🥈' : (i === 2 ? '🥉' : (i + 1)));
+
                 html += `
-                    <div class="lb-item">
-                        <div style="display:flex; align-items:center;">
-                            <span class="lb-rank">${i+1}</span>
-                            <span>${s.displayName || 'Unbekannt'}</span>
-                        </div>
-                        <span class="lb-score">${displayScore}</span>
+                    <div class="lb-row">
+                        <div class="lb-rank ${rankClass}">${rankIcon}</div>
+                        <div class="lb-user">${s.displayName || 'Unbekannt'}</div>
+                        <div class="lb-val">${displayScore}</div>
                     </div>
                 `;
             });
-            html += '</div>';
         }
+        html += `</div></div>`; // Close list & section
     }
     lb.innerHTML = html;
 }

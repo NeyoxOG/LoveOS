@@ -1,6 +1,6 @@
 
 import { UserRewardsData, Reward, UserProfile, UserPrefs, Session, AdminConfig, UserIndex, UserIndexItem, DailyState } from '../types';
-import { REWARD_CATALOG, VALENTINE_REWARDS, THEMES } from '../constants';
+import { REWARD_CATALOG, VALENTINE_REWARDS, THEMES, INITIAL_ADMIN_CONFIG } from '../constants';
 
 export const INITIAL_REWARDS_DATA: UserRewardsData = {
   version: 2,
@@ -30,36 +30,6 @@ export const INITIAL_REWARDS_DATA: UserRewardsData = {
     lastSeenAt: Date.now(),
     points: 10
   }
-};
-
-// --- Admin Defaults ---
-
-const INITIAL_ADMIN_CONFIG: AdminConfig = {
-  appVisibility: {
-    luna: true,
-    rewards: true,
-    settings: true,
-    valentine: true,
-    vault: true,
-    admin: true,
-    messages: true,
-    achievements: true,
-    games: true,
-    diary: true,
-    daily: true,
-    love: true,
-    rewards_app: true,
-    story: true,
-    bucket: true // Ensure explicitly true
-  },
-  userStatus: {
-    "fia": { role: "user", banned: false },
-    "collin": { role: "admin", banned: false },
-    "guest": { role: "guest", banned: false }
-  },
-  maintenanceMode: false,
-  lastEditedBy: "system",
-  updatedAt: Date.now()
 };
 
 // --- Helpers ---
