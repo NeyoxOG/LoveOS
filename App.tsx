@@ -248,23 +248,29 @@ const App: React.FC = () => {
 
     setSelectedUser(u);
     if (u.role === 'guest') {
-        handleLoginAttempt(u, '');
+        handleLoginAttempt('guest'); // Guest auto-login
     } else {
         setIsAuthSheetOpen(true);
     }
   };
 
-  const handleLoginAttempt = async (userObj: User, pass: string): Promise<boolean> => {
-    if (userObj.role !== 'guest' && userObj.password && pass !== userObj.password) {
+  const handleLoginAttempt = async (password: string): Promise<boolean> => {
+    if (!selectedUser) return false;
+
+    // 1. Local Password Check
+    if (selectedUser.role !== 'guest' && selectedUser.password && password !== selectedUser.password) {
         return false;
     }
     
-    await cloud.silentLogin(userObj.id, pass);
+    // 2. Silent Cloud Login (Fire & Forget)
+    // This attempts to sync in background, but lets user in immediately
+    cloud.silentLogin(selectedUser.id, password).catch(() => {});
 
+    // 3. Create Session
     const newSession: Session = {
-        userId: userObj.id,
-        name: userObj.name,
-        role: userObj.role,
+        userId: selectedUser.id,
+        name: selectedUser.name,
+        role: selectedUser.role,
         lastLoginAt: Date.now()
     };
     
@@ -286,6 +292,7 @@ const App: React.FC = () => {
     setUserPrefs(null);
     setBypassMaintenance(false);
     playSound('close');
+    cloud.logout();
   };
 
   const handleUnlockReward = async (rewardId: string) => {
@@ -440,7 +447,7 @@ const App: React.FC = () => {
         isOpen={isAuthSheetOpen}
         onClose={() => setIsAuthSheetOpen(false)}
         user={selectedUser}
-        onLogin={(pw) => handleLoginAttempt(selectedUser!, pw)}
+        onLogin={handleLoginAttempt}
       />
 
       <Toast 

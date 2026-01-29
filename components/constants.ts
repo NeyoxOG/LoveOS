@@ -6,14 +6,14 @@ export const USERS: User[] = [
     id: "fia", 
     name: "Fia", 
     role: "user", 
-    password: null, // SECURITY: Password removed. Auth is handled by Appwrite.
+    password: "FiaundCollin*", 
     avatar: null 
   },
   { 
     id: "collin", 
     name: "Collin", 
     role: "admin", 
-    password: null, // SECURITY: Password removed. Auth is handled by Appwrite.
+    password: "AmbradisPW826*", 
     avatar: null 
   },
   { 

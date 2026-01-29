@@ -3,7 +3,6 @@ import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { User } from '../types';
 import { Lock, ArrowRight, X } from 'lucide-react';
-import { cloud } from '../utils/cloud'; // Import cloud
 
 interface AuthSheetProps {
   user: User | null;
@@ -27,36 +26,22 @@ const AuthSheet: React.FC<AuthSheetProps> = ({ user, isOpen, onClose, onLogin })
 
   const handleSubmit = async (e?: React.FormEvent) => {
     e?.preventDefault();
-    if (!password) return;
+    if (!password && user?.role !== 'guest') return;
 
     setIsSubmitting(true);
     setError(false);
 
-    try {
-        let success = false;
-        
-        if (user?.role === 'guest') {
-            // Guest uses existing simple logic
-            success = await onLogin(password);
-        } else if (user) {
-            // Real Users use Cloud Auth
-            // Assumed email format for internal users: user.id + @fiaos.app
-            const email = `${user.id}@fiaos.app`; 
-            success = await cloud.login(email, password);
-            if (success) {
-                // If cloud login worked, we trigger the app's login handler to set session state
-                await onLogin(password); 
-            }
-        }
+    // Simulate small network delay for better UX even on local
+    await new Promise(resolve => setTimeout(resolve, 300));
 
-        setIsSubmitting(false);
-        if (!success) {
-            setError(true);
-            setTimeout(() => setError(false), 500);
-        }
-    } catch (err) {
-        setIsSubmitting(false);
+    const success = await onLogin(password);
+
+    setIsSubmitting(false);
+    if (success) {
+        onClose();
+    } else {
         setError(true);
+        setTimeout(() => setError(false), 500);
     }
   };
 
@@ -108,7 +93,7 @@ const AuthSheet: React.FC<AuthSheetProps> = ({ user, isOpen, onClose, onLogin })
                     type="password"
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
-                    placeholder="Passwort"
+                    placeholder={user.role === 'guest' ? 'Kein Passwort nötig' : 'Passwort'}
                     className={`w-full bg-black/20 border ${error ? 'border-red-500/50' : 'border-white/10'} rounded-2xl py-4 pl-12 pr-4 text-white placeholder-white/30 focus:outline-none focus:border-indigo-500/50 focus:bg-black/40 transition-all text-lg`}
                     autoFocus
                   />

@@ -8,9 +8,45 @@
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <link rel="manifest" href="/manifest.json">
     <title>FiaOS</title>
+    
+    <!-- Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
-      /* Custom scrollbar hiding for clean UI */
+      :root {
+        --glass-border: rgba(255, 255, 255, 0.08);
+        --glass-bg: rgba(20, 20, 20, 0.6);
+        --glass-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.3);
+        --font-main: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+      }
+
+      body {
+        font-family: var(--font-main);
+        -webkit-tap-highlight-color: transparent;
+        overscroll-behavior: none;
+        background-color: black;
+        color: white;
+      }
+
+      /* Premium Scrollbar */
+      ::-webkit-scrollbar {
+        width: 6px;
+        height: 6px;
+      }
+      ::-webkit-scrollbar-track {
+        background: transparent;
+      }
+      ::-webkit-scrollbar-thumb {
+        background: rgba(255, 255, 255, 0.15);
+        border-radius: 10px;
+      }
+      ::-webkit-scrollbar-thumb:hover {
+        background: rgba(255, 255, 255, 0.3);
+      }
+      
       .no-scrollbar::-webkit-scrollbar {
         display: none;
       }
@@ -18,10 +54,15 @@
         -ms-overflow-style: none;
         scrollbar-width: none;
       }
-      body {
-        -webkit-tap-highlight-color: transparent;
-        overscroll-behavior: none;
-        background-color: black;
+
+      /* Squircle Utility */
+      .squircle {
+        mask-image: url("data:image/svg+xml,%3Csvg width='200' height='200' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M100,0 C20,0 0,20 0,100 C0,180 20,200 100,200 C180,200 200,180 200,100 C200,20 180,0 100,0 Z'/%3E%3C/svg%3E");
+        -webkit-mask-image: url("data:image/svg+xml,%3Csvg width='200' height='200' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M100,0 C20,0 0,20 0,100 C0,180 20,200 100,200 C180,200 200,180 200,100 C200,20 180,0 100,0 Z'/%3E%3C/svg%3E");
+        mask-size: 100% 100%;
+        -webkit-mask-size: 100% 100%;
+        mask-repeat: no-repeat;
+        -webkit-mask-repeat: no-repeat;
       }
 
       /* Aurora Theme Animation */
@@ -30,7 +71,6 @@
         animation: auroraMove 20s ease infinite;
       }
       [data-theme="aurora"] #root > div > div:first-child {
-        /* Target the background div in App.tsx */
         background-size: 200% 200% !important;
         animation: auroraMove 20s ease infinite;
       }
@@ -52,7 +92,7 @@
     "vite": "https://esm.sh/vite@^7.3.1",
     "@vitejs/plugin-react": "https://esm.sh/@vitejs/plugin-react@^5.1.2",
     "path": "https://esm.sh/path@^0.12.7",
-    "appwrite": "https://esm.sh/appwrite@^21.5.0",
+    "appwrite": "https://esm.sh/appwrite@^14.0.0",
     "url": "https://esm.sh/url@^0.11.4",
     "fs": "https://esm.sh/fs@^0.0.1-security"
   }

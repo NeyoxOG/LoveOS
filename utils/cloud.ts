@@ -42,8 +42,10 @@ const setStatus = (s: 'online' | 'offline' | 'syncing') => {
 };
 
 const isNetworkError = (e: any) => {
+    // Appwrite SDK often returns objects with code 0 for network issues
+    if (e?.code === 0) return true;
     const msg = e?.message || '';
-    return msg === 'Load failed' || msg === 'Network request failed' || msg.includes('offline');
+    return msg === 'Load failed' || msg === 'Network request failed' || msg.includes('offline') || msg.includes('Failed to fetch');
 };
 
 // --- Document ID Cache (Optimization) ---
@@ -95,7 +97,11 @@ const stateManager = {
                 return data;
             }
         } catch (e) {
-            if (!isNetworkError(e)) console.warn(`[Cloud] GetState Error ${module}:`, e);
+            // Suppress network errors to avoid console noise
+            if (!isNetworkError(e)) {
+                // 404 is normal for first time load
+                if (e.code !== 404) console.warn(`[Cloud] GetState Error ${module}:`, e.message);
+            }
             setStatus('offline');
             
             // Try offline cache for logged-in user
@@ -152,7 +158,7 @@ const stateManager = {
             }
             setStatus('online');
         } catch (e) {
-            console.error(`[Cloud] SetState Error ${module}:`, e);
+            if (!isNetworkError(e)) console.error(`[Cloud] SetState Error ${module}:`, e);
             setStatus('offline');
         }
     }
@@ -181,7 +187,10 @@ export const cloud = {
             _docIdCache.clear();
             return true;
         } catch (e) {
-            console.error("[Cloud] Login failed", e);
+            if (!isNetworkError(e)) {
+                // Log non-network errors (like Invalid Credentials)
+                console.warn("[Cloud] Login failed:", e.message);
+            }
             setStatus('offline');
             return false;
         }
@@ -215,7 +224,7 @@ export const cloud = {
             await account.deleteSession('current');
             _docIdCache.clear();
             setStatus('offline');
-        } catch(e) { console.warn("Logout error", e); }
+        } catch(e) { /* Ignore logout errors */ }
     },
 
     // --- Admin Config ---
@@ -290,8 +299,6 @@ export const cloud = {
 
     async saveRewards(newData: UserRewardsData, targetUid?: string) {
         const uid = targetUid || getUid();
-        
-        // Optimistic: Write immediately
         await stateManager.set('rewards', uid, newData);
     },
 
@@ -431,7 +438,7 @@ export const cloud = {
             }
             setStatus('online');
         } catch (e) {
-            console.error("Diary Save Error", e);
+            if (!isNetworkError(e)) console.error("Diary Save Error", e);
             setStatus('offline');
         }
     },
@@ -486,7 +493,9 @@ export const cloud = {
                 text,
                 createdAt: Date.now()
             });
-        } catch(e) { console.error("Send Error", e); }
+        } catch(e) { 
+            if (!isNetworkError(e)) console.error("Send Error", e); 
+        }
     },
 
     // --- Vault ---
@@ -514,7 +523,6 @@ export const cloud = {
         }
         if (!state.messages) return;
         
-        // This is inefficient but functional for MVP. Ideally we'd only save the changed item.
         for (const msg of state.messages) {
             try {
                 await databases.updateDocument(DB_ID, COL_VAULT, msg.id, {
@@ -571,7 +579,9 @@ export const cloud = {
                     updatedAt: Date.now()
                 });
             }
-        } catch (e) { console.error("Score Save Error", e); }
+        } catch (e) { 
+            if (!isNetworkError(e)) console.error("Score Save Error", e); 
+        }
     },
 
     async getLeaderboard(gameId: string) {

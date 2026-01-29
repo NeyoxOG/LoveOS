@@ -5,20 +5,22 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Belohnungen</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
     <style>
         :root {
             --bg-dark: #000000;
-            --bg-card: #1c1c1e;
+            --bg-card: #121212;
             --text: #ffffff;
             --text-sec: rgba(255, 255, 255, 0.55);
             --accent: #f59e0b;
+            --font: 'Inter', sans-serif;
         }
 
         * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
 
         body {
             margin: 0; padding: 0;
-            font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "Segoe UI", Roboto, sans-serif;
+            font-family: var(--font);
             background: var(--bg-dark);
             color: var(--text);
             height: 100vh;
@@ -33,103 +35,101 @@
             padding: 20px 24px;
             padding-top: calc(20px + env(safe-area-inset-top));
             display: flex; justify-content: space-between; align-items: flex-end;
-            background: rgba(0,0,0,0.8); backdrop-filter: blur(20px);
+            background: rgba(0,0,0,0.8); backdrop-filter: blur(30px);
             position: sticky; top: 0; z-index: 50;
-            border-bottom: 1px solid rgba(255,255,255,0.1);
+            border-bottom: 1px solid rgba(255,255,255,0.05);
         }
-        .header-title { font-size: 32px; font-weight: 800; letter-spacing: -0.5px; }
-        .header-date { font-size: 13px; color: var(--text-sec); text-transform: uppercase; font-weight: 600; margin-bottom: 4px; }
-        .user-points { 
-            background: rgba(255,255,255,0.1); padding: 6px 12px; 
-            border-radius: 20px; font-size: 14px; font-weight: 700; color: #fbbf24;
+        .header-title { font-size: 28px; font-weight: 800; letter-spacing: -0.5px; }
+        .header-date { font-size: 11px; color: var(--text-sec); text-transform: uppercase; font-weight: 700; letter-spacing: 1px; margin-bottom: 4px; }
+        
+        .points-badge {
+            background: linear-gradient(135deg, rgba(251, 191, 36, 0.2), rgba(245, 158, 11, 0.1));
+            border: 1px solid rgba(251, 191, 36, 0.3);
+            padding: 6px 14px; border-radius: 20px;
+            color: #fbbf24; font-weight: 700; font-size: 14px;
             display: flex; align-items: center; gap: 6px;
+            box-shadow: 0 4px 12px rgba(251, 191, 36, 0.1);
         }
 
-        /* Scroll Area */
         .content {
             flex: 1; overflow-y: auto; padding-bottom: 80px;
             overflow-x: hidden;
         }
 
-        /* Hero Card */
-        .hero-section { padding: 24px; }
+        /* Hero */
+        .hero-container { padding: 24px 24px 10px 24px; }
         .hero-card {
-            background: linear-gradient(135deg, #4f46e5, #9333ea);
+            min-height: 220px;
+            background: linear-gradient(135deg, #6366f1, #a855f7);
             border-radius: 24px; padding: 24px;
             position: relative; overflow: hidden;
-            box-shadow: 0 10px 40px rgba(79, 70, 229, 0.4);
-            min-height: 200px; display: flex; flex-direction: column; justify-content: flex-end;
+            display: flex; flex-direction: column; justify-content: flex-end;
+            box-shadow: 0 15px 40px rgba(99, 102, 241, 0.3);
         }
-        .hero-bg-icon {
-            position: absolute; top: -20px; right: -20px; font-size: 140px; opacity: 0.2; transform: rotate(15deg);
+        .hero-icon-bg {
+            position: absolute; top: -30px; right: -30px; font-size: 160px;
+            opacity: 0.15; transform: rotate(15deg); pointer-events: none;
         }
-        .hero-label { font-size: 12px; font-weight: 700; text-transform: uppercase; color: rgba(255,255,255,0.7); margin-bottom: 8px; }
-        .hero-title { font-size: 28px; font-weight: 800; line-height: 1.1; margin-bottom: 8px; max-width: 80%; }
-        .hero-desc { font-size: 15px; color: rgba(255,255,255,0.8); margin-bottom: 20px; max-width: 90%; }
+        .hero-eyebrow { font-size: 11px; font-weight: 700; text-transform: uppercase; color: rgba(255,255,255,0.8); margin-bottom: 8px; letter-spacing: 1px; }
+        .hero-headline { font-size: 26px; font-weight: 800; line-height: 1.1; margin-bottom: 8px; width: 90%; }
+        .hero-sub { font-size: 14px; color: rgba(255,255,255,0.9); margin-bottom: 20px; max-width: 85%; font-weight: 500; }
         
         .hero-btn {
-            background: #fff; color: #000; border: none; padding: 12px 24px;
-            border-radius: 30px; font-weight: 700; font-size: 15px; width: fit-content;
-            cursor: pointer; box-shadow: 0 4px 15px rgba(0,0,0,0.2);
+            background: rgba(255,255,255,0.95); color: #000;
+            border: none; padding: 12px 24px; border-radius: 30px;
+            font-size: 14px; font-weight: 700; width: fit-content;
+            cursor: pointer; box-shadow: 0 4px 15px rgba(0,0,0,0.1);
             transition: transform 0.2s;
         }
         .hero-btn:active { transform: scale(0.95); }
 
         /* Sections */
-        .section { margin-bottom: 32px; }
-        .section-header { 
-            padding: 0 24px; margin-bottom: 16px; 
-            display: flex; justify-content: space-between; align-items: flex-end; 
+        .section { margin-top: 32px; }
+        .section-head { 
+            padding: 0 24px; margin-bottom: 16px;
+            display: flex; justify-content: space-between; align-items: flex-end;
         }
-        .section-title { font-size: 22px; font-weight: 700; }
-        .section-more { font-size: 15px; color: var(--accent); font-weight: 600; cursor: pointer; }
+        .section-title { font-size: 20px; font-weight: 700; }
+        .section-link { font-size: 13px; color: var(--accent); font-weight: 600; cursor: pointer; }
 
         /* Horizontal Scroll */
         .h-scroll {
             display: flex; gap: 16px; overflow-x: auto; padding: 0 24px;
-            padding-bottom: 20px; scroll-snap-type: x mandatory;
+            padding-bottom: 24px; scroll-snap-type: x mandatory;
             scrollbar-width: none;
         }
         .h-scroll::-webkit-scrollbar { display: none; }
 
         .reward-card {
-            flex: 0 0 160px; scroll-snap-align: start;
-            background: var(--bg-card); border-radius: 20px; padding: 16px;
+            flex: 0 0 150px; scroll-snap-align: start;
+            background: #18181b; border-radius: 20px; padding: 16px;
+            border: 1px solid rgba(255,255,255,0.05);
             display: flex; flex-direction: column; gap: 12px;
-            border: 1px solid rgba(255,255,255,0.1);
-            position: relative; overflow: hidden;
-            transition: transform 0.2s;
+            transition: transform 0.2s; position: relative;
         }
         .reward-card:active { transform: scale(0.96); }
         .reward-card.locked { opacity: 0.6; }
-        
-        .card-icon-box {
-            width: 50px; height: 50px; border-radius: 14px;
+
+        .card-icon {
+            width: 48px; height: 48px; border-radius: 12px;
             background: rgba(255,255,255,0.08); display: flex; justify-content: center; align-items: center;
-            font-size: 24px; box-shadow: 0 4px 10px rgba(0,0,0,0.2);
+            font-size: 24px; box-shadow: inset 0 0 0 1px rgba(255,255,255,0.05);
         }
         
-        .card-content h3 { font-size: 15px; font-weight: 600; margin: 0 0 4px 0; line-height: 1.3; }
-        .card-content p { font-size: 12px; color: var(--text-sec); margin: 0; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
-        
-        .status-badge {
+        .card-title { font-size: 14px; font-weight: 700; line-height: 1.3; color: #fff; margin-bottom: 4px; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+        .card-cat { font-size: 10px; font-weight: 600; color: var(--text-sec); text-transform: uppercase; }
+
+        /* Category Color Accents */
+        .cat-dot { display: inline-block; width: 6px; height: 6px; border-radius: 50%; margin-right: 4px; }
+
+        .status-pill {
             position: absolute; top: 12px; right: 12px;
-            width: 20px; height: 20px; border-radius: 50%;
-            display: flex; justify-content: center; align-items: center; font-size: 10px;
+            font-size: 10px; font-weight: 700; padding: 2px 8px; border-radius: 10px;
+            text-transform: uppercase;
         }
-        .status-badge.locked { background: rgba(255,255,255,0.1); color: #fff; }
-        .status-badge.unlocked { background: #34c759; color: #000; }
-        .status-badge.redeemed { background: var(--bg-dark); border: 1px solid var(--text-sec); color: var(--text-sec); }
-
-        .progress-container { margin: 0 24px 8px 24px; }
-        .progress-bar { height: 4px; background: rgba(255,255,255,0.1); border-radius: 2px; overflow: hidden; }
-        .progress-fill { height: 100%; background: var(--accent); width: 0%; border-radius: 2px; }
-        .progress-text { font-size: 12px; color: var(--text-sec); margin-top: 6px; font-weight: 500; }
-
-        /* Confetti */
-        .confetti-container { position: fixed; inset: 0; pointer-events: none; z-index: 100; overflow: hidden; }
-        .confetti { position: absolute; width: 8px; height: 8px; background: #f00; animation: fall 3s linear forwards; }
-        @keyframes fall { 0% { transform: translateY(-10vh) rotate(0deg); opacity: 1; } 100% { transform: translateY(110vh) rotate(720deg); opacity: 0; } }
+        .st-locked { background: rgba(255,255,255,0.1); color: #aaa; }
+        .st-ready { background: #22c55e; color: #000; }
+        .st-done { background: transparent; border: 1px solid #333; color: #666; }
 
     </style>
 </head>
@@ -137,27 +137,25 @@
 
     <div class="header">
         <div>
-            <div class="header-date">Sonntag, 18. Mai</div>
+            <div class="header-date">Heute</div>
             <div class="header-title">Belohnungen</div>
         </div>
-        <div class="user-points">
-            <span>✨</span> <span id="pointsVal">0</span>
+        <div class="points-badge">
+            <span>✨</span> <span id="pointsVal">...</span>
         </div>
     </div>
 
     <div class="content" id="contentArea">
-        <!-- Hero -->
-        <div class="hero-section" id="heroSection">
-            <!-- Populated by JS -->
+        <div class="hero-container" id="heroSection">
+            <!-- Hero injected -->
         </div>
-
-        <!-- Categories -->
+        
         <div id="categoriesArea">
-            <!-- Populated by JS -->
+            <!-- Categories injected -->
         </div>
     </div>
 
-    <div class="confetti-container" id="confetti"></div>
+    <div class="confetti-container" id="confetti" style="position:fixed;inset:0;pointer-events:none;z-index:100;"></div>
 
     <script src="rewards_app.js"></script>
 </body>

@@ -4,413 +4,175 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>AdminOS v3</title>
+    <title>Admin</title>
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
     <style>
         :root {
-            --bg-dark: #050505;
-            --bg-panel: #111111;
-            --bg-card: rgba(28, 28, 30, 0.6);
-            --primary: #3b82f6; /* Blue */
-            --accent: #8b5cf6; /* Purple */
-            --danger: #ef4444;
-            --success: #10b981;
-            --warning: #f59e0b;
-            --text: #ffffff;
-            --text-sec: rgba(255, 255, 255, 0.5);
-            --border: rgba(255, 255, 255, 0.1);
-            --font-mono: "SF Mono", "Monaco", "Consolas", monospace;
+            --bg: #050505;
+            --panel: #0a0a0a;
+            --border: #333;
+            --primary: #00ff9d;
+            --accent: #00b8ff;
+            --danger: #ff0055;
+            --text: #eee;
+            --text-dim: #666;
+            --font: 'JetBrains Mono', monospace;
         }
-
-        * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
 
         body {
             margin: 0; padding: 0;
-            font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", Roboto, sans-serif;
-            background: #000;
-            color: var(--text);
-            height: 100vh;
+            background: var(--bg); color: var(--text);
+            font-family: var(--font);
+            height: 100vh; overflow: hidden;
             display: flex; flex-direction: column;
-            overflow: hidden; user-select: none;
+            user-select: none;
         }
 
-        /* Grid Layout Background */
-        .bg-grid {
-            position: absolute; inset: 0; z-index: -1; opacity: 0.15;
-            background-image: linear-gradient(var(--border) 1px, transparent 1px),
-                              linear-gradient(90deg, var(--border) 1px, transparent 1px);
-            background-size: 40px 40px;
+        /* CRT Scanline Effect */
+        body::after {
+            content: " ";
+            display: block; position: absolute; inset: 0;
+            background: linear-gradient(rgba(18, 16, 16, 0) 50%, rgba(0, 0, 0, 0.25) 50%), linear-gradient(90deg, rgba(255, 0, 0, 0.06), rgba(0, 255, 0, 0.02), rgba(0, 0, 255, 0.06));
+            z-index: 999; background-size: 100% 2px, 3px 100%; pointer-events: none;
         }
 
-        /* Header */
         .header {
-            padding: 16px 24px;
-            padding-top: calc(16px + env(safe-area-inset-top));
+            padding: 16px 20px; border-bottom: 1px solid var(--border);
             display: flex; justify-content: space-between; align-items: center;
-            background: rgba(10, 10, 10, 0.8); backdrop-filter: blur(20px);
-            border-bottom: 1px solid var(--border);
-            z-index: 50;
+            background: rgba(10, 10, 10, 0.9);
         }
-        .header-left { display: flex; align-items: center; gap: 10px; }
-        .header h1 { font-size: 18px; font-weight: 700; margin: 0; letter-spacing: 0.5px; font-family: var(--font-mono); text-transform: uppercase; }
-        
-        .status-badge { 
-            font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 1px;
-            padding: 4px 8px; border-radius: 4px; display: flex; align-items: center; gap: 6px;
-            background: rgba(16, 185, 129, 0.1); color: var(--success); border: 1px solid rgba(16, 185, 129, 0.2);
-        }
-        .status-badge.offline { background: rgba(239, 68, 68, 0.1); color: var(--danger); border-color: rgba(239, 68, 68, 0.2); }
-        .pulse { width: 6px; height: 6px; border-radius: 50%; background: currentColor; box-shadow: 0 0 8px currentColor; animation: blink 2s infinite; }
-        @keyframes blink { 0%, 100% { opacity: 1; } 50% { opacity: 0.4; } }
+        .brand { font-weight: 700; letter-spacing: -1px; display: flex; align-items: center; gap: 8px; color: var(--text); }
+        .brand span { color: var(--primary); }
+        .status { font-size: 10px; background: rgba(0, 255, 157, 0.1); color: var(--primary); padding: 4px 8px; border-radius: 4px; text-transform: uppercase; }
+        .status.offline { color: var(--danger); background: rgba(255, 0, 85, 0.1); }
 
-        /* Main Scroll Area */
         .content {
-            flex: 1; overflow-y: auto; padding: 20px; padding-bottom: 100px;
-            scroll-behavior: smooth;
+            flex: 1; overflow-y: auto; padding: 20px;
+            display: flex; flex-direction: column; gap: 24px;
         }
 
-        /* Sections */
-        .view-section { display: none; animation: fadeIn 0.3s ease; }
-        .view-section.active { display: block; }
-        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
-
-        .section-header { 
-            display: flex; justify-content: space-between; align-items: flex-end;
-            margin: 24px 0 12px 0; border-bottom: 1px solid var(--border); padding-bottom: 8px;
-        }
-        .section-header:first-child { margin-top: 0; }
-        .section-label { 
-            font-size: 12px; color: var(--accent); text-transform: uppercase; 
-            letter-spacing: 2px; font-weight: 800; font-family: var(--font-mono);
-        }
-
-        /* Dashboard Widgets */
-        .grid-row { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 16px; }
-        
+        /* Widgets */
+        .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
         .card {
-            background: var(--bg-panel); border-radius: 16px; padding: 20px;
-            border: 1px solid var(--border); position: relative; overflow: hidden;
+            background: var(--panel); border: 1px solid var(--border);
+            padding: 16px; border-radius: 4px; position: relative;
         }
         .card::before {
-            content: ''; position: absolute; top: 0; left: 0; width: 100%; height: 2px;
-            background: linear-gradient(90deg, var(--primary), var(--accent)); opacity: 0.5;
+            content: ''; position: absolute; top: -1px; left: -1px; width: 10px; height: 10px;
+            border-top: 1px solid var(--primary); border-left: 1px solid var(--primary);
         }
-
-        /* Health Bars */
-        .health-row { display: flex; align-items: center; gap: 10px; margin-bottom: 8px; font-family: var(--font-mono); font-size: 11px; }
-        .health-label { width: 30px; color: var(--text-sec); }
-        .health-track { flex: 1; height: 4px; background: #333; border-radius: 2px; overflow: hidden; }
-        .health-fill { height: 100%; background: var(--success); width: 50%; transition: width 0.5s ease; }
-        .health-val { width: 30px; text-align: right; color: var(--text); }
+        
+        .label { font-size: 10px; text-transform: uppercase; color: var(--text-dim); margin-bottom: 8px; letter-spacing: 1px; }
+        .value { font-size: 24px; font-weight: 700; color: #fff; }
+        
+        /* Bar Charts */
+        .bar-group { display: flex; flex-direction: column; gap: 8px; }
+        .bar-row { display: flex; align-items: center; gap: 10px; font-size: 11px; }
+        .bar-track { flex: 1; height: 6px; background: #222; overflow: hidden; }
+        .bar-fill { height: 100%; background: var(--accent); width: 0%; transition: width 0.5s; }
 
         /* Terminal */
         .terminal {
-            background: #000; border: 1px solid var(--border); border-radius: 12px;
-            padding: 12px; font-family: var(--font-mono); font-size: 11px; color: #33ff00;
-            height: 120px; overflow-y: hidden; position: relative;
-            text-shadow: 0 0 5px rgba(51, 255, 0, 0.3);
+            background: #000; border: 1px solid var(--border); padding: 12px;
+            height: 150px; overflow: hidden; font-size: 11px; color: #888;
+            display: flex; flex-direction: column; justify-content: flex-end;
         }
-        .terminal::after {
-            content: ''; position: absolute; inset: 0;
-            background: linear-gradient(transparent 50%, rgba(0,0,0,0.1) 50%);
-            background-size: 100% 4px; pointer-events: none;
-        }
-        .log-line { margin-bottom: 4px; opacity: 0.8; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .log-line { margin-top: 2px; }
+        .log-line.success { color: var(--primary); }
+        .log-line.warn { color: #f59e0b; }
         .log-line.error { color: var(--danger); }
-        .log-line.warn { color: var(--warning); }
 
-        /* Maintenance Card */
-        .maint-card {
-            background: linear-gradient(145deg, #1a1a1a, #0a0a0a);
-            border: 1px solid var(--border); border-radius: 16px; padding: 20px;
+        /* Toggles */
+        .control-row {
             display: flex; justify-content: space-between; align-items: center;
-            margin-bottom: 16px;
+            padding: 12px; background: #111; margin-bottom: 8px; border: 1px solid #222;
         }
-        .maint-active { border-color: var(--warning); box-shadow: 0 0 20px rgba(245, 158, 11, 0.1); }
-        .maint-info h3 { margin: 0; font-size: 16px; color: #fff; }
-        .maint-info p { margin: 4px 0 0 0; font-size: 12px; color: var(--text-sec); }
-
-        /* Inputs */
-        .input-group { margin-bottom: 12px; }
-        .input-label { display: block; font-size: 11px; color: var(--text-sec); margin-bottom: 6px; text-transform: uppercase; font-weight: 600; }
-        .input-text {
-            width: 100%; background: #222; border: 1px solid var(--border); color: #fff;
-            padding: 10px; border-radius: 8px; font-family: var(--font-mono); font-size: 13px;
-            outline: none; transition: border-color 0.2s;
+        .switch {
+            width: 36px; height: 20px; background: #333; border-radius: 10px; position: relative; cursor: pointer;
         }
-        .input-text:focus { border-color: var(--primary); }
-
-        /* Buttons */
-        .btn {
-            border: none; padding: 10px 16px; border-radius: 8px; cursor: pointer;
-            font-size: 13px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px;
-            transition: all 0.2s; display: flex; align-items: center; justify-content: center; gap: 8px;
+        .switch::after {
+            content: ''; position: absolute; top: 2px; left: 2px; width: 16px; height: 16px;
+            background: #fff; border-radius: 50%; transition: transform 0.2s;
         }
-        .btn-primary { background: var(--primary); color: #000; }
-        .btn-primary:active { transform: scale(0.96); opacity: 0.9; }
-        
-        .btn-sec { background: rgba(255,255,255,0.1); color: #fff; border: 1px solid var(--border); }
-        .btn-danger { background: rgba(239, 68, 68, 0.1); color: var(--danger); border: 1px solid rgba(239, 68, 68, 0.3); }
-
-        /* App Grid */
-        .apps-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(90px, 1fr)); gap: 12px; }
-        .app-toggle {
-            background: #151515; border-radius: 12px; padding: 12px;
-            display: flex; flex-direction: column; align-items: center; gap: 8px;
-            border: 1px solid var(--border); cursor: pointer; transition: all 0.2s;
-        }
-        .app-toggle.active { background: rgba(59, 130, 246, 0.15); border-color: var(--primary); box-shadow: 0 0 15px rgba(59, 130, 246, 0.1); }
-        .app-toggle.disabled { opacity: 0.4; filter: grayscale(1); }
-        .app-icon { font-size: 28px; }
-        .app-name { font-size: 11px; font-weight: 600; text-align: center; }
-
-        /* User Rows */
-        .user-row {
-            display: flex; align-items: center; gap: 14px; padding: 14px;
-            background: #151515; border-radius: 12px; margin-bottom: 10px;
-            cursor: pointer; border: 1px solid var(--border);
-            transition: transform 0.2s;
-        }
-        .user-row:active { transform: scale(0.98); background: #222; }
-        .user-avatar { 
-            width: 40px; height: 40px; border-radius: 50%; background: linear-gradient(135deg, #333, #555);
-            display: flex; justify-content: center; align-items: center; font-size: 18px;
-            border: 2px solid #000; box-shadow: 0 2px 10px rgba(0,0,0,0.5);
-        }
-        .user-info { flex: 1; }
-        .user-name { font-size: 15px; font-weight: 600; color: #fff; }
-        .user-meta { font-size: 11px; color: var(--text-sec); font-family: var(--font-mono); }
-        .tag { font-size: 9px; padding: 2px 6px; border-radius: 4px; background: #333; margin-left: 6px; }
-        .tag.banned { background: var(--danger); color: #000; }
+        .switch.active { background: var(--primary); }
+        .switch.active::after { transform: translateX(16px); }
 
         /* Dock */
-        .admin-dock {
-            position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%);
-            background: rgba(20, 20, 20, 0.8); backdrop-filter: blur(20px);
-            border: 1px solid var(--border); border-radius: 24px;
-            padding: 6px; display: flex; gap: 4px; box-shadow: 0 10px 40px rgba(0,0,0,0.5);
-            z-index: 100;
+        .dock {
+            padding: 12px; border-top: 1px solid var(--border); background: #000;
+            display: flex; justify-content: center; gap: 20px;
         }
         .dock-btn {
-            width: 44px; height: 44px; border-radius: 18px; border: none;
-            background: transparent; color: var(--text-sec);
-            font-size: 20px; cursor: pointer; display: flex; justify-content: center; align-items: center;
-            transition: all 0.2s;
+            background: transparent; border: 1px solid transparent; color: #666;
+            width: 40px; height: 40px; display: flex; align-items: center; justify-content: center;
+            font-size: 18px; cursor: pointer; transition: all 0.2s;
         }
-        .dock-btn.active { background: #333; color: #fff; box-shadow: 0 4px 10px rgba(0,0,0,0.3); }
+        .dock-btn.active { color: var(--primary); border-color: var(--primary); box-shadow: 0 0 10px rgba(0, 255, 157, 0.2); }
 
-        /* Toggle */
-        .toggle {
-            width: 44px; height: 26px; background: #333; border-radius: 13px;
-            position: relative; transition: 0.3s; cursor: pointer;
-        }
-        .toggle::after {
-            content: ''; position: absolute; top: 3px; left: 3px;
-            width: 20px; height: 20px; background: #fff; border-radius: 50%;
-            transition: 0.3s cubic-bezier(0.2, 0.8, 0.2, 1);
-        }
-        .toggle.active { background: var(--success); }
-        .toggle.active::after { transform: translateX(18px); }
-
-        /* Modal */
-        .modal {
-            position: fixed; inset: 0; background: rgba(0,0,0,0.8); backdrop-filter: blur(5px);
-            z-index: 200; display: none; align-items: center; justify-content: center; opacity: 0; transition: opacity 0.2s;
-        }
-        .modal.open { display: flex; opacity: 1; }
-        .modal-card {
-            background: #111; width: 90%; max-width: 400px; border-radius: 20px;
-            border: 1px solid var(--border); padding: 24px; box-shadow: 0 20px 60px rgba(0,0,0,0.8);
-            transform: scale(0.9); transition: transform 0.2s;
-        }
-        .modal.open .modal-card { transform: scale(1); }
-        .modal-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
-        .modal-title { font-size: 18px; font-weight: 700; color: #fff; }
-        .close-icon { cursor: pointer; padding: 4px; color: var(--text-sec); }
-
-        /* Range Slider */
-        .range-wrap { margin-bottom: 12px; }
-        .range-header { display: flex; justify-content: space-between; font-size: 11px; color: var(--text-sec); margin-bottom: 6px; font-weight: 600; text-transform: uppercase; }
-        input[type=range] {
-            width: 100%; -webkit-appearance: none; background: #333; height: 4px; border-radius: 2px; outline: none;
-        }
-        input[type=range]::-webkit-slider-thumb {
-            -webkit-appearance: none; width: 16px; height: 16px; border-radius: 50%; background: var(--primary); cursor: pointer;
-            box-shadow: 0 0 10px rgba(59, 130, 246, 0.5);
-        }
+        .view-section { display: none; }
+        .view-section.active { display: block; }
 
     </style>
 </head>
 <body>
 
-    <div class="bg-grid"></div>
-
     <div class="header">
-        <div class="header-left">
-            <h1>Admin<span style="color:var(--primary)">OS</span></h1>
-        </div>
-        <div class="status-badge" id="connStatus">
-            <div class="pulse"></div>
-            <span id="connText">Init...</span>
-        </div>
+        <div class="brand">FIA<span>OS</span>_SYS</div>
+        <div class="status" id="connStatus">INIT</div>
     </div>
 
     <div class="content">
         
         <!-- DASHBOARD -->
         <div id="view-dash" class="view-section active">
-            
-            <div class="maint-card" id="maintCard">
-                <div class="maint-info">
-                    <h3>MAINTENANCE MODE</h3>
-                    <p>System Lockdown Active</p>
-                </div>
-                <div class="toggle" id="maintToggle" onclick="toggleMaintenance()"></div>
-            </div>
-
-            <div class="grid-row">
+            <div class="grid">
                 <div class="card">
-                    <div class="section-label" style="margin-top:0">System Health</div>
-                    <div style="margin-top:12px;">
-                        <div class="health-row">
-                            <span class="health-label">CPU</span>
-                            <div class="health-track"><div class="health-fill" id="cpuBar" style="width:20%"></div></div>
-                            <span class="health-val" id="cpuVal">20%</span>
-                        </div>
-                        <div class="health-row">
-                            <span class="health-label">RAM</span>
-                            <div class="health-track"><div class="health-fill" id="ramBar" style="width:45%; background:var(--accent);"></div></div>
-                            <span class="health-val" id="ramVal">45%</span>
-                        </div>
-                        <div class="health-row">
-                            <span class="health-label">NET</span>
-                            <div class="health-track"><div class="health-fill" id="netBar" style="width:10%; background:var(--warning);"></div></div>
-                            <span class="health-val" id="netVal">10%</span>
-                        </div>
-                    </div>
+                    <div class="label">CPU LOAD</div>
+                    <div class="value" id="cpuVal">12%</div>
+                    <div class="bar-track" style="margin-top:8px"><div class="bar-fill" id="cpuBar" style="width:12%"></div></div>
                 </div>
-                
-                <div class="card" style="display:flex; flex-direction:column; justify-content:center; align-items:center;">
-                    <div style="font-size:32px; font-weight:800; line-height:1;" id="statUsers">3</div>
-                    <div style="font-size:11px; color:var(--text-sec); text-transform:uppercase; margin-top:4px;">Total Users</div>
+                <div class="card">
+                    <div class="label">MEMORY</div>
+                    <div class="value" id="ramVal">4GB</div>
+                    <div class="bar-track" style="margin-top:8px"><div class="bar-fill" id="ramBar" style="width:40%; background:var(--accent)"></div></div>
                 </div>
             </div>
 
-            <div class="card">
-                <div class="section-label" style="margin-top:0; margin-bottom:12px;">Global Broadcast</div>
-                <div style="display:flex; gap:10px;">
-                    <input type="text" class="input-text" id="broadcastInput" placeholder="Nachricht an alle...">
-                    <button class="btn btn-primary" onclick="sendBroadcast()">SENDEN</button>
+            <div class="card" style="margin-top:10px; border-color: var(--border);">
+                <div class="label">SYSTEM LOCKDOWN</div>
+                <div class="control-row">
+                    <span style="font-size:12px">MAINTENANCE MODE</span>
+                    <div class="switch" id="maintToggle" onclick="toggleMaintenance()"></div>
                 </div>
             </div>
 
-            <div class="section-header">
-                <span class="section-label">Live Terminal</span>
-                <span style="font-size:10px; color:var(--text-sec); font-family:var(--font-mono);">tail -f system.log</span>
+            <div class="card" style="margin-top:10px;">
+                <div class="label">KERNEL LOG</div>
+                <div class="terminal" id="terminalLog">
+                    <div class="log-line">> Boot sequence initiated...</div>
+                    <div class="log-line success">> Core services loaded.</div>
+                </div>
             </div>
-            <div class="terminal" id="terminalLog">
-                <div class="log-line">> System initialized...</div>
-                <div class="log-line">> Connecting to Appwrite Cloud...</div>
-            </div>
-
         </div>
 
         <!-- APPS -->
         <div id="view-apps" class="view-section">
-            <div class="section-header">
-                <span class="section-label">Application Control</span>
-                <button class="btn btn-sec" style="padding:4px 10px; font-size:10px;" onclick="renderApps()">Refresh</button>
-            </div>
-            <div class="apps-grid" id="appsGrid">
-                <!-- JS -->
-            </div>
+            <div class="label">APP CONTROLLER</div>
+            <div id="appsList"></div>
         </div>
 
         <!-- USERS -->
         <div id="view-users" class="view-section">
-            <div class="section-header">
-                <span class="section-label">User Management</span>
-            </div>
-            <div id="usersList">
-                <!-- JS -->
-            </div>
-        </div>
-
-        <!-- LUNA & REWARDS -->
-        <div id="view-rewards" class="view-section">
-            <div class="section-header">
-                <span class="section-label">Luna Core Stats</span>
-            </div>
-            <div class="card">
-                <div class="range-wrap">
-                    <div class="range-header"><span>Hunger</span><span id="lunaHVal">50%</span></div>
-                    <input type="range" id="lunaH" min="0" max="100" oninput="updateLunaUI()">
-                </div>
-                <div class="range-wrap">
-                    <div class="range-header"><span>Love</span><span id="lunaLVal">50%</span></div>
-                    <input type="range" id="lunaL" min="0" max="100" oninput="updateLunaUI()">
-                </div>
-                <div class="range-wrap">
-                    <div class="range-header"><span>Energy</span><span id="lunaEVal">50%</span></div>
-                    <input type="range" id="lunaE" min="0" max="100" oninput="updateLunaUI()">
-                </div>
-                <button class="btn btn-primary" style="width:100%; margin-top:10px;" onclick="saveLunaStats()">Update Core</button>
-            </div>
-
-            <div class="section-header" style="margin-top:30px;">
-                <span class="section-label">Reward Injection</span>
-            </div>
-            <div class="input-group">
-                <select id="rewardUserSelect" class="input-text" onchange="loadUserRewardsList()">
-                    <option value="fia">Fia</option>
-                    <option value="collin">Collin</option>
-                    <option value="guest">Gast</option>
-                </select>
-            </div>
-            <input type="text" class="input-text" id="rewardSearch" placeholder="Filter IDs..." onkeyup="filterRewards()">
-            <div id="rewardsList" style="margin-top:12px;"></div>
+            <div class="label">USER DATABASE</div>
+            <div id="usersList"></div>
         </div>
 
     </div>
 
-    <!-- DOCK -->
-    <nav class="admin-dock">
+    <div class="dock">
         <button class="dock-btn active" onclick="switchView('dash', this)">⚡</button>
-        <button class="dock-btn" onclick="switchView('apps', this)">📱</button>
+        <button class="dock-btn" onclick="switchView('apps', this)">❖</button>
         <button class="dock-btn" onclick="switchView('users', this)">👥</button>
-        <button class="dock-btn" onclick="switchView('rewards', this)">🐑</button>
-    </nav>
-
-    <!-- USER MODAL -->
-    <div class="modal" id="userModal">
-        <div class="modal-card">
-            <div class="modal-header">
-                <div class="modal-title" id="modalUserName">User</div>
-                <div class="close-icon" onclick="closeUserModal()">✕</div>
-            </div>
-            
-            <div class="section-label" style="margin-top:0;">Daily Override</div>
-            <div style="display:flex; gap:10px; margin-bottom:20px;">
-                <div style="flex:1">
-                    <span class="input-label">Streak</span>
-                    <input type="number" class="input-text" id="inpStreak">
-                </div>
-                <div style="flex:1">
-                    <span class="input-label">Points</span>
-                    <input type="number" class="input-text" id="inpPoints">
-                </div>
-            </div>
-            <button class="btn btn-sec" style="width:100%; margin-bottom:20px;" onclick="saveUserDaily()">Save Stats</button>
-
-            <div class="section-label" style="color:var(--danger)">Danger Zone</div>
-            <div style="display:flex; justify-content:space-between; align-items:center; background:#1a1a1a; padding:12px; border-radius:8px; border:1px solid #333; margin-bottom:10px;">
-                <span style="font-size:13px; font-weight:600;">Ban Account</span>
-                <div class="toggle" id="banToggle" onclick="toggleBan()"></div>
-            </div>
-            <div style="display:flex; gap:10px;">
-                <button class="btn btn-danger" style="flex:1" onclick="forceLogoutUser()">Kick</button>
-                <button class="btn btn-danger" style="flex:1" onclick="resetUser()">Reset Profile</button>
-            </div>
-        </div>
     </div>
 
     <script src="admin.js"></script>
