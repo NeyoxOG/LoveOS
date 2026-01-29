@@ -48,6 +48,25 @@ const normalizeAdminConfig = (config?: AdminConfig | null): AdminConfig => {
     };
 };
 
+const normalizeAdminConfig = (config?: AdminConfig | null): AdminConfig => {
+    const safeConfig = config || {};
+    return {
+        ...DEFAULT_ADMIN_CONFIG,
+        ...safeConfig,
+        appVisibility: {
+            ...DEFAULT_ADMIN_CONFIG.appVisibility,
+            ...(safeConfig.appVisibility || {})
+        },
+        userStatus: {
+            ...DEFAULT_ADMIN_CONFIG.userStatus,
+            ...(safeConfig.userStatus || {})
+        },
+        maintenanceMode: safeConfig.maintenanceMode ?? DEFAULT_ADMIN_CONFIG.maintenanceMode,
+        lastEditedBy: safeConfig.lastEditedBy || DEFAULT_ADMIN_CONFIG.lastEditedBy,
+        updatedAt: safeConfig.updatedAt || DEFAULT_ADMIN_CONFIG.updatedAt
+    };
+};
+
 // --- Helpers ---
 
 const getUid = () => {

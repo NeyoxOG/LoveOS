@@ -83,6 +83,25 @@ const normalizeAdminConfig = (config?: AdminConfig | null): AdminConfig => {
     };
 };
 
+const normalizeAdminConfig = (config?: AdminConfig | null): AdminConfig => {
+    const safeConfig = config || {};
+    return {
+        ...INITIAL_ADMIN_CONFIG,
+        ...safeConfig,
+        appVisibility: {
+            ...INITIAL_ADMIN_CONFIG.appVisibility,
+            ...(safeConfig.appVisibility || {})
+        },
+        userStatus: {
+            ...INITIAL_ADMIN_CONFIG.userStatus,
+            ...(safeConfig.userStatus || {})
+        },
+        maintenanceMode: safeConfig.maintenanceMode ?? INITIAL_ADMIN_CONFIG.maintenanceMode,
+        lastEditedBy: safeConfig.lastEditedBy || INITIAL_ADMIN_CONFIG.lastEditedBy,
+        updatedAt: safeConfig.updatedAt || INITIAL_ADMIN_CONFIG.updatedAt
+    };
+};
+
 // --- Helpers ---
 
 const userKey = (userId: string, suffix: string) => {
