@@ -13,7 +13,9 @@ const GAME_DURATION = 30000; // 30s
 
 function init() {
     const sessionStr = localStorage.getItem(KEYS.SESSION);
-    if (sessionStr) user = JSON.parse(sessionStr);
+    if (!sessionStr) return;
+    user = JSON.parse(sessionStr);
+    user.id = user.id || user.userId;
 
     document.getElementById('tapArea').addEventListener('mousedown', tap);
     document.getElementById('tapArea').addEventListener('touchstart', (e) => { e.preventDefault(); tap(); });

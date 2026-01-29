@@ -54,5 +54,12 @@
     </div>
 
     <script src="game_puzzle.js"></script>
+
+    <script>
+        window.addEventListener('keydown', (event) => {
+            if (event.key === 'Escape') window.history.back();
+        });
+    </script>
+
 </body>
 </html>
