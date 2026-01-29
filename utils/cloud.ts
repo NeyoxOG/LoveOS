@@ -27,6 +27,25 @@ const DEFAULT_ADMIN_CONFIG: AdminConfig = {
   updatedAt: Date.now()
 };
 
+const normalizeAdminConfig = (config?: AdminConfig | null): AdminConfig => {
+    const safeConfig = config || {};
+    return {
+        ...DEFAULT_ADMIN_CONFIG,
+        ...safeConfig,
+        appVisibility: {
+            ...DEFAULT_ADMIN_CONFIG.appVisibility,
+            ...(safeConfig.appVisibility || {})
+        },
+        userStatus: {
+            ...DEFAULT_ADMIN_CONFIG.userStatus,
+            ...(safeConfig.userStatus || {})
+        },
+        maintenanceMode: safeConfig.maintenanceMode ?? DEFAULT_ADMIN_CONFIG.maintenanceMode,
+        lastEditedBy: safeConfig.lastEditedBy || DEFAULT_ADMIN_CONFIG.lastEditedBy,
+        updatedAt: safeConfig.updatedAt || DEFAULT_ADMIN_CONFIG.updatedAt
+    };
+};
+
 // --- Helpers ---
 
 const getUid = () => {
@@ -201,29 +220,33 @@ export const cloud = {
         }
 
         if (config) {
-            localStorage.setItem(cacheKey, JSON.stringify(config));
-            return config;
+            const normalized = normalizeAdminConfig(config);
+            localStorage.setItem(cacheKey, JSON.stringify(normalized));
+            return normalized;
         }
 
         // Fallback
-        return JSON.parse(localStorage.getItem(cacheKey) || JSON.stringify(DEFAULT_ADMIN_CONFIG));
+        const cached = JSON.parse(localStorage.getItem(cacheKey) || 'null');
+        return normalizeAdminConfig(cached || DEFAULT_ADMIN_CONFIG);
     },
 
     async saveAdminConfig(config: AdminConfig) {
-        localStorage.setItem('fiaos_global_admin_config', JSON.stringify(config));
-        await docHelper.setState('admin_config', 'system', config);
+        const normalized = normalizeAdminConfig(config);
+        localStorage.setItem('fiaos_global_admin_config', JSON.stringify(normalized));
+        await docHelper.setState('admin_config', 'system', normalized);
     },
 
     listenToAdminConfig(callback: (config: AdminConfig) => void) {
         // Initial Local Load
         const local = localStorage.getItem('fiaos_global_admin_config');
-        callback(local ? JSON.parse(local) : DEFAULT_ADMIN_CONFIG);
+        const localConfig = local ? JSON.parse(local) : DEFAULT_ADMIN_CONFIG;
+        callback(normalizeAdminConfig(localConfig));
 
         if (isGuest()) return () => {};
 
         // Fetch Fresh
         this.loadAdminConfig().then(cfg => {
-            if (cfg) callback(cfg);
+            if (cfg) callback(normalizeAdminConfig(cfg));
         });
 
         try {
@@ -233,7 +256,7 @@ export const cloud = {
                     
                     const payload = (response.payload as any);
                     if (payload.module === 'admin_config' && payload.profileKey === 'system') {
-                        const data = JSON.parse(payload.payload);
+                        const data = normalizeAdminConfig(JSON.parse(payload.payload));
                         callback(data);
                         localStorage.setItem('fiaos_global_admin_config', JSON.stringify(data));
                     }
