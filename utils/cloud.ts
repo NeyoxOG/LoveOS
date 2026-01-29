@@ -45,7 +45,15 @@ const isNetworkError = (e: any) => {
     // Appwrite SDK often returns objects with code 0 for network issues
     if (e?.code === 0) return true;
     const msg = e?.message || '';
-    return msg === 'Load failed' || msg === 'Network request failed' || msg.includes('offline') || msg.includes('Failed to fetch');
+    // Common fetch/network error messages
+    return (
+        msg === 'Load failed' || 
+        msg === 'Network request failed' || 
+        msg.includes('offline') || 
+        msg.includes('Failed to fetch') ||
+        msg.includes('NetworkError') ||
+        e instanceof TypeError // Fetch failures often return TypeError
+    );
 };
 
 // --- Document ID Cache (Optimization) ---
@@ -187,10 +195,9 @@ export const cloud = {
             _docIdCache.clear();
             return true;
         } catch (e) {
-            if (!isNetworkError(e)) {
-                // Log non-network errors (like Invalid Credentials)
-                console.warn("[Cloud] Login failed:", e.message);
-            }
+            // Completely silent failure for hybrid mode
+            // We don't want to alert the user if they are just logging in locally
+            // and the backend happens to be down or unconfigured.
             setStatus('offline');
             return false;
         }
