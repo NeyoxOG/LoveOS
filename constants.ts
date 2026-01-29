@@ -154,12 +154,23 @@ export const VALENTINE_REWARDS: Reward[] = [
 export const THEMES: Record<string, ThemeDef> = {
   roseGlass: {
     id: 'roseGlass',
-    name: 'Default',
+    name: 'Rose Glass',
     colors: {
-      bgGradient: 'linear-gradient(to bottom right, #2e1065, #000)',
-      cardBg: 'rgba(255, 255, 255, 0.08)',
-      text: '#fff',
-      textDim: 'rgba(255, 255, 255, 0.5)'
+      bgGradient: 'radial-gradient(circle at top, rgba(236, 72, 153, 0.25), transparent 55%), linear-gradient(145deg, #1b0f2f 0%, #0a0615 55%, #05030d 100%)',
+      cardBg: 'rgba(255, 255, 255, 0.11)',
+      text: '#fdf2f8',
+      textDim: 'rgba(252, 231, 243, 0.6)'
+    }
+  },
+  aurora: {
+    id: 'aurora',
+    name: 'Aurora Drift',
+    unlockRewardId: 'reward.welcomeTheme',
+    colors: {
+      bgGradient: 'radial-gradient(circle at top right, rgba(56, 189, 248, 0.45), transparent 60%), radial-gradient(circle at left, rgba(14, 165, 233, 0.25), transparent 50%), linear-gradient(140deg, #0b1023 0%, #111827 45%, #0f172a 100%)',
+      cardBg: 'rgba(148, 163, 184, 0.14)',
+      text: '#e2e8f0',
+      textDim: 'rgba(226, 232, 240, 0.7)'
     }
   },
   softRose: {
@@ -167,10 +178,10 @@ export const THEMES: Record<string, ThemeDef> = {
     name: 'Soft Rose',
     unlockRewardId: 'love_1_month',
     colors: {
-      bgGradient: 'linear-gradient(to bottom right, #be185d, #4c0519)',
-      cardBg: 'rgba(255, 200, 210, 0.1)',
-      text: '#fff0f5',
-      textDim: 'rgba(255, 240, 245, 0.6)'
+      bgGradient: 'radial-gradient(circle at top, rgba(251, 113, 133, 0.45), transparent 60%), linear-gradient(150deg, #831843 0%, #be123c 50%, #4c0519 100%)',
+      cardBg: 'rgba(255, 228, 230, 0.18)',
+      text: '#fff1f2',
+      textDim: 'rgba(255, 228, 230, 0.75)'
     }
   },
   midnightLove: {
@@ -178,10 +189,10 @@ export const THEMES: Record<string, ThemeDef> = {
     name: 'Midnight Love',
     unlockRewardId: 'love_3_month',
     colors: {
-      bgGradient: 'linear-gradient(to bottom, #1e1b4b, #312e81)',
-      cardBg: 'rgba(129, 140, 248, 0.1)',
-      text: '#e0e7ff',
-      textDim: '#a5b4fc'
+      bgGradient: 'radial-gradient(circle at top, rgba(99, 102, 241, 0.4), transparent 60%), linear-gradient(180deg, #0b1020 0%, #1e1b4b 50%, #2e1065 100%)',
+      cardBg: 'rgba(129, 140, 248, 0.16)',
+      text: '#eef2ff',
+      textDim: 'rgba(199, 210, 254, 0.78)'
     }
   },
   pastelSky: {
@@ -189,10 +200,10 @@ export const THEMES: Record<string, ThemeDef> = {
     name: 'Pastel Sky',
     unlockRewardId: 'love_6_month',
     colors: {
-      bgGradient: 'linear-gradient(to top, #7dd3fc 0%, #e0f2fe 100%)',
-      cardBg: 'rgba(255, 255, 255, 0.4)',
-      text: '#0c4a6e',
-      textDim: '#0369a1'
+      bgGradient: 'linear-gradient(150deg, #bae6fd 0%, #fef3c7 45%, #fbcfe8 100%)',
+      cardBg: 'rgba(255, 255, 255, 0.55)',
+      text: '#0f172a',
+      textDim: 'rgba(30, 41, 59, 0.7)'
     }
   },
   eternal: {
@@ -200,21 +211,21 @@ export const THEMES: Record<string, ThemeDef> = {
     name: 'Eternal Gold',
     unlockRewardId: 'love_1_year',
     colors: {
-      bgGradient: 'linear-gradient(to bottom right, #713f12, #451a03)',
-      cardBg: 'rgba(253, 224, 71, 0.1)',
-      text: '#fefce8',
-      textDim: '#fef08a'
+      bgGradient: 'radial-gradient(circle at top, rgba(251, 191, 36, 0.45), transparent 60%), linear-gradient(150deg, #92400e 0%, #713f12 45%, #3f1a06 100%)',
+      cardBg: 'rgba(253, 224, 71, 0.2)',
+      text: '#fffbeb',
+      textDim: 'rgba(254, 240, 138, 0.85)'
     }
   },
   royal: {
     id: 'royal',
-    name: 'Royal Gold (Unlock)',
+    name: 'Royal Gold',
     unlockRewardId: 'daily.points100',
     colors: {
-      bgGradient: 'linear-gradient(135deg, #422006, #78350f)',
-      cardBg: 'rgba(251, 191, 36, 0.15)',
-      text: '#fffbeb',
-      textDim: '#fde68a'
+      bgGradient: 'radial-gradient(circle at top right, rgba(253, 224, 71, 0.35), transparent 60%), linear-gradient(135deg, #3b0764 0%, #7c2d12 50%, #451a03 100%)',
+      cardBg: 'rgba(251, 191, 36, 0.2)',
+      text: '#fef3c7',
+      textDim: 'rgba(253, 230, 138, 0.85)'
     }
   },
   custom: {

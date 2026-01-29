@@ -13,6 +13,7 @@ function init() {
     const sessionStr = localStorage.getItem(KEYS.SESSION);
     if (!sessionStr) return;
     user = JSON.parse(sessionStr);
+    user.id = user.id || user.userId;
 
     if (window.parent.FIAOS && window.parent.FIAOS.cloud) {
         cloud = window.parent.FIAOS.cloud;
@@ -40,8 +41,12 @@ function renderMessages(messages) {
         return;
     }
 
-    // Sort by Date Ascending for Display
-    const sorted = [...messages].sort((a,b) => (a.createdAt?.seconds || 0) - (b.createdAt?.seconds || 0));
+    // Sort by Date Ascending for Display (Appwrite integer or Firestore timestamp)
+    const sorted = [...messages].sort((a, b) => {
+        const aTime = a.createdAt?.seconds ? a.createdAt.seconds * 1000 : a.createdAt || 0;
+        const bTime = b.createdAt?.seconds ? b.createdAt.seconds * 1000 : b.createdAt || 0;
+        return aTime - bTime;
+    });
 
     sorted.forEach(msg => {
         const div = document.createElement('div');
