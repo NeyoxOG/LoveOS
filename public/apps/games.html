@@ -7,12 +7,12 @@
     <title>Arcade</title>
     <style>
         :root {
-            --bg-dark: #000;
-            --bg-card: #1c1c1e;
+            --bg-dark: #05010a;
+            --bg-card: rgba(18, 18, 28, 0.92);
             --primary: #f472b6;
             --text: #ffffff;
-            --text-dim: rgba(255, 255, 255, 0.5);
-            --border: rgba(255, 255, 255, 0.1);
+            --text-dim: rgba(255, 255, 255, 0.55);
+            --border: rgba(255, 255, 255, 0.08);
         }
 
         * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
@@ -20,7 +20,7 @@
         body {
             margin: 0; padding: 0;
             font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-            background: var(--bg-dark);
+            background: radial-gradient(circle at top, #1f1147 0%, #090112 55%, #05010a 100%);
             color: var(--text);
             height: 100vh;
             display: flex;
@@ -35,21 +35,49 @@
             display: flex;
             align-items: center;
             justify-content: center;
-            background: rgba(28, 28, 30, 0.8);
+            background: rgba(12, 12, 20, 0.85);
             backdrop-filter: blur(20px);
             border-bottom: 1px solid var(--border);
             z-index: 50;
             position: relative;
         }
-        .title { font-size: 17px; font-weight: 600; text-align: center; }
+        .title {
+            font-size: 18px;
+            font-weight: 700;
+            text-align: center;
+            letter-spacing: 0.4px;
+        }
+        .subtitle {
+            position: absolute;
+            left: 20px;
+            font-size: 12px;
+            color: var(--text-dim);
+        }
+        .status-pill {
+            position: absolute;
+            right: 16px;
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            font-size: 11px;
+            padding: 4px 10px;
+            border-radius: 999px;
+            background: rgba(255, 255, 255, 0.08);
+            border: 1px solid var(--border);
+        }
+        .status-dot {
+            width: 8px; height: 8px; border-radius: 50%;
+            background: #ef4444;
+        }
+        .status-pill.online .status-dot { background: #22c55e; box-shadow: 0 0 8px rgba(34, 197, 94, 0.6); }
 
         /* Tabs */
         .tabs-container {
             padding: 12px 16px;
-            background: rgba(28, 28, 30, 0.5);
+            background: rgba(12, 12, 20, 0.6);
         }
         .segmented-control {
-            background: rgba(118, 118, 128, 0.24);
+            background: rgba(255, 255, 255, 0.08);
             border-radius: 9px;
             padding: 2px;
             display: flex;
@@ -69,7 +97,7 @@
             position: absolute;
             top: 2px; bottom: 2px;
             width: 50%;
-            background: #636366;
+            background: rgba(255, 255, 255, 0.18);
             border-radius: 7px;
             box-shadow: 0 3px 8px rgba(0,0,0,0.12);
             transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
@@ -91,44 +119,52 @@
         /* Game Cards */
         .game-card {
             background: var(--bg-card);
-            border-radius: 16px;
+            border-radius: 20px;
             overflow: hidden;
             margin-bottom: 20px;
             border: 1px solid var(--border);
             display: flex;
             flex-direction: column;
-            box-shadow: 0 4px 20px rgba(0,0,0,0.3);
-            transition: transform 0.2s;
+            box-shadow: 0 14px 40px rgba(4, 4, 12, 0.5);
+            transition: transform 0.2s, box-shadow 0.2s;
         }
-        .game-card:active { transform: scale(0.98); }
+        .game-card:active { transform: scale(0.98); box-shadow: 0 8px 24px rgba(4, 4, 12, 0.4); }
+        .game-card:hover { box-shadow: 0 18px 48px rgba(4, 4, 12, 0.6); }
 
         .card-header {
-            height: 120px;
+            height: 140px;
             background: linear-gradient(135deg, #333, #000);
             position: relative;
             display: flex; align-items: center; justify-content: center;
         }
+        .card-header::after {
+            content: '';
+            position: absolute;
+            inset: 0;
+            background: radial-gradient(circle at 20% 20%, rgba(255,255,255,0.2), transparent 45%);
+            opacity: 0.6;
+        }
         
-        .card-icon { font-size: 48px; filter: drop-shadow(0 4px 8px rgba(0,0,0,0.4)); }
+        .card-icon { font-size: 56px; filter: drop-shadow(0 6px 12px rgba(0,0,0,0.45)); z-index: 1; }
         
         .card-body { padding: 16px; display: flex; flex-direction: column; gap: 4px; }
-        .game-title { font-size: 18px; font-weight: 700; color: #fff; }
+        .game-title { font-size: 19px; font-weight: 700; color: #fff; }
         .game-desc { font-size: 13px; color: var(--text-dim); }
         
         .game-meta { 
             display: flex; justify-content: space-between; align-items: center; margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--border);
         }
-        .score-badge { font-size: 12px; font-weight: 600; color: var(--primary); background: rgba(244, 114, 182, 0.1); padding: 4px 8px; border-radius: 8px; }
+        .score-badge { font-size: 12px; font-weight: 600; color: var(--primary); background: rgba(244, 114, 182, 0.15); padding: 6px 10px; border-radius: 999px; }
         
         .play-btn {
-            background: #fff; color: #000; border: none; padding: 6px 14px; border-radius: 20px; font-size: 13px; font-weight: 700; cursor: pointer;
+            background: #fff; color: #000; border: none; padding: 6px 14px; border-radius: 999px; font-size: 13px; font-weight: 700; cursor: pointer;
         }
 
         /* Leaderboard */
         .lb-item {
             display: flex; align-items: center; justify-content: space-between;
             padding: 12px;
-            background: rgba(255,255,255,0.05);
+            background: rgba(255,255,255,0.08);
             border-radius: 10px;
             margin-bottom: 8px;
             font-size: 14px;
@@ -138,13 +174,37 @@
 
         .lb-section { margin-bottom: 30px; }
         .lb-title { font-size: 14px; font-weight: 600; color: var(--text-dim); margin-bottom: 10px; text-transform: uppercase; letter-spacing: 0.5px; }
+        .lb-toolbar {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 16px;
+        }
+        .lb-refresh {
+            background: rgba(255,255,255,0.08);
+            border: 1px solid var(--border);
+            color: #fff;
+            font-size: 12px;
+            padding: 6px 12px;
+            border-radius: 999px;
+            cursor: pointer;
+        }
+        .lb-updated {
+            font-size: 11px;
+            color: var(--text-dim);
+        }
 
     </style>
 </head>
 <body>
 
     <div class="topbar">
+        <div class="subtitle">Game Hub</div>
         <div class="title">Arcade 💗</div>
+        <div class="status-pill" id="cloudStatus">
+            <span class="status-dot"></span>
+            <span id="cloudStatusText">Offline</span>
+        </div>
     </div>
 
     <div class="tabs-container">
@@ -175,14 +235,14 @@
             </div>
 
             <div class="game-card" onclick="playGame('reaction')">
-                <div class="card-header" style="background: linear-gradient(135deg, #8b5cf6, #7c3aed);">
-                    <div class="card-icon">⚡</div>
+                <div class="card-header" style="background: linear-gradient(135deg, #ef4444, #991b1b);">
+                    <div class="card-icon">⏱️</div>
                 </div>
                 <div class="card-body">
-                    <div class="game-title">Reaction Tap</div>
-                    <div class="game-desc">Triff den perfekten Moment. Schnelligkeit zählt.</div>
+                    <div class="game-title">Precision Timer</div>
+                    <div class="game-desc">Drücke den roten Button exakt bei 3 Minuten.</div>
                     <div class="game-meta">
-                        <span class="score-badge" id="best-reaction">Best: 0</span>
+                        <span class="score-badge" id="best-reaction">Best: —</span>
                         <button class="play-btn">SPIELEN</button>
                     </div>
                 </div>
@@ -248,6 +308,10 @@
 
         <!-- STATS TAB -->
         <div id="tab-stats" class="hidden">
+            <div class="lb-toolbar">
+                <span class="lb-updated" id="lbUpdated">Zuletzt aktualisiert: —</span>
+                <button class="lb-refresh" onclick="refreshLeaderboard()">Aktualisieren</button>
+            </div>
             <div id="lb-container">
                 <!-- Populated by JS -->
                 <div style="text-align:center; padding: 20px; color:#666;">Lade Daten...</div>
