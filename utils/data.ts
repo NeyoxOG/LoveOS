@@ -59,7 +59,28 @@ const INITIAL_ADMIN_CONFIG: AdminConfig = {
   },
   maintenanceMode: false,
   lastEditedBy: "system",
-  updatedAt: Date.now()
+  updatedAt: Date.now(),
+  forceLogoutAt: 0
+};
+
+const normalizeAdminConfig = (config?: AdminConfig | null): AdminConfig => {
+    const safeConfig = config || {};
+    return {
+        ...INITIAL_ADMIN_CONFIG,
+        ...safeConfig,
+        appVisibility: {
+            ...INITIAL_ADMIN_CONFIG.appVisibility,
+            ...(safeConfig.appVisibility || {})
+        },
+        userStatus: {
+            ...INITIAL_ADMIN_CONFIG.userStatus,
+            ...(safeConfig.userStatus || {})
+        },
+        maintenanceMode: safeConfig.maintenanceMode ?? INITIAL_ADMIN_CONFIG.maintenanceMode,
+        lastEditedBy: safeConfig.lastEditedBy || INITIAL_ADMIN_CONFIG.lastEditedBy,
+        updatedAt: safeConfig.updatedAt || INITIAL_ADMIN_CONFIG.updatedAt,
+        forceLogoutAt: safeConfig.forceLogoutAt ?? INITIAL_ADMIN_CONFIG.forceLogoutAt
+    };
 };
 
 const normalizeAdminConfig = (config?: AdminConfig | null): AdminConfig => {
