@@ -3,7 +3,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import { Session, AppItem } from '../types';
 import { APPS } from '../constants';
 import { motion } from 'framer-motion';
-import { ChevronDown, Home, Grid as GridIcon, Trophy, User as UserIcon, Play } from 'lucide-react';
+import { ChevronDown, Home, Grid as GridIcon, Trophy, User as UserIcon, Play, Sparkles, Palette, ArrowUpRight, CloudOff } from 'lucide-react';
 import { loadLastApp, loadAdminConfig, loadDailyState, loadUserPrefs } from '../utils/data';
 import ClockWidget from './ClockWidget';
 
@@ -28,6 +28,7 @@ const HomeScreen: React.FC<HomeScreenProps> = ({
 }) => {
   const [activeTab, setActiveTab] = useState<'home' | 'apps' | 'achievements' | 'profile'>('home');
   const [visibleApps, setVisibleApps] = useState<AppItem[]>(APPS);
+  const [activeThemeName, setActiveThemeName] = useState('Rose Glass');
   const containerRef = useRef<HTMLDivElement>(null);
   const appsRef = useRef<HTMLDivElement>(null);
 
@@ -35,9 +36,11 @@ const HomeScreen: React.FC<HomeScreenProps> = ({
   useEffect(() => {
     const config = loadAdminConfig();
     const dailyState = loadDailyState(session.userId);
+    const prefs = loadUserPrefs(session);
     
     // Admin check strict:
     const isAdmin = session.role === 'admin' || session.role === 'developer';
+    const themeName = prefs.theme ? prefs.theme.replace(/([A-Z])/g, ' $1').trim() : 'Rose Glass';
 
     const filtered = APPS.map(app => {
         // Daily Badge
@@ -57,6 +60,7 @@ const HomeScreen: React.FC<HomeScreenProps> = ({
         return true;
     });
     setVisibleApps(filtered);
+    setActiveThemeName(themeName);
 
   }, [session.role, session.userId]); // Re-run if role/user changes
 
@@ -113,9 +117,10 @@ const HomeScreen: React.FC<HomeScreenProps> = ({
     >
       
       {/* --- Top Bar (Compact) --- */}
-      <header className="px-6 pt-12 pb-4 flex items-start justify-between flex-shrink-0">
+      <header className="px-6 pt-12 pb-6 flex items-start justify-between flex-shrink-0">
         <div>
-          <h1 className="text-lg font-bold text-white/80 tracking-tight">FiaOS</h1>
+          <h1 className="text-lg font-bold text-white tracking-tight">FiaOS Hub</h1>
+          <p className="text-xs text-white/50 tracking-[0.3em] uppercase">Gemeinsame Momente</p>
           
           {(session.role === 'admin' || session.role === 'developer') && (
              <div className="inline-flex items-center px-1.5 py-0.5 rounded bg-indigo-500/20 border border-indigo-500/30 text-[10px] text-indigo-300 font-bold uppercase tracking-wider">
@@ -137,35 +142,141 @@ const HomeScreen: React.FC<HomeScreenProps> = ({
         </motion.button>
       </header>
 
-      {/* --- Clock Widget --- */}
-      <div className="px-6 pb-8">
-        <ClockWidget />
+      {/* --- Hub Intro --- */}
+      <div className="px-6 pb-6">
+        <motion.div
+          initial={{ opacity: 0, y: 16 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="relative overflow-hidden rounded-[2.4rem] border border-white/10 bg-gradient-to-br from-white/12 via-white/5 to-transparent p-6 shadow-[0_24px_50px_rgba(12,8,25,0.6)]"
+        >
+          <div className="absolute -top-20 -right-10 w-56 h-56 bg-fuchsia-500/25 blur-[100px]" />
+          <div className="absolute -bottom-20 -left-10 w-56 h-56 bg-indigo-500/25 blur-[100px]" />
+          <div className="relative z-10 space-y-4">
+            <div className="inline-flex items-center gap-2 text-xs uppercase tracking-[0.3em] text-white/60">
+              <Sparkles className="w-4 h-4 text-pink-300" />
+              Einführung
+            </div>
+            <h2 className="text-2xl font-semibold text-white">
+              Willkommen zurück, {session.name}.
+            </h2>
+            <p className="text-sm text-white/65 leading-relaxed">
+              Dein LoveOS ist live verbunden: Belohnungen sammeln, Themes wechseln und direkt weitermachen – alles in einer klaren Übersicht.
+            </p>
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs text-white/70">
+              <div className="rounded-2xl border border-white/10 bg-white/5 px-4 py-3 flex items-center gap-3">
+                <div className="w-9 h-9 rounded-xl bg-pink-500/20 text-pink-200 flex items-center justify-center">
+                  <Sparkles className="w-4 h-4" />
+                </div>
+                <div>
+                  <div className="font-semibold text-white">Belohnungen</div>
+                  <div className="text-white/50">Neue Erfolge freischalten</div>
+                </div>
+              </div>
+              <div className="rounded-2xl border border-white/10 bg-white/5 px-4 py-3 flex items-center gap-3">
+                <div className="w-9 h-9 rounded-xl bg-indigo-500/20 text-indigo-200 flex items-center justify-center">
+                  <Palette className="w-4 h-4" />
+                </div>
+                <div>
+                  <div className="font-semibold text-white">Themes</div>
+                  <div className="text-white/50">Looks & Stimmung wechseln</div>
+                </div>
+              </div>
+              <div className="rounded-2xl border border-white/10 bg-white/5 px-4 py-3 flex items-center gap-3">
+                <div className="w-9 h-9 rounded-xl bg-cyan-500/20 text-cyan-200 flex items-center justify-center">
+                  <CloudOff className="w-4 h-4" />
+                </div>
+                <div>
+                  <div className="font-semibold text-white">Live Sync</div>
+                  <div className="text-white/50">Immer aktuell & sicher</div>
+                </div>
+              </div>
+            </div>
+            <div className="flex flex-wrap gap-3">
+              <button
+                onClick={() => onOpenRewards('general')}
+                className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-white/10 border border-white/20 text-sm font-semibold text-white hover:bg-white/20 transition"
+              >
+                <Sparkles className="w-4 h-4" />
+                Belohnungen öffnen
+              </button>
+              <button
+                onClick={() => onAppClick({ id: 'settings', name: 'Einstellungen', icon: '⚙️', status: 'available' })}
+                className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-black/30 border border-white/10 text-sm font-semibold text-white/80 hover:text-white hover:bg-black/40 transition"
+              >
+                <Palette className="w-4 h-4" />
+                Themes & Settings
+              </button>
+            </div>
+          </div>
+        </motion.div>
       </div>
 
       {/* --- Quickstart Widget --- */}
-      <div className="px-6 pb-8 flex-shrink-0">
+      <div className="px-6 pb-6 flex-shrink-0">
         <motion.button
           initial={{ opacity: 0, y: 10 }}
           animate={{ opacity: 1, y: 0 }}
           whileTap={{ scale: 0.98 }}
           onClick={handleWidgetClick}
-          className="w-full relative overflow-hidden bg-gradient-to-br from-pink-500/20 to-purple-600/20 backdrop-blur-xl border border-pink-500/20 rounded-[2rem] p-5 text-left group shadow-lg shadow-pink-900/10"
+          className="w-full relative overflow-hidden bg-gradient-to-br from-pink-500/20 via-purple-600/20 to-indigo-600/20 backdrop-blur-xl border border-white/15 rounded-[2rem] p-5 text-left group shadow-lg shadow-pink-900/10"
         >
           <div className="relative z-10 flex items-center justify-between">
             <div>
               <div className="flex items-center gap-2 mb-1">
-                 <Play className="w-4 h-4 text-pink-400 fill-pink-400/50" />
-                 <h3 className="text-sm font-bold text-pink-100 uppercase tracking-wider">Schnellstart</h3>
+                 <Play className="w-4 h-4 text-pink-300 fill-pink-300/50" />
+                 <h3 className="text-xs font-bold text-pink-100 uppercase tracking-[0.3em]">Schnellstart</h3>
               </div>
               <p className="text-xl font-bold text-white mb-1">
-                Weiter machen
+                Weitermachen
               </p>
+              <p className="text-xs text-white/50">Zuletzt genutzt • Theme: {activeThemeName}</p>
             </div>
-            <div className="w-10 h-10 rounded-full bg-white/10 flex items-center justify-center border border-white/10 group-hover:bg-white/20 transition-colors">
-               <ChevronDown className="w-5 h-5 text-white -rotate-90 ml-0.5" />
+            <div className="w-11 h-11 rounded-full bg-white/10 flex items-center justify-center border border-white/10 group-hover:bg-white/20 transition-colors">
+               <ArrowUpRight className="w-5 h-5 text-white" />
             </div>
           </div>
         </motion.button>
+      </div>
+
+      {/* --- Utility Cards --- */}
+      <div className="px-6 pb-8 grid grid-cols-1 md:grid-cols-2 gap-4">
+        <motion.button
+          whileTap={{ scale: 0.98 }}
+          onClick={() => onOpenRewards('general')}
+          className="text-left rounded-[1.6rem] border border-white/10 bg-white/5 p-5 shadow-[0_18px_40px_rgba(0,0,0,0.35)] hover:bg-white/10 transition"
+        >
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-xs uppercase tracking-[0.3em] text-white/50">Belohnung</p>
+              <h3 className="text-lg font-semibold text-white">Erfolge & Specials</h3>
+              <p className="text-xs text-white/50 mt-1">Sammle neue Themes & Überraschungen.</p>
+            </div>
+            <div className="w-10 h-10 rounded-full bg-pink-500/20 text-pink-200 flex items-center justify-center">
+              <Sparkles className="w-5 h-5" />
+            </div>
+          </div>
+        </motion.button>
+        <motion.button
+          whileTap={{ scale: 0.98 }}
+          onClick={() => onAppClick({ id: 'settings', name: 'Einstellungen', icon: '⚙️', status: 'available' })}
+          className="text-left rounded-[1.6rem] border border-white/10 bg-white/5 p-5 shadow-[0_18px_40px_rgba(0,0,0,0.35)] hover:bg-white/10 transition"
+        >
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-xs uppercase tracking-[0.3em] text-white/50">Theme</p>
+              <h3 className="text-lg font-semibold text-white">Design anpassen</h3>
+              <p className="text-xs text-white/50 mt-1">Wähle neue Looks & Hintergründe.</p>
+            </div>
+            <div className="w-10 h-10 rounded-full bg-indigo-500/20 text-indigo-200 flex items-center justify-center">
+              <Palette className="w-5 h-5" />
+            </div>
+          </div>
+        </motion.button>
+      </div>
+
+      {/* --- Clock Widget --- */}
+      <div className="px-6 pb-6">
+        <ClockWidget />
       </div>
 
       {/* --- App Grid --- */}

@@ -26,6 +26,7 @@ function init() {
     const sessionStr = localStorage.getItem(KEYS.SESSION);
     if (!sessionStr) return;
     user = JSON.parse(sessionStr);
+    user.id = user.id || user.userId;
 
     if (window.parent.FIAOS && window.parent.FIAOS.cloud) {
         cloud = window.parent.FIAOS.cloud;
@@ -140,13 +141,12 @@ function render() {
             
             const isRedeemed = currentFilter === 'redeemed';
             let actionHtml = '';
-            
             if (isRedeemed) {
                 const ts = rewardsData.redeemed[item.id];
                 const dateStr = new Date(ts).toLocaleDateString();
                 actionHtml = `<div class="redeemed-badge"><span>✔</span> ${dateStr}</div>`;
             } else {
-                actionHtml = `<button class="redeem-btn" onclick="redeem('${item.id}')">Einlösen</button>`;
+                actionHtml = `<div class="redeem-note">Einlösen nur im Belohnungen‑Center</div>`;
             }
 
             el.innerHTML = `
@@ -170,24 +170,6 @@ function getMeta(id) {
     return { title: id, icon: '🏆', category: 'general' };
 }
 
-window.redeem = async (id) => {
-    if (!confirm("Möchtest du diese Belohnung jetzt einlösen?")) return;
-
-    // Confetti
-    fireConfetti();
-
-    // Update Local Data
-    if (!rewardsData.redeemed) rewardsData.redeemed = {};
-    rewardsData.redeemed[id] = Date.now();
-
-    // Save
-    if (cloud) {
-        await cloud.saveRewards(rewardsData);
-    }
-
-    // UI Update
-    setTimeout(render, 500); // Delay for visual effect
-};
 
 window.filterList = (filter, idx) => {
     currentFilter = filter;
