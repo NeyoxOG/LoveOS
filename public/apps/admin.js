@@ -77,6 +77,7 @@ function init() {
     const sessionStr = localStorage.getItem(KEYS.SESSION);
     if (!sessionStr) return denyAccess();
     currentUser = JSON.parse(sessionStr);
+    currentUser.id = currentUser.id || currentUser.userId;
 
     if (currentUser.role !== 'admin' && currentUser.role !== 'developer') return denyAccess();
     
@@ -236,6 +237,8 @@ window.toggleAppVisibility = async (appId) => {
 };
 
 async function syncConfig() {
+    adminConfig.lastEditedBy = currentUser?.userId || 'system';
+    adminConfig.updatedAt = Date.now();
     // Optimistic local save
     localStorage.setItem('fiaos_global_admin_config', JSON.stringify(adminConfig));
     // Cloud save
