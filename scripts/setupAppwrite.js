@@ -130,7 +130,8 @@ const DEFAULT_ADMIN_CONFIG = {
     maintenanceMode: false,
     lastEditedBy: 'system',
     updatedAt: Date.now(),
-    forceLogoutAt: 0
+    forceLogoutAt: 0,
+    forceLogoutAtByUser: {}
 };
 
 const DEFAULT_APP_CATALOG = [

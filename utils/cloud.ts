@@ -25,7 +25,8 @@ const DEFAULT_ADMIN_CONFIG: AdminConfig = {
   maintenanceMode: false,
   lastEditedBy: "system",
   updatedAt: Date.now(),
-  forceLogoutAt: 0
+  forceLogoutAt: 0,
+  forceLogoutAtByUser: {}
 };
 
 const normalizeAdminConfig = (config?: AdminConfig | null): AdminConfig => {
@@ -44,7 +45,36 @@ const normalizeAdminConfig = (config?: AdminConfig | null): AdminConfig => {
         maintenanceMode: safeConfig.maintenanceMode ?? DEFAULT_ADMIN_CONFIG.maintenanceMode,
         lastEditedBy: safeConfig.lastEditedBy || DEFAULT_ADMIN_CONFIG.lastEditedBy,
         updatedAt: safeConfig.updatedAt || DEFAULT_ADMIN_CONFIG.updatedAt,
-        forceLogoutAt: safeConfig.forceLogoutAt ?? DEFAULT_ADMIN_CONFIG.forceLogoutAt
+        forceLogoutAt: safeConfig.forceLogoutAt ?? DEFAULT_ADMIN_CONFIG.forceLogoutAt,
+        forceLogoutAtByUser: {
+            ...DEFAULT_ADMIN_CONFIG.forceLogoutAtByUser,
+            ...(safeConfig.forceLogoutAtByUser || {})
+        }
+    };
+};
+
+type RewardClaimsData = {
+    redeemed: Record<string, number>;
+};
+
+const splitRewardsData = (data: UserRewardsData) => {
+    const achievements = {
+        version: data.version,
+        rewards: data.rewards,
+        valentine: data.valentine,
+        meta: data.meta
+    };
+    const claims: RewardClaimsData = {
+        redeemed: data.redeemed || {}
+    };
+    return { achievements, claims };
+};
+
+const mergeRewardsData = (achievements: UserRewardsData | null, claims: RewardClaimsData | null) => {
+    if (!achievements) return null;
+    return {
+        ...achievements,
+        redeemed: claims?.redeemed || {}
     };
 };
 
@@ -272,6 +302,8 @@ export const cloud = {
 
     async adminForceLogout(targetUid: string) {
         const config = await this.loadAdminConfig() || DEFAULT_ADMIN_CONFIG;
+        if (!config.forceLogoutAtByUser) config.forceLogoutAtByUser = {};
+        config.forceLogoutAtByUser[targetUid] = Date.now();
         config.updatedAt = Date.now();
         await this.saveAdminConfig(config);
         return true;
@@ -279,6 +311,8 @@ export const cloud = {
 
     async adminResetUser(targetUid: string) {
         try {
+            await docHelper.setState('achievements', targetUid, null);
+            await docHelper.setState('reward_claims', targetUid, null);
             await docHelper.setState('rewards', targetUid, null);
             await docHelper.setState('prefs', targetUid, null);
             await docHelper.setState('daily', targetUid, null);
@@ -305,13 +339,24 @@ export const cloud = {
         const cacheKey = uid === 'guest' ? 'fiaos_rewards_guest' : `fiaos_rewards_${uid}`; // Legacy key match for seamless transition
         
         let data = null;
+        let claims: RewardClaimsData | null = null;
         if (!isGuest()) {
-            data = await docHelper.getState('rewards', uid);
+            data = await docHelper.getState('achievements', uid);
+            claims = await docHelper.getState('reward_claims', uid);
+            if (!data) {
+                data = await docHelper.getState('rewards', uid);
+            }
         }
 
         if (data) {
-            localStorage.setItem(cacheKey, JSON.stringify(data));
-            return data;
+            if (!claims && (data as UserRewardsData).redeemed) {
+                claims = { redeemed: (data as UserRewardsData).redeemed || {} };
+            }
+            const merged = mergeRewardsData(data as UserRewardsData, claims);
+            if (merged) {
+                localStorage.setItem(cacheKey, JSON.stringify(merged));
+                return merged;
+            }
         }
 
         return JSON.parse(localStorage.getItem(cacheKey) || 'null');
@@ -322,7 +367,9 @@ export const cloud = {
         const cacheKey = uid === 'guest' ? 'fiaos_rewards_guest' : `fiaos_rewards_${uid}`;
         
         localStorage.setItem(cacheKey, JSON.stringify(data));
-        await docHelper.setState('rewards', uid, data);
+        const { achievements, claims } = splitRewardsData(data);
+        await docHelper.setState('achievements', uid, achievements);
+        await docHelper.setState('reward_claims', uid, claims);
     },
 
     // --- Prefs (Offline First) ---

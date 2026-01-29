@@ -3,7 +3,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import { Session, AppItem } from '../types';
 import { APPS } from '../constants';
 import { motion } from 'framer-motion';
-import { ChevronDown, Home, Grid as GridIcon, Trophy, User as UserIcon, Play, Sparkles, Palette, ArrowUpRight } from 'lucide-react';
+import { ChevronDown, Home, Grid as GridIcon, Trophy, User as UserIcon, Play, Sparkles, Palette, ArrowUpRight, Cloud } from 'lucide-react';
 import { loadLastApp, loadAdminConfig, loadDailyState, loadUserPrefs } from '../utils/data';
 import ClockWidget from './ClockWidget';
 
@@ -147,21 +147,50 @@ const HomeScreen: React.FC<HomeScreenProps> = ({
         <motion.div
           initial={{ opacity: 0, y: 16 }}
           animate={{ opacity: 1, y: 0 }}
-          className="relative overflow-hidden rounded-[2.2rem] border border-white/10 bg-gradient-to-br from-white/10 via-white/5 to-transparent p-6 shadow-[0_20px_45px_rgba(12,8,25,0.6)]"
+          className="relative overflow-hidden rounded-[2.4rem] border border-white/10 bg-gradient-to-br from-white/12 via-white/5 to-transparent p-6 shadow-[0_24px_50px_rgba(12,8,25,0.6)]"
         >
-          <div className="absolute -top-16 -right-10 w-44 h-44 bg-fuchsia-500/20 blur-[90px]" />
-          <div className="absolute -bottom-16 -left-10 w-44 h-44 bg-indigo-500/20 blur-[90px]" />
-          <div className="relative z-10 space-y-3">
+          <div className="absolute -top-20 -right-10 w-56 h-56 bg-fuchsia-500/25 blur-[100px]" />
+          <div className="absolute -bottom-20 -left-10 w-56 h-56 bg-indigo-500/25 blur-[100px]" />
+          <div className="relative z-10 space-y-4">
             <div className="inline-flex items-center gap-2 text-xs uppercase tracking-[0.3em] text-white/60">
               <Sparkles className="w-4 h-4 text-pink-300" />
-              Hub Einführung
+              Einführung
             </div>
             <h2 className="text-2xl font-semibold text-white">
               Willkommen zurück, {session.name}.
             </h2>
-            <p className="text-sm text-white/60 leading-relaxed">
-              Gestalte euer System mit Belohnungen, neuen Themes und schnellen Zugängen. Alles ist live synchronisiert.
+            <p className="text-sm text-white/65 leading-relaxed">
+              Dein LoveOS ist live verbunden: Belohnungen sammeln, Themes wechseln und direkt weitermachen – alles in einer klaren Übersicht.
             </p>
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs text-white/70">
+              <div className="rounded-2xl border border-white/10 bg-white/5 px-4 py-3 flex items-center gap-3">
+                <div className="w-9 h-9 rounded-xl bg-pink-500/20 text-pink-200 flex items-center justify-center">
+                  <Sparkles className="w-4 h-4" />
+                </div>
+                <div>
+                  <div className="font-semibold text-white">Belohnungen</div>
+                  <div className="text-white/50">Neue Erfolge freischalten</div>
+                </div>
+              </div>
+              <div className="rounded-2xl border border-white/10 bg-white/5 px-4 py-3 flex items-center gap-3">
+                <div className="w-9 h-9 rounded-xl bg-indigo-500/20 text-indigo-200 flex items-center justify-center">
+                  <Palette className="w-4 h-4" />
+                </div>
+                <div>
+                  <div className="font-semibold text-white">Themes</div>
+                  <div className="text-white/50">Looks & Stimmung wechseln</div>
+                </div>
+              </div>
+              <div className="rounded-2xl border border-white/10 bg-white/5 px-4 py-3 flex items-center gap-3">
+                <div className="w-9 h-9 rounded-xl bg-cyan-500/20 text-cyan-200 flex items-center justify-center">
+                  <Cloud className="w-4 h-4" />
+                </div>
+                <div>
+                  <div className="font-semibold text-white">Live Sync</div>
+                  <div className="text-white/50">Immer aktuell & sicher</div>
+                </div>
+              </div>
+            </div>
             <div className="flex flex-wrap gap-3">
               <button
                 onClick={() => onOpenRewards('general')}

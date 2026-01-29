@@ -86,6 +86,14 @@ function init() {
     }
 
     loadSystemData();
+    if (cloud && cloud.listenToAdminConfig) {
+        cloud.listenToAdminConfig((conf) => {
+            adminConfig = conf;
+            renderDashboard();
+            renderApps();
+            renderUsersList();
+        });
+    }
     setInterval(updateUptime, 60000);
 }
 
@@ -119,9 +127,10 @@ async function loadSystemData() {
         }
 
         // Init defaults if empty
-        if (!adminConfig) adminConfig = { appVisibility: {}, userStatus: {}, maintenanceMode: false, forceLogoutAt: 0 };
+        if (!adminConfig) adminConfig = { appVisibility: {}, userStatus: {}, maintenanceMode: false, forceLogoutAt: 0, forceLogoutAtByUser: {} };
         if (!adminConfig.appVisibility) adminConfig.appVisibility = {};
         if (!adminConfig.userStatus) adminConfig.userStatus = {};
+        if (!adminConfig.forceLogoutAtByUser) adminConfig.forceLogoutAtByUser = {};
 
         // Force defaults for apps
         APP_DEFS.forEach(a => {
@@ -156,8 +165,12 @@ function renderDashboard() {
     const editedBy = adminConfig.lastEditedBy ? `von ${adminConfig.lastEditedBy}` : '—';
     const updatedEl = document.getElementById('statUpdated');
     const editedEl = document.getElementById('statEditedBy');
+    const lastLogoutEl = document.getElementById('statLogoutAt');
     if (updatedEl) updatedEl.innerText = updatedAt;
     if (editedEl) editedEl.innerText = editedBy;
+    if (lastLogoutEl) {
+        lastLogoutEl.innerText = adminConfig.forceLogoutAt ? new Date(adminConfig.forceLogoutAt).toLocaleString() : '—';
+    }
 }
 
 function updateUptime() {
@@ -246,7 +259,7 @@ window.toggleAppVisibility = async (appId) => {
 };
 
 async function syncConfig() {
-    adminConfig.lastEditedBy = currentUser?.userId || 'system';
+    adminConfig.lastEditedBy = currentUser?.userId || currentUser?.id || 'system';
     adminConfig.updatedAt = Date.now();
     // Optimistic local save
     localStorage.setItem('fiaos_global_admin_config', JSON.stringify(adminConfig));

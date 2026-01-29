@@ -60,7 +60,8 @@ const INITIAL_ADMIN_CONFIG: AdminConfig = {
   maintenanceMode: false,
   lastEditedBy: "system",
   updatedAt: Date.now(),
-  forceLogoutAt: 0
+  forceLogoutAt: 0,
+  forceLogoutAtByUser: {}
 };
 
 const normalizeAdminConfigLocal = (config?: AdminConfig | null): AdminConfig => {
@@ -79,7 +80,11 @@ const normalizeAdminConfigLocal = (config?: AdminConfig | null): AdminConfig => 
         maintenanceMode: safeConfig.maintenanceMode ?? INITIAL_ADMIN_CONFIG.maintenanceMode,
         lastEditedBy: safeConfig.lastEditedBy || INITIAL_ADMIN_CONFIG.lastEditedBy,
         updatedAt: safeConfig.updatedAt || INITIAL_ADMIN_CONFIG.updatedAt,
-        forceLogoutAt: safeConfig.forceLogoutAt ?? INITIAL_ADMIN_CONFIG.forceLogoutAt
+        forceLogoutAt: safeConfig.forceLogoutAt ?? INITIAL_ADMIN_CONFIG.forceLogoutAt,
+        forceLogoutAtByUser: {
+            ...INITIAL_ADMIN_CONFIG.forceLogoutAtByUser,
+            ...(safeConfig.forceLogoutAtByUser || {})
+        }
     };
 };
 

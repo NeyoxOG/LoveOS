@@ -182,6 +182,9 @@ const App: React.FC = () => {
     if (adminConfig.forceLogoutAt && session.lastLoginAt < adminConfig.forceLogoutAt) {
         handleLogout();
     }
+    if (adminConfig.forceLogoutAtByUser?.[session.userId] && session.lastLoginAt < adminConfig.forceLogoutAtByUser[session.userId]) {
+        handleLogout();
+    }
   }, [adminConfig, session]);
 
   // 4. Global Bridge

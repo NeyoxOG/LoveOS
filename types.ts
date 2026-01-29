@@ -125,6 +125,7 @@ export interface AdminConfig {
   lastEditedBy: string;
   updatedAt: number;
   forceLogoutAt?: number;
+  forceLogoutAtByUser?: Record<string, number>;
   roleOverrides?: Record<string, UserRole>; 
   userBadges?: Record<string, UserBadge[]>;
 }
