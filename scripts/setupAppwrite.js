@@ -130,9 +130,10 @@ const PROJECT_ID = process.env.VITE_APPWRITE_PROJECT_ID;
 const API_KEY = process.env.VITE_APPWRITE_API_KEY;
 
 if (!PROJECT_ID || !API_KEY) {
-    console.error("❌ Missing VITE_APPWRITE_PROJECT_ID or VITE_APPWRITE_API_KEY.");
-    console.error("   Please set them in .env or your environment.");
-    process.exit(1);
+    console.warn("⚠️  Setup Skipped: Missing VITE_APPWRITE_PROJECT_ID or VITE_APPWRITE_API_KEY.");
+    console.warn("   (This is normal in production or if you haven't set up the .env file yet)");
+    // Exit with success code (0) so chained commands (like 'vite') still run
+    process.exit(0);
 }
 
 // --- API Helper ---
@@ -164,20 +165,19 @@ const api = async (method, path, body = null) => {
 // --- Execution ---
 
 const setup = async () => {
-    console.log(`🚀 Starting Appwrite Setup for project: ${PROJECT_ID}`);
+    console.log(`🚀 Checking Appwrite Schema...`);
 
     // 1. Create Database
-    console.log(`\n📦 Checking Database: ${DB_ID}`);
+    // console.log(`\n📦 Checking Database: ${DB_ID}`);
     const dbRes = await api('POST', '/databases', {
         databaseId: DB_ID,
         name: 'FiaOS Database'
     });
-    if (dbRes.error === 'conflict') console.log(`   -> Database already exists.`);
-    else console.log(`   -> Database created.`);
+    if (dbRes.error !== 'conflict') console.log(`   -> Database created.`);
 
     // 2. Process Collections
     for (const col of COLLECTIONS) {
-        console.log(`\n📂 Processing Collection: ${col.id} (${col.name})`);
+        // console.log(`\n📂 Processing Collection: ${col.id} (${col.name})`);
         
         // Create Collection
         const colRes = await api('POST', `/databases/${DB_ID}/collections`, {
@@ -187,11 +187,9 @@ const setup = async () => {
             documentSecurity: false
         });
         
-        if (colRes.error === 'conflict') console.log(`   -> Collection exists.`);
-        else console.log(`   -> Collection created.`);
+        if (colRes.error !== 'conflict') console.log(`   -> Collection ${col.name} created.`);
 
         // Create Attributes
-        console.log(`   -> Syncing Attributes...`);
         for (const attr of col.attributes) {
             let path = '';
             let body = { key: attr.key, required: attr.required };
@@ -207,10 +205,8 @@ const setup = async () => {
 
             const attrRes = await api('POST', `/databases/${DB_ID}/collections/${col.id}/attributes/${path}`, body);
             
-            if (attrRes.error === 'conflict') {
-                // console.log(`      - ${attr.key}: Exists`);
-            } else {
-                console.log(`      - ${attr.key}: Created`);
+            if (attrRes.error !== 'conflict') {
+                console.log(`      - Attribute ${attr.key}: Created`);
                 // Wait a bit to ensure attribute is ready before indexing (Appwrite async nature)
                 await new Promise(r => setTimeout(r, 500));
             }
@@ -218,10 +214,8 @@ const setup = async () => {
 
         // Create Indexes
         if (col.indexes) {
-            console.log(`   -> Syncing Indexes...`);
             // Wait for attributes to be "available"
-            console.log(`      (Waiting 3s for attributes to settle...)`);
-            await new Promise(r => setTimeout(r, 3000));
+            await new Promise(r => setTimeout(r, 2000));
 
             for (const idx of col.indexes) {
                 const idxRes = await api('POST', `/databases/${DB_ID}/collections/${col.id}/indexes`, {
@@ -231,19 +225,17 @@ const setup = async () => {
                     orders: idx.order ? [idx.order] : undefined
                 });
 
-                if (idxRes.error === 'conflict') {
-                    // console.log(`      - Index ${idx.key}: Exists`);
-                } else {
+                if (idxRes.error !== 'conflict') {
                     console.log(`      - Index ${idx.key}: Created`);
                 }
             }
         }
     }
 
-    console.log(`\n✅ Setup Complete!`);
+    console.log(`✅ Appwrite Schema Synced`);
 };
 
 setup().catch(err => {
-    console.error("\n❌ Setup Failed:");
-    console.error(err);
+    console.warn("\n⚠️ Setup Warning (Non-critical):");
+    console.warn(err.message);
 });
