@@ -2,32 +2,29 @@ const KEYS = { SESSION: 'fiaos_session', USER_GAMES: 'fiaos_user_', GLOBAL_ARCAD
 
 let user = null;
 let score = 0;
-let combo = 0;
-let maxCombo = 0;
-let rotation = 0;
-let speed = 2; // deg per frame
-let targetAngle = 0; // The angle of the pink arc center
+let bestScore = 0;
+let bestDiff = null;
 let isPlaying = false;
 let startTime = 0;
-const GAME_DURATION = 30000; // 30s
+let rafId = null;
+const TARGET_TIME = 180000; // 3 minutes
 
 function init() {
     const sessionStr = localStorage.getItem(KEYS.SESSION);
-    if (sessionStr) user = JSON.parse(sessionStr);
+    if (!sessionStr) return;
+    user = JSON.parse(sessionStr);
+    user.id = user.id || user.userId;
 
-    document.getElementById('tapArea').addEventListener('mousedown', tap);
-    document.getElementById('tapArea').addEventListener('touchstart', (e) => { e.preventDefault(); tap(); });
+    document.getElementById('tapButton').addEventListener('mousedown', tap);
+    document.getElementById('tapButton').addEventListener('touchstart', (e) => { e.preventDefault(); tap(); });
     document.addEventListener('keydown', (e) => { if (e.code === 'Space') tap(); });
 
-    randomizeTarget();
+    loadBest();
+    updateTimerDisplay(0);
 }
 
 function startGame() {
     score = 0;
-    combo = 0;
-    maxCombo = 0;
-    rotation = 0;
-    speed = 3;
     startTime = Date.now();
     isPlaying = true;
 
@@ -35,112 +32,60 @@ function startGame() {
     document.getElementById('endScreen').classList.remove('active');
     updateUI();
     
-    requestAnimationFrame(loop);
-}
-
-function randomizeTarget() {
-    // Random angle between 0 and 360
-    targetAngle = Math.floor(Math.random() * 360);
-    // Visual is rotated. CSS rotate starts at top (12 o'clock).
-    // Our pointer starts top.
-    const arcSize = 40; // degrees visual width of target
-    
-    const el = document.getElementById('targetRing');
-    // We want the gap to be centered at targetAngle.
-    // The border-top-color covers about 45deg in standard css border hack?
-    // Actually using a simple conic gradient or clip path is better, but border hack:
-    // With border-radius 50% and transparent borders, top border is a wedge.
-    // Let's rely on visual approximation. 
-    // Just rotate the div so the top part aligns with targetAngle.
-    el.style.transform = `rotate(${targetAngle}deg)`;
+    if (rafId) cancelAnimationFrame(rafId);
+    rafId = requestAnimationFrame(loop);
 }
 
 function tap() {
     if (!isPlaying) return;
-
-    // Normalize rotation 0-360
-    let currentDeg = (rotation % 360 + 360) % 360; // 0 is top (start)
-    // Target is targetAngle. Tolerance +/- 15 deg?
-    
-    // Dist
-    let diff = Math.abs(currentDeg - targetAngle);
-    if (diff > 180) diff = 360 - diff; // wrap around
+    const elapsed = Date.now() - startTime;
+    const diff = Math.abs(elapsed - TARGET_TIME);
+    const bounded = Math.max(0, 100000 - diff);
+    score = Math.floor(bounded / 10);
 
     const feedback = document.getElementById('feedback');
     feedback.classList.remove('pop');
     void feedback.offsetWidth; // trigger reflow
 
-    if (diff < 20) {
-        // Hit
-        let points = 10;
-        let txt = "GOOD";
-        if (diff < 8) {
-            points = 20;
-            txt = "PERFECT!";
-            combo++;
-        } else {
-            combo = 0; // Missed perfect breaks combo? Or keep combo for good? Let's break on Bad.
-            // Prompt says: "Perfect increases Combo". So Good implies keep or soft reset.
-            // Let's say Good keeps combo, only perfect increases multiplier. 
-            // Simplifying: Good resets combo for "Perfect Streak".
-            combo = 0; 
-        }
-
-        if (combo > maxCombo) maxCombo = combo;
-        
-        score += points + (combo * 5);
-        feedback.innerText = txt;
-        feedback.style.color = diff < 8 ? '#ec4899' : '#a78bfa';
-        
-        // Speed up slightly
-        speed += 0.2;
-        randomizeTarget();
-
-        // Check milestones
-        if (score === 200) unlock('games.react.200'); // simple checks
-        if (combo === 10) unlock('games.react.combo10');
-        if (score > 0) unlock('games.react.first');
-
+    if (diff <= 250) {
+        feedback.innerText = "PERFEKT!";
+        feedback.style.color = "#fda4af";
+        unlock('games.react.combo10');
+    } else if (diff <= 1000) {
+        feedback.innerText = "SEHR GUT";
+        feedback.style.color = "#f87171";
+        unlock('games.react.first');
+    } else if (diff <= 5000) {
+        feedback.innerText = "GUT";
+        feedback.style.color = "#fbbf24";
     } else {
-        // Miss
-        combo = 0;
-        feedback.innerText = "MISS";
-        feedback.style.color = "#ef4444";
-        score = Math.max(0, score - 5);
+        feedback.innerText = "ZU FRÜH / SPÄT";
+        feedback.style.color = "#fca5a5";
     }
     
     feedback.classList.add('pop');
-    updateUI();
+    gameOver(diff);
 }
 
 function updateUI() {
-    document.getElementById('score').innerText = score;
-    document.getElementById('combo').innerText = combo;
+    document.getElementById('best').innerText = bestDiff !== null ? `${bestDiff} ms` : '—';
 }
 
 function loop() {
     if (!isPlaying) return;
-    
-    const now = Date.now();
-    const elapsed = now - startTime;
-    if (elapsed > GAME_DURATION) {
-        gameOver();
-        return;
-    }
-
-    rotation += speed;
-    document.getElementById('pointer').style.transform = `translate(-50%, -50%) rotate(${rotation}deg)`;
-
-    requestAnimationFrame(loop);
+    const elapsed = Date.now() - startTime;
+    updateTimerDisplay(elapsed);
+    rafId = requestAnimationFrame(loop);
 }
 
-function gameOver() {
+function gameOver(diff) {
     isPlaying = false;
+    if (rafId) cancelAnimationFrame(rafId);
     document.getElementById('finalScore').innerText = score;
-    document.getElementById('finalCombo').innerText = maxCombo;
+    document.getElementById('finalDiff').innerText = diff;
     document.getElementById('endScreen').classList.add('active');
     
-    saveData();
+    saveData(diff);
 }
 
 function unlock(id) {
@@ -149,26 +94,52 @@ function unlock(id) {
     }
 }
 
-function saveData() {
+function saveData(diff) {
     if (!user) return;
     const uKey = `${KEYS.USER_GAMES}${user.id}_games`;
     let uData = JSON.parse(localStorage.getItem(uKey) || '{}');
-    if (!uData.reaction) uData.reaction = { best: 0, bestCombo: 0, plays: 0 };
+    if (!uData.reaction) uData.reaction = { best: 0, bestDiff: null, plays: 0 };
     
     uData.reaction.last = score;
     uData.reaction.plays++;
     if (score > uData.reaction.best) uData.reaction.best = score;
-    if (maxCombo > uData.reaction.bestCombo) uData.reaction.bestCombo = maxCombo;
+    if (uData.reaction.bestDiff === null || diff < uData.reaction.bestDiff) {
+        uData.reaction.bestDiff = diff;
+        bestDiff = diff;
+        bestScore = score;
+    }
     
     localStorage.setItem(uKey, JSON.stringify(uData));
+    updateUI();
 
     // Global
     const gKey = KEYS.GLOBAL_ARCADE;
     let gData = JSON.parse(localStorage.getItem(gKey) || '{"reaction":[]}');
-    gData.reaction.push({ userId: user.id, name: user.name, score, date: Date.now() });
+    gData.reaction.push({ userId: user.id, name: user.name, score, diff, date: Date.now() });
     gData.reaction.sort((a,b) => b.score - a.score);
     gData.reaction = gData.reaction.slice(0, 10);
     localStorage.setItem(gKey, JSON.stringify(gData));
+}
+
+function updateTimerDisplay(elapsed) {
+    const timerEl = document.getElementById('timer');
+    if (!timerEl) return;
+    const totalMs = Math.max(0, elapsed);
+    const minutes = Math.floor(totalMs / 60000);
+    const seconds = Math.floor((totalMs % 60000) / 1000);
+    const millis = Math.floor(totalMs % 1000);
+    timerEl.innerText = `${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}.${String(millis).padStart(3, '0')}`;
+}
+
+function loadBest() {
+    if (!user) return;
+    const uKey = `${KEYS.USER_GAMES}${user.id}_games`;
+    const uData = JSON.parse(localStorage.getItem(uKey) || '{}');
+    if (uData.reaction) {
+        bestScore = uData.reaction.best || 0;
+        bestDiff = uData.reaction.bestDiff ?? null;
+    }
+    updateUI();
 }
 
 init();
