@@ -24,26 +24,21 @@ const AVATAR_EMOJIS = ["👽", "🦊", "🐱", "🐶", "🦁", "🐯", "🐨", "
 
 // Themes Defs (Visual) - Exact match with constants.ts
 const THEMES_UI = [
-    { id: 'roseGlass', name: 'FiaOS Rose', color: '#4a0423', unlockRewardId: null },
-    { id: 'lavender', name: 'Lavender', color: '#4c1d95', unlockRewardId: null },
-    { id: 'mint', name: 'Mint', color: '#064e3b', unlockRewardId: null },
-    { id: 'ocean', name: 'Ocean', color: '#0c4a6e', unlockRewardId: null },
-    { id: 'sunset', name: 'Sunset', color: '#7c2d12', unlockRewardId: null },
-    
-    // Unlockables
-    { id: 'aurora', name: 'Aurora', color: '#2b5876', unlockRewardId: 'reward.welcomeTheme' },
-    { id: 'softRose', name: 'Soft Rose', color: '#be185d', unlockRewardId: 'love_1_month' },
-    { id: 'midnightLove', name: 'Midnight', color: '#1e1b4b', unlockRewardId: 'love_3_month' },
-    { id: 'pastelSky', name: 'Pastel', color: '#7dd3fc', unlockRewardId: 'love_6_month' },
-    { id: 'eternal', name: 'Eternal', color: '#713f12', unlockRewardId: 'love_1_year' },
-    { id: 'royal', name: 'Royal', color: '#d97706', unlockRewardId: 'daily.points100' },
-    { id: 'custom', name: 'Eigene', color: '#333', unlockRewardId: 'custom_theme_unlock' }
+    { id: 'roseGlass', name: 'Rose Glass', preview: 'radial-gradient(circle at top, rgba(236, 72, 153, 0.25), transparent 55%), linear-gradient(145deg, #1b0f2f 0%, #0a0615 55%, #05030d 100%)', unlockRewardId: null },
+    { id: 'aurora', name: 'Aurora Drift', preview: 'radial-gradient(circle at top right, rgba(56, 189, 248, 0.45), transparent 60%), radial-gradient(circle at left, rgba(14, 165, 233, 0.25), transparent 50%), linear-gradient(140deg, #0b1023 0%, #111827 45%, #0f172a 100%)', unlockRewardId: 'reward.welcomeTheme' },
+    { id: 'softRose', name: 'Soft Rose', preview: 'radial-gradient(circle at top, rgba(251, 113, 133, 0.45), transparent 60%), linear-gradient(150deg, #831843 0%, #be123c 50%, #4c0519 100%)', unlockRewardId: 'love_1_month' },
+    { id: 'midnightLove', name: 'Midnight Love', preview: 'radial-gradient(circle at top, rgba(99, 102, 241, 0.4), transparent 60%), linear-gradient(180deg, #0b1020 0%, #1e1b4b 50%, #2e1065 100%)', unlockRewardId: 'love_3_month' },
+    { id: 'pastelSky', name: 'Pastel Sky', preview: 'linear-gradient(150deg, #bae6fd 0%, #fef3c7 45%, #fbcfe8 100%)', unlockRewardId: 'love_6_month' },
+    { id: 'eternal', name: 'Eternal Gold', preview: 'radial-gradient(circle at top, rgba(251, 191, 36, 0.45), transparent 60%), linear-gradient(150deg, #92400e 0%, #713f12 45%, #3f1a06 100%)', unlockRewardId: 'love_1_year' },
+    { id: 'royal', name: 'Royal Gold', preview: 'radial-gradient(circle at top right, rgba(253, 224, 71, 0.35), transparent 60%), linear-gradient(135deg, #3b0764 0%, #7c2d12 50%, #451a03 100%)', unlockRewardId: 'daily.points100' },
+    { id: 'custom', name: 'Eigene', preview: '#111827', unlockRewardId: 'custom_theme_unlock' }
 ];
 
 function init() {
     const s = localStorage.getItem(KEYS.SESSION);
     if (!s) return;
     user = JSON.parse(s);
+    user.id = user.id || user.userId;
 
     if (window.parent.FIAOS && window.parent.FIAOS.cloud) {
         cloud = window.parent.FIAOS.cloud;
@@ -134,7 +129,7 @@ function renderUI() {
         
         return `
         <div class="theme-opt ${activeClass}" onclick="${onclick}">
-            <div class="theme-preview" style="background:${t.color}">
+            <div class="theme-preview" style="background:${t.preview}">
                 ${lockHtml}
             </div>
             <div class="theme-name">${t.name}</div>

@@ -53,7 +53,9 @@ let dragInfo = null; // { piece, startX, startY, slotIdx, element, clone }
 
 function init() {
     const sessionStr = localStorage.getItem(KEYS.SESSION);
-    if (sessionStr) user = JSON.parse(sessionStr);
+    if (!sessionStr) return;
+    user = JSON.parse(sessionStr);
+    user.id = user.id || user.userId;
 
     if (window.parent.FIAOS && window.parent.FIAOS.cloud) {
         cloud = window.parent.FIAOS.cloud;
@@ -172,14 +174,19 @@ function handleDragStart(e) {
     const clone = target.cloneNode(true);
     clone.classList.add('dragging');
     
-    // Size adjustment for drag (match grid cell size approx 30px instead of tray 20px)
-    // Scale up visual: 1.5x
+    const gridRect = document.getElementById('grid').getBoundingClientRect();
+    const cellSize = Math.min(gridRect.width / COLS, gridRect.height / ROWS);
+
+    // Size adjustment for drag (match grid cell size)
     const rows = pieceData.shape.length;
     const cols = pieceData.shape[0].length;
-    clone.style.gridTemplateRows = `repeat(${rows}, 30px)`;
-    clone.style.gridTemplateColumns = `repeat(${cols}, 30px)`;
+    clone.style.gridTemplateRows = `repeat(${rows}, ${cellSize}px)`;
+    clone.style.gridTemplateColumns = `repeat(${cols}, ${cellSize}px)`;
     Array.from(clone.children).forEach(b => {
-        if(b.classList.contains('block')) { b.style.width = '30px'; b.style.height = '30px'; }
+        if (b.classList.contains('block')) {
+            b.style.width = `${cellSize}px`;
+            b.style.height = `${cellSize}px`;
+        }
     });
 
     document.body.appendChild(clone);
@@ -192,8 +199,8 @@ function handleDragStart(e) {
         slotIdx: slotIdx,
         element: target,
         clone: clone,
-        width: cols * 30,
-        height: rows * 30,
+        width: cols * cellSize,
+        height: rows * cellSize,
         offsetX: 0,
         offsetY: -50 // lift slightly above finger
     };
