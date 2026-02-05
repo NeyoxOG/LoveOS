@@ -43,6 +43,8 @@ const INITIAL_ADMIN_CONFIG: AdminConfig = {
     vault: true,
     admin: true,
     messages: true,
+    notifications: true,
+    letters: true,
     mypeace: true,
     achievements: true,
     games: true,

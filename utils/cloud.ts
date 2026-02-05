@@ -14,7 +14,7 @@ const COUPLE_ID = 'couple';
 const DEFAULT_ADMIN_CONFIG: AdminConfig = {
   appVisibility: {
     luna: true, rewards: true, settings: true, valentine: true, 
-    vault: true, admin: true, messages: true, achievements: true, 
+    vault: true, admin: true, messages: true, notifications: true, letters: true, achievements: true, 
     games: true, diary: true, daily: true, love: true, rewards_app: true, story: true, bucket: true, mypeace: true
   },
   userStatus: {

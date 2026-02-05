@@ -31,6 +31,8 @@ export const APPS: AppItem[] = [
   { id:"daily", name:"Daily", icon:"✨", status:"available" },
   { id:"rewards_app", name:"Belohnungen", icon:"🎁", status:"available" },
   { id:"messages", name:"Nachrichten", icon:"💬", status:"available" },
+  { id:"notifications", name:"Mitteilungen", icon:"🔔", status:"available" },
+  { id:"letters", name:"Briefe", icon:"💌", status:"available" },
   { id:"mypeace", name:"MyPeace", icon:"🌿", status:"available" },
   { id:"valentine", name:"Valentinstag", icon:"💘", status:"lockedHint" },
   { id:"luna", name:"Luna", icon:"🐑", status:"lockedHint" },

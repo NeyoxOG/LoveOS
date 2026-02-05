@@ -40,6 +40,8 @@ const APP_DEFS = [
     { id: 'daily', name: 'Daily', icon: '✨' },
     { id: 'love', name: 'Love', icon: '💞' },
     { id: 'messages', name: 'Chat', icon: '💬' },
+    { id: 'notifications', name: 'Mitteilungen', icon: '🔔' },
+    { id: 'letters', name: 'Briefe', icon: '💌' },
     { id: 'mypeace', name: 'MyPeace', icon: '🌿' },
     { id: 'settings', name: 'Einstellungen', icon: '⚙️' },
     { id: 'story', name: 'Story', icon: '🎞️' },

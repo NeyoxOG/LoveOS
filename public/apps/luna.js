@@ -479,11 +479,33 @@ function updateParticles() {
 
 // --- UI Helpers ---
 
+
+function getWeatherInfo() {
+    const hour = new Date().getHours();
+    const dayPart = hour < 6 ? 'Nacht' : hour < 12 ? 'Morgen' : hour < 18 ? 'Tag' : 'Abend';
+    const variants = [
+        { icon: '☀️', label: 'Sonnig' },
+        { icon: '🌤️', label: 'Leicht bewölkt' },
+        { icon: '🌧️', label: 'Sanfter Regen' },
+        { icon: '🌙', label: 'Ruhige Nacht' }
+    ];
+    const idx = (new Date().getDate() + new Date().getHours()) % variants.length;
+    return { ...variants[idx], dayPart };
+}
+
+
 function updateUI() {
     document.getElementById('bar-love').style.width = state.love + '%';
     document.getElementById('bar-hunger').style.width = state.hunger + '%';
     document.getElementById('bar-energy').style.width = state.energy + '%';
     document.getElementById('status-text').innerText = getMoodText();
+    const weather = getWeatherInfo();
+    const weatherIcon = document.getElementById('weather-icon');
+    const weatherText = document.getElementById('weather-text');
+    const dayPart = document.getElementById('daypart-text');
+    if (weatherIcon) weatherIcon.innerText = weather.icon;
+    if (weatherText) weatherText.innerText = weather.label;
+    if (dayPart) dayPart.innerText = weather.dayPart;
 }
 
 function getMoodText() {

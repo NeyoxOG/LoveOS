@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>Briefe</title>
+  <style>
+    :root {
+      --bg: radial-gradient(circle at top, rgba(251,113,133,0.25), transparent 55%), linear-gradient(160deg,#170a16 0%,#250f2d 45%,#0f0a1d 100%);
+      --card: rgba(255,255,255,0.11);
+      --border: rgba(255,255,255,0.15);
+      --text: #fdf2f8;
+      --dim: rgba(251,207,232,0.72);
+    }
+    * { box-sizing: border-box; }
+    body { margin:0; font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', sans-serif; color:var(--text); background:var(--bg); }
+    .wrap { padding:18px 16px 100px; min-height:100vh; }
+    .title { font-size:30px; font-weight:700; }
+    .sub { color:var(--dim); font-size:13px; margin-top:4px; }
+    .moods { display:flex; gap:8px; overflow:auto; margin:14px 0; }
+    .chip { border:1px solid var(--border); background:var(--card); border-radius:14px; padding:8px 11px; font-size:12px; color:var(--dim); }
+    .chip.active { color:#fff; border-color:rgba(251,207,232,0.5); }
+    .card { background:var(--card); border:1px solid var(--border); border-radius:18px; padding:12px; margin-bottom:10px; }
+    .input { width:100%; background:rgba(0,0,0,0.2); border:1px solid rgba(255,255,255,0.12); color:#fff; border-radius:12px; padding:10px; }
+    textarea.input { min-height:120px; resize:none; margin-top:8px; }
+    .btn { margin-top:10px; width:100%; height:46px; border-radius:14px; border:none; color:#1f1026; font-weight:700; background:linear-gradient(135deg,#fbcfe8,#f9a8d4); }
+    .meta { font-size:12px; color:var(--dim); margin-top:6px; }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="title">Briefe</div>
+    <div class="sub">Für jeden Moment: Liebe, Streit, Trauer, Hoffnung.</div>
+
+    <div class="moods" id="moods"></div>
+
+    <div class="card">
+      <input class="input" id="titleInput" placeholder="Titel deines Briefes" />
+      <textarea class="input" id="textInput" placeholder="Schreib, was du fühlst..."></textarea>
+      <button class="btn" onclick="saveLetter()">Brief speichern</button>
+    </div>
+
+    <div id="letters"></div>
+  </div>
+  <script src="letters.js"></script>
+</body>
+</html>
