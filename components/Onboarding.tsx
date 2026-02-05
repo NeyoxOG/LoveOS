@@ -1,6 +1,6 @@
 import React, { useMemo, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { ChevronRight, Shield, Cloud, Sparkles, Palette, Gamepad2, Gift, CheckCircle2 } from 'lucide-react';
+import { ChevronRight, Shield, Cloud, Sparkles, Gamepad2, Gift, CheckCircle2 } from 'lucide-react';
 import { THEMES } from '../constants';
 import { playSound } from '../utils/sound';
 
@@ -15,6 +15,8 @@ const Onboarding: React.FC<OnboardingProps> = ({ onComplete }) => {
   const [step, setStep] = useState(0);
   const [selectedTheme, setSelectedTheme] = useState('aurora');
   const [syncEnabled, setSyncEnabled] = useState(true);
+  const [showLunaEgg, setShowLunaEgg] = useState(false);
+  let holdTimer: number | null = null;
 
   const currentTheme = useMemo(() => THEMES[selectedTheme] || THEMES.aurora, [selectedTheme]);
 
@@ -52,7 +54,7 @@ const Onboarding: React.FC<OnboardingProps> = ({ onComplete }) => {
 
       <div className="relative z-10 h-full flex flex-col justify-between p-6 pt-10 pb-8">
         <div className="flex justify-between items-center">
-          <div className="px-3 py-1 rounded-full bg-white/12 border border-white/20 text-xs tracking-[0.18em] uppercase font-semibold">v0.3 Aurora</div>
+          <div onMouseDown={() => { holdTimer = window.setTimeout(() => setShowLunaEgg(true), 5000); }} onMouseUp={() => { if (holdTimer) window.clearTimeout(holdTimer); }} onMouseLeave={() => { if (holdTimer) window.clearTimeout(holdTimer); }} className="px-3 py-1 rounded-full bg-white/12 border border-white/20 text-xs tracking-[0.18em] uppercase font-semibold">v0.3 Aurora</div>
           <button onClick={skip} className="text-sm text-white/70">Überspringen</button>
         </div>
 
@@ -183,6 +185,12 @@ const Onboarding: React.FC<OnboardingProps> = ({ onComplete }) => {
           </button>
         </div>
       </div>
+
+      {showLunaEgg && (
+        <div className="absolute right-6 bottom-28 text-sm bg-white/12 border border-white/30 rounded-2xl px-4 py-3">
+          Luna winkt dir zu 👋🐑
+        </div>
+      )}
 
       <style>{`@keyframes auroraDrift { 0% { transform: scale(1) translate3d(0,0,0);} 100% { transform: scale(1.03) translate3d(-8px, 6px, 0);} }`}</style>
     </div>

@@ -1,0 +1,25 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>Wörterspiel</title>
+  <style>
+    body{margin:0;font-family:-apple-system;background:linear-gradient(170deg,#111827,#312e81);color:#fff;height:100vh;display:flex;flex-direction:column;align-items:center;padding:18px}
+    .row{width:100%;max-width:420px;display:flex;justify-content:space-between;font-weight:700}
+    .word{margin-top:40px;font-size:42px;letter-spacing:6px;font-weight:800}
+    input{margin-top:20px;width:min(90vw,360px);height:50px;border:none;border-radius:14px;padding:0 14px;font-size:20px}
+    button{margin-top:12px;height:46px;padding:0 20px;border:none;border-radius:999px;font-weight:700}
+    .hint{margin-top:14px;color:rgba(255,255,255,.7)}
+  </style>
+</head>
+<body>
+  <div class="row"><div>Score: <span id="score">0</span></div><div>Zeit: <span id="timer">3.00</span>s</div></div>
+  <div class="word" id="scramble">LOVE</div>
+  <input id="answer" placeholder="Wort eingeben" autocomplete="off" />
+  <button onclick="submitWord()">Bestätigen</button>
+  <div class="hint" id="hint">Die Zeit wird pro Treffer kürzer.</div>
+  <script src="game_word.js"></script>
+  <script>window.addEventListener('keydown',e=>{if(e.key==='Escape')history.back(); if(e.key==='Enter')submitWord();})</script>
+</body>
+</html>

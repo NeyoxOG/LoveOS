@@ -16,7 +16,9 @@ const DEFAULT_STATE = {
     ],
     mood: '🙂',
     reflection: '',
-    journal: ''
+    journal: '',
+    focusMode: false,
+    habitStreak: 0
 };
 
 const QUOTES = [
@@ -44,6 +46,9 @@ const renderDate = () => {
     const dateStr = now.toLocaleDateString('de-DE', { weekday: 'long', day: 'numeric', month: 'long' });
     document.getElementById('todayDate').textContent = dateStr;
     document.getElementById('quoteHint').textContent = QUOTES[now.getDay() % QUOTES.length];
+    const weather = ['Sanft sonnig', 'Leicht bewölkt', 'Ruhiger Regen', 'Klarer Abend'][now.getHours() % 4];
+    const weatherEl = document.getElementById('todayWeather');
+    if (weatherEl) weatherEl.textContent = weather;
 };
 
 const renderPriorities = () => {
@@ -107,6 +112,22 @@ const renderHabits = () => {
         item.onclick = () => toggleHabit(habit.id);
         habitList.appendChild(item);
     });
+    const streakEl = document.getElementById('habitStreak');
+    if (streakEl) streakEl.textContent = `Streak: ${state.habitStreak || 0} Tage`;
+};
+
+
+const renderFocus = () => {
+    const focusEl = document.getElementById('focusText');
+    if (!focusEl) return;
+    const nextTask = state.tasks.find(task => !task.done);
+    if (state.focusMode && nextTask) {
+        focusEl.textContent = `Jetzt: ${nextTask.text}`;
+    } else if (nextTask) {
+        focusEl.textContent = `Nächste Aufgabe: ${nextTask.text}`;
+    } else {
+        focusEl.textContent = 'Alles erledigt – atme kurz durch ✨';
+    }
 };
 
 const renderMood = () => {
@@ -136,6 +157,14 @@ window.addPriority = () => {
     input.value = '';
     saveState(state);
     renderPriorities();
+    renderFocus();
+};
+
+
+window.toggleFocusMode = () => {
+    state.focusMode = !state.focusMode;
+    saveState(state);
+    renderFocus();
 };
 
 window.addTask = () => {
@@ -146,6 +175,7 @@ window.addTask = () => {
     input.value = '';
     saveState(state);
     renderTasks();
+    renderFocus();
 };
 
 window.addPlan = () => {
@@ -179,12 +209,16 @@ const toggleTask = (id) => {
     state.tasks = state.tasks.map(task => task.id === id ? { ...task, done: !task.done } : task);
     saveState(state);
     renderTasks();
+    renderFocus();
 };
 
 const toggleHabit = (id) => {
     state.habits = state.habits.map(habit => habit.id === id ? { ...habit, done: !habit.done } : habit);
+    const allDone = state.habits.length > 0 && state.habits.every(habit => habit.done);
+    if (allDone) state.habitStreak = (state.habitStreak || 0) + 1;
     saveState(state);
     renderHabits();
+    renderFocus();
 };
 
 const initTabs = () => {
@@ -209,6 +243,7 @@ const init = () => {
     renderTasks();
     renderHabits();
     renderMood();
+    renderFocus();
     initTabs();
 };
 

@@ -233,7 +233,7 @@
     <header class="header">
         <div>
             <div class="title">MyPeace</div>
-            <div class="subtitle" id="todayDate"></div>
+            <div class="subtitle"><span id="todayDate"></span> • <span id="todayWeather">Sanft sonnig</span></div>
         </div>
         <div class="chip">Ruhiger Fokus</div>
     </header>
@@ -248,6 +248,13 @@
                     <div class="input-row">
                         <input id="priorityInput" placeholder="Neue Priorität hinzufügen" />
                         <button class="btn" onclick="addPriority()">+ Hinzufügen</button>
+                    </div>
+                </div>
+                <div class="card">
+                    <div style="font-weight:600;">Fokusmodus</div>
+                    <div class="subtitle" id="focusText" style="margin-top:6px;">Nächste Aufgabe: —</div>
+                    <div class="input-row">
+                        <button class="btn" onclick="toggleFocusMode()">Fokus starten</button>
                     </div>
                 </div>
             </div>
@@ -300,6 +307,7 @@
             </div>
             <div class="section">
                 <h3>Gewohnheiten</h3>
+                <div class="subtitle" id="habitStreak">Streak: 0 Tage</div>
                 <div class="card list" id="habitList"></div>
             </div>
         </section>

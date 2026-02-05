@@ -39,6 +39,8 @@ function renderUI() {
     updateBadge('blockblast', data.blockblast?.best);
     updateBadge('snake', data.snake?.best);
     updateBadge('flappy', data.flappy?.best);
+    updateBadge('fillfridge', data.fillfridge?.best);
+    updateBadge('word', data.word?.best);
     
     if (data.puzzle?.bestTimeMs) {
         document.getElementById('best-puzzle').innerText = `Best: ${(data.puzzle.bestTimeMs/1000).toFixed(1)}s`;
@@ -77,7 +79,9 @@ async function loadLeaderboards() {
         { key: 'reaction', title: 'Reaction Tap' },
         { key: 'blockblast', title: 'BlockBlast' },
         { key: 'snake', title: 'Snake' },
-        { key: 'flappy', title: 'Flappy Love' }
+        { key: 'flappy', title: 'Flappy Love' },
+        { key: 'fillfridge', title: 'Fill The Fridge' },
+        { key: 'word', title: 'Wörterspiel' }
     ];
 
     let html = '';
@@ -109,7 +113,7 @@ async function loadLeaderboards() {
 
 function subscribeLeaderboards() {
     if (!cloud || leaderboardUnsub) return;
-    leaderboardUnsub = cloud.listenToLeaderboards(['stack', 'reaction', 'blockblast', 'snake', 'flappy'], () => {
+    leaderboardUnsub = cloud.listenToLeaderboards(['stack', 'reaction', 'blockblast', 'snake', 'flappy', 'fillfridge', 'word'], () => {
         loadLeaderboards();
     });
 }

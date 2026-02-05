@@ -7,7 +7,9 @@ let bestDiff = null;
 let isPlaying = false;
 let startTime = 0;
 let rafId = null;
-const TARGET_TIME = 180000; // 3 minutes
+const BASE_TARGET_TIME = 180000; // 3 minutes
+let currentTargetTime = BASE_TARGET_TIME;
+const MIN_TARGET_TIME = 3000;
 
 function init() {
     const sessionStr = localStorage.getItem(KEYS.SESSION);
@@ -26,6 +28,8 @@ function init() {
 function startGame() {
     score = 0;
     startTime = Date.now();
+    updateTargetFromProgress();
+    renderTarget();
     isPlaying = true;
 
     document.getElementById('startScreen').style.display = 'none';
@@ -39,7 +43,7 @@ function startGame() {
 function tap() {
     if (!isPlaying) return;
     const elapsed = Date.now() - startTime;
-    const diff = Math.abs(elapsed - TARGET_TIME);
+    const diff = Math.abs(elapsed - currentTargetTime);
     const bounded = Math.max(0, 100000 - diff);
     score = Math.floor(bounded / 10);
 
@@ -65,6 +69,25 @@ function tap() {
     
     feedback.classList.add('pop');
     gameOver(diff);
+}
+
+
+function updateTargetFromProgress() {
+    if (!user) return;
+    const uKey = `${KEYS.USER_GAMES}${user.id}_games`;
+    const uData = JSON.parse(localStorage.getItem(uKey) || '{}');
+    const plays = uData?.reaction?.plays || 0;
+    currentTargetTime = Math.max(MIN_TARGET_TIME, BASE_TARGET_TIME - (plays * 15000));
+}
+
+function renderTarget() {
+    const minutes = Math.floor(currentTargetTime / 60000);
+    const seconds = Math.floor((currentTargetTime % 60000) / 1000);
+    const targetText = `${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
+    const targetEl = document.getElementById('targetPill');
+    const subEl = document.getElementById('timerSub');
+    if (targetEl) targetEl.innerText = `Zielzeit ${targetText}`;
+    if (subEl) subEl.innerText = `Drücke den roten Button exakt bei ${targetText}.`;
 }
 
 function updateUI() {
@@ -139,6 +162,8 @@ function loadBest() {
         bestScore = uData.reaction.best || 0;
         bestDiff = uData.reaction.bestDiff ?? null;
     }
+    updateTargetFromProgress();
+    renderTarget();
     updateUI();
 }
 
